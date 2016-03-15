@@ -34,7 +34,7 @@ public class TestRegistryConfig implements RegistryConfig {
 
   @Override
   public String getProjectId() {
-    return "domain-registry";
+    return "mercury-donuts";
   }
 
   @Override
@@ -84,7 +84,7 @@ public class TestRegistryConfig implements RegistryConfig {
 
   @Override
   public HostAndPort getServer() {
-    throw new UnsupportedOperationException();
+    return null;
   }
 
   @Override

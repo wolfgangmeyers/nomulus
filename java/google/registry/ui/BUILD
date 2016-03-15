@@ -7,9 +7,9 @@ load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_binary", "closure_
 exports_files(["globals.txt"])
 
 
-filegroup(
-    name = "assets_recursive",
-    srcs = glob(["assets/**"]),
+java_library(
+	name = "assets_recursive_jar",
+	resources = glob(["assets/**"]),
 )
 
 filegroup(
@@ -21,6 +21,24 @@ filegroup(
         "//java/google/registry/ui/soy/api:js_files",
         "//java/google/registry/ui/soy/registrar:js_files",
     ],
+)
+
+filegroup(
+    name = "assets_recursive",
+    srcs = glob(["assets/**"]),
+)
+
+java_library(
+    name = "runfiles_jar",
+    resources = [
+        "brain_bin.js",
+        "brain_bin_map.js",
+        "registrar_bin.js",
+        "registrar_bin_map.js",
+        "//java/com/google/domain/registry/ui:deps-runfiles.js",
+        "//java/com/google/domain/registry/ui/css:registrar_bin.css",
+        "//java/com/google/domain/registry/ui/html:html_files",
+	],
 )
 
 filegroup(

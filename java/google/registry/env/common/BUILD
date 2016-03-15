@@ -5,3 +5,7 @@ package(
 licenses(["notice"])  # Apache 2.0
 
 
+java_library(
+    name = "common_ear_metainf",
+    resources = glob(["META-INF/*"]),
+)
