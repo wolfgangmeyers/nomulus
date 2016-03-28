@@ -121,6 +121,15 @@
   </security-constraint>
   <security-constraint>
     <web-resource-collection>
+      <web-resource-name>External</web-resource-name>
+      <description>
+        Use built in epp security for epp path.
+      </description>
+      <url-pattern>/_dr/epp</url-pattern>
+    </web-resource-collection>
+  </security-constraint>
+  <security-constraint>
+    <web-resource-collection>
       <web-resource-name>profile-registrar-xhr</web-resource-name>
       <description>
         Only allow logged-in users to even try to issue EPP commands. This is an additional
