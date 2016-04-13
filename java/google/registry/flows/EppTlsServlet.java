@@ -19,7 +19,18 @@ import static google.registry.flows.EppServletUtils.handleEppCommandAndWriteResp
 
 import google.registry.util.FormattingLogger;
 
+import com.google.appengine.api.oauth.OAuthService;
+import com.google.appengine.api.oauth.OAuthServiceFactory;
+import com.google.appengine.api.users.User;
+import com.google.appengine.api.users.UserService;
+import com.google.appengine.api.users.UserServiceFactory;
+import com.google.domain.registry.util.FormattingLogger;
+
 import java.io.IOException;
+import java.util.Arrays;
+import java.util.Enumeration;
+import java.util.HashSet;
+import java.util.Set;
 
 import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
@@ -50,9 +61,9 @@ public class EppTlsServlet extends HttpServlet {
 
   private static final FormattingLogger logger = FormattingLogger.getLoggerForCallerClass();
 
-  static final String REQUESTED_SERVERNAME_VIA_SNI_FIELD = "X-GFE-Requested-Servername-SNI";
+  static final String REQUESTED_SERVERNAME_VIA_SNI_FIELD = "X-Requested-Servername-SNI";
   static final String FORWARDED_FOR_FIELD = "X-Forwarded-For";
-  static final String SSL_CLIENT_CERTIFICATE_HASH_FIELD = "X-GFE-SSL-Certificate";
+  static final String SSL_CLIENT_CERTIFICATE_HASH_FIELD = "X-SSL-Certificate";
 
   @Override
   public void doPost(HttpServletRequest req, HttpServletResponse rsp) throws IOException {
