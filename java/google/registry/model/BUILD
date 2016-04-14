@@ -24,6 +24,7 @@ FIELD_EXPOSERS = [
     "index/FieldExposer.java",
     "mark/FieldExposer.java",
     "ofy/FieldExposer.java",
+    "permission/FieldExposer.java",
     "poll/FieldExposer.java",
     "registrar/FieldExposer.java",
     "registry/FieldExposer.java",

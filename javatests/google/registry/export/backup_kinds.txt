@@ -14,6 +14,7 @@ HostResource
 LogsExportCursor
 Modification
 OneTime
+PermissionGroup
 PollMessage
 PremiumList
 PremiumListEntry
@@ -27,3 +28,4 @@ RegistrarCreditBalance
 Registry
 RegistryCursor
 ReservedList
+UserPermissionGroups

@@ -16,7 +16,6 @@ package google.registry.model;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Key;
 
 import google.registry.model.billing.BillingEvent;
@@ -41,6 +40,8 @@ import google.registry.model.ofy.CommitLogCheckpoint;
 import google.registry.model.ofy.CommitLogCheckpointRoot;
 import google.registry.model.ofy.CommitLogManifest;
 import google.registry.model.ofy.CommitLogMutation;
+import google.registry.model.permission.PermissionGroup;
+import google.registry.model.permission.UserPermissionGroups;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.rde.RdeRevision;
 import google.registry.model.registrar.Registrar;
@@ -94,6 +95,7 @@ public final class EntityClasses {
           HostResource.class,
           Lock.class,
           LogsExportCursor.class,
+          PermissionGroup.class,
           PollMessage.class,
           PollMessage.Autorenew.class,
           PollMessage.OneTime.class,
@@ -111,7 +113,8 @@ public final class EntityClasses {
           ReservedList.class,
           ServerSecret.class,
           SignedMarkRevocationList.class,
-          TmchCrl.class);
+          TmchCrl.class,
+          UserPermissionGroups.class);
 
   /**
    * Function that converts an Objectify-registered class to its datastore kind name.
