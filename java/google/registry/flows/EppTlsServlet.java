@@ -24,7 +24,6 @@ import com.google.appengine.api.oauth.OAuthServiceFactory;
 import com.google.appengine.api.users.User;
 import com.google.appengine.api.users.UserService;
 import com.google.appengine.api.users.UserServiceFactory;
-import com.google.domain.registry.util.FormattingLogger;
 
 import java.io.IOException;
 import java.util.Arrays;

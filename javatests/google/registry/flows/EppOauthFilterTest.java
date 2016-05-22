@@ -1,4 +1,4 @@
-package com.google.domain.registry.flows;
+package google.registry.flows;
 
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.mock;

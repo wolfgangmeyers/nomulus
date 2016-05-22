@@ -1,10 +1,11 @@
-package com.google.domain.registry.flows;
+package google.registry.flows;
 
 import com.google.appengine.api.oauth.OAuthRequestException;
 import com.google.appengine.api.oauth.OAuthService;
 import com.google.appengine.api.oauth.OAuthServiceFactory;
 import com.google.appengine.api.oauth.OAuthServiceFailureException;
-import com.google.domain.registry.util.FormattingLogger;
+
+import google.registry.util.FormattingLogger;
 
 import java.io.IOException;
 

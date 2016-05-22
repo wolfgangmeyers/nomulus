@@ -445,18 +445,6 @@ def domain_registry_repositories():
   )
 
   native.maven_jar(
-      name = "soy",
-      artifact = "com.google.template:soy:2015-04-10",
-      sha1 = "f2a260c0eafbc5756ccec546efd2ffd5b0a583cb",
-  )
-
-  native.http_file(
-      name = "soyutils_usegoog",
-      sha256 = "fdb0e318949c1af668038df1d85d45353a00ff585f321c86efe91ac2a10cc91f",
-      url = "https://repo1.maven.org/maven2/com/google/template/soy/2016-01-12/soy-2016-01-12-soyutils_usegoog.js",
-  )
-
-  native.maven_jar(
       name = "sshd_core",
       artifact = "org.apache.sshd:sshd-core:0.7.0",
       sha1 = "ef5d0cae23845dead3fc53ecd61bd990ed42f60f",

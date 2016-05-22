@@ -35,9 +35,8 @@ java_library(
         "brain_bin_map.js",
         "registrar_bin.js",
         "registrar_bin_map.js",
-        "//java/com/google/domain/registry/ui:deps-runfiles.js",
-        "//java/com/google/domain/registry/ui/css:registrar_bin.css",
-        "//java/com/google/domain/registry/ui/html:html_files",
+        "//java/google/registry/ui/css:registrar_bin.css",
+        "//java/google/registry/ui/html:html_files",
 	],
 )
 
