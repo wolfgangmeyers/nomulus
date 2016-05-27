@@ -18,7 +18,8 @@ import dagger.Component;
 
 import google.registry.bigquery.BigqueryModule;
 import google.registry.config.ConfigModule;
-import google.registry.dns.writer.api.VoidDnsWriterModule;
+import google.registry.dns.writer.dnsupdate.DnsUpdateConfigModule;
+import google.registry.dns.writer.dnsupdate.DnsUpdateWriterModule;
 import google.registry.export.DriveModule;
 import google.registry.export.sheet.SpreadsheetServiceModule;
 import google.registry.gcs.GcsServiceModule;
@@ -51,6 +52,8 @@ import javax.inject.Singleton;
         ConfigModule.class,
         DatastoreServiceModule.class,
         DirectoryModule.class,
+        DnsUpdateConfigModule.class,
+        DnsUpdateWriterModule.class,
         DriveModule.class,
         GcsServiceModule.class,
         GoogleCredentialModule.class,
@@ -66,7 +69,6 @@ import javax.inject.Singleton;
         URLFetchServiceModule.class,
         UrlFetchTransportModule.class,
         UseAppIdentityCredentialForGoogleApisModule.class,
-        VoidDnsWriterModule.class,
         VoidKeyringModule.class,
     })
 interface BackendComponent {
