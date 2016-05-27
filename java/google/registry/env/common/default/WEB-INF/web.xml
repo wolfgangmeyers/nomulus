@@ -273,7 +273,7 @@
   <!-- Add OAuth for epp requests -->
   <filter>
     <filter-name>EppOauthFilter</filter-name>
-    <filter-class>com.google.domain.registry.flows.EppOauthFilter</filter-class>
+    <filter-class>google.registry.flows.EppOauthFilter</filter-class>
   </filter>
   <filter-mapping>
     <filter-name>EppOauthFilter</filter-name>
