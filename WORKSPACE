@@ -6,8 +6,8 @@ domain_registry_repositories()
 
 git_repository(
     name = "io_bazel_rules_closure",
-    remote = "https://github.com/bazelbuild/rules_closure.git",
-    tag = "0.1.0",
+    remote = "https://github.com/donutsinc/rules_closure.git",
+    commit = "271f7b7e340a5313c82b3ecbfd035834a1b46153",
 )
 
 load("@io_bazel_rules_closure//closure:defs.bzl", "closure_repositories")
