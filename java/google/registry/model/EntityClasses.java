@@ -42,6 +42,7 @@ import google.registry.model.ofy.CommitLogManifest;
 import google.registry.model.ofy.CommitLogMutation;
 import google.registry.model.permission.PermissionGroup;
 import google.registry.model.permission.UserPermissionGroups;
+import google.registry.model.pricing.PricingCategory;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.rde.RdeRevision;
 import google.registry.model.registrar.Registrar;
@@ -96,6 +97,7 @@ public final class EntityClasses {
           Lock.class,
           LogsExportCursor.class,
           PermissionGroup.class,
+          PricingCategory.class,
           PollMessage.class,
           PollMessage.Autorenew.class,
           PollMessage.OneTime.class,
