@@ -18,6 +18,7 @@ PermissionGroup
 PollMessage
 PremiumList
 PremiumListEntry
+PricingCategory
 RdeRevision
 Recurring
 Registrar

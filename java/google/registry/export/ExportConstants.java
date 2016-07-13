@@ -46,6 +46,7 @@ import google.registry.model.registrar.RegistrarContact;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.label.PremiumList;
 import google.registry.model.registry.label.PremiumList.PremiumListEntry;
+import google.registry.model.pricing.PricingCategory;
 import google.registry.model.reporting.HistoryEntry;
 
 /** Constants related to export code. */
@@ -70,6 +71,7 @@ public final class ExportConstants {
           OneTime.class,
           PremiumList.class,
           PremiumListEntry.class,
+          PricingCategory.class,
           Recurring.class,
           Registrar.class,
           RegistrarContact.class,
