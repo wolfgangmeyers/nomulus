@@ -920,6 +920,8 @@ enum google.registry.model.transfer.TransferStatus {
 class google.registry.model.user.User {
   @Id long id;
   @Parent com.googlecode.objectify.Key<google.registry.model.registrar.Registrar> parent;
+  google.registry.model.CreateAutoTimestamp creationTime;
+  google.registry.model.UpdateAutoTimestamp lastUpdateTime;
   java.lang.Boolean active;
   java.lang.String email;
   java.lang.String faxNumber;
