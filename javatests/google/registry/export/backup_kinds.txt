@@ -1,4 +1,3 @@
-
 Cancellation
 ContactResource
 Cursor
@@ -29,4 +28,5 @@ RegistrarCreditBalance
 Registry
 RegistryCursor
 ReservedList
+User
 UserPermissionGroups

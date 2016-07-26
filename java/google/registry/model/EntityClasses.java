@@ -59,6 +59,7 @@ import google.registry.model.tmch.ClaimsListShard;
 import google.registry.model.tmch.ClaimsListShard.ClaimsListRevision;
 import google.registry.model.tmch.ClaimsListShard.ClaimsListSingleton;
 import google.registry.model.tmch.TmchCrl;
+import google.registry.model.user.User;
 
 /** Sets of classes of the Objectify-registered entities in use throughout the model. */
 public final class EntityClasses {
@@ -116,6 +117,7 @@ public final class EntityClasses {
           ServerSecret.class,
           SignedMarkRevocationList.class,
           TmchCrl.class,
+          User.class,
           UserPermissionGroups.class);
 
   /**

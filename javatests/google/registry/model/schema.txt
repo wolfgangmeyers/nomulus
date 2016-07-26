@@ -917,3 +917,17 @@ enum google.registry.model.transfer.TransferStatus {
   SERVER_APPROVED;
   SERVER_CANCELLED;
 }
+class google.registry.model.user.User {
+  @Id long id;
+  @Parent com.googlecode.objectify.Key<google.registry.model.registrar.Registrar> parent;
+  java.lang.Boolean active;
+  java.lang.String email;
+  java.lang.String faxNumber;
+  java.lang.String firstName;
+  java.lang.String gaeUserId;
+  java.lang.String lastName;
+  java.lang.String middleName;
+  java.lang.String phoneNumber;
+  java.lang.String role;
+  java.lang.String securityPhrase;
+}

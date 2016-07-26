@@ -37,6 +37,7 @@ FIELD_EXPOSERS = [
     "tmch/FieldExposer.java",
     "transfer/FieldExposer.java",
     "translators/FieldExposer.java",
+    "user/FieldExposer.java",
 ]
 
 
