@@ -18,20 +18,25 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
 import static google.registry.model.common.EntityGroupRoot.getCrossTldKey;
 
+import com.google.common.collect.ImmutableSortedMap;
+
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.annotation.Cache;
+import com.googlecode.objectify.annotation.Embed;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Id;
+import com.googlecode.objectify.annotation.Mapify;
 import com.googlecode.objectify.annotation.Parent;
 
 import google.registry.model.common.EntityGroupRoot;
+import google.registry.model.common.TimedTransitionProperty;
+import google.registry.model.common.TimedTransitionProperty.TimedTransition;
 import google.registry.model.JsonMapBuilder;
 import google.registry.model.Buildable;
 import google.registry.model.ImmutableObject;
 import google.registry.model.Jsonifiable;
 
 
-import org.joda.money.Money;
 import org.joda.time.DateTime;
 
 import java.util.Map;
@@ -44,71 +49,58 @@ will be deferred to this category*/
 
 @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
 @Entity
-public class PricingCategory extends ImmutableObject implements Jsonifiable {
+public class PricingCategory extends ImmutableObject {
 
     @Parent
     Key<EntityGroupRoot> parent = getCrossTldKey();
 
     /**
-     * Universally unique name for this price category.   
+     * Universally unique name for this price category.
      */
     @Id
     String pricingCategoryName;
 
-    Money createPriceFirstYear;
+    String comments;
 
-    Money createPriceRemainingYears;
+    /**
+     * A single transition event to set of domain prices at a specific time, for use
+     * in a TimedTransitionProperty.
+     *
+     * Public because AppEngine's security manager requires this for instantiation via reflection.
+     */
+    @Embed
+    public static class DomainPricesTransition extends TimedTransition<DomainPrices> {
+        private DomainPrices prices;
 
-    Money renewPrice;
+        @Override
+        public DomainPrices getValue() {
+            return prices;
+        }
 
-    Money transferPrice;
-
-    Money restorePrice;
-
-    DateTime effectiveDate;
-
-    DateTime endDate;
-
-    @Override
-    public Map<String, Object> toJsonMap() {
-        return new JsonMapBuilder()
-            .put("pricingCategoryName", pricingCategoryName)
-            .put("createPriceFirstYear", createPriceFirstYear.getAmount())
-            .put("createPriceRemainingYears", createPriceRemainingYears.getAmount())
-            .put("renewPrice", renewPrice.getAmount())
-            .put("transferPrice", transferPrice.getAmount())
-            .put("restorePrice", restorePrice.getAmount())
-            .put("effectiveDate", effectiveDate.toString())
-            .put("endDate", endDate.toString())
-            .build();
-
+        @Override
+        protected void setValue(DomainPrices prices) {
+            this.prices = prices; 
+        }
     }
+    
+
+    /**
+     * A property that transitions to different domainPrices at different times. Stored as a list of
+     * domainPrices Transition embedded objects using the @Mapify annotation.
+     */
+    @Mapify(TimedTransitionProperty.TimeMapper.class)
+    TimedTransitionProperty<DomainPrices, DomainPricesTransition> priceTransitions =
+        TimedTransitionProperty.forMapify(new DomainPrices(), DomainPricesTransition.class);
 
     public String getPricingCategoryName() {
         return pricingCategoryName;
     }
-    public Money getCreatePriceFirstYear() {
-        return createPriceFirstYear;
+    public ImmutableSortedMap<DateTime, DomainPrices> getPriceTransitions() {
+        return priceTransitions.toValueMap();
     }
-    public Money getCreatePriceRemainingYears() {
-        return createPriceRemainingYears;
+    public String getComments() {
+        return comments;
     }
-    public Money getRenewPrice() {
-        return renewPrice;
-    }
-    public Money getTransferPrice() {
-        return transferPrice;
-    }
-    public Money getRestorePrice() {
-        return restorePrice;
-    }
-    public DateTime getEffectiveDate() {
-        return effectiveDate;
-    }
-    public DateTime getEndDate() {
-        return endDate;
-    }
-
 
     public static class Builder extends Buildable.Builder<PricingCategory> {
         public Builder() {}
@@ -120,37 +112,19 @@ public class PricingCategory extends ImmutableObject implements Jsonifiable {
 
         public Builder setPricingCategoryName(String pricingCategoryName) {
             getInstance().pricingCategoryName = pricingCategoryName;
-            return this; 
+            return this;
         }
-        public Builder setCreatePriceFirstYear(Money createPriceFirstYear) {
-            getInstance().createPriceFirstYear = createPriceFirstYear;
-            return this; 
-        }
-        public Builder setCreatePriceRemainingYears(Money createPriceRemainingYears) {
-            getInstance().createPriceRemainingYears = createPriceRemainingYears;
-            return this; 
-        }
-        public Builder setRenewPrice(Money renewPrice) {
-            getInstance().renewPrice = renewPrice;
-            return this; 
-        }
-        public Builder setTransferPrice(Money transferPrice) {
-            getInstance().transferPrice = transferPrice;
-            return this; 
-        }
-        public Builder setRestorePrice(Money restorePrice) {
-            getInstance().restorePrice = restorePrice;
-            return this; 
-        }
-        public Builder setEffectiveDate(DateTime effectiveDate) {
-            getInstance().effectiveDate = effectiveDate;
-            return this; 
-        }
-        public Builder setEndDate(DateTime endDate) {
-            getInstance().endDate = endDate;
-            return this; 
-        }
+        public Builder setPriceTransitions(
+            Map<DateTime, DomainPrices> priceTransitionsMap) {
 
+            getInstance().priceTransitions =
+                TimedTransitionProperty.fromValueMap(ImmutableSortedMap.copyOf(priceTransitionsMap), DomainPricesTransition.class);
+            return this;
+        }
+        public Builder setComments(String comments) {
+            getInstance().comments = comments;
+            return this;
+        }
 
         public Builder setIfNotNullPriceCategoryName(String pricingCategoryName) {
             if(pricingCategoryName != null) {
@@ -158,65 +132,30 @@ public class PricingCategory extends ImmutableObject implements Jsonifiable {
             }
             return this;
         }
-        public Builder setIfNotNullCreatePriceFirstYear(Money createPriceFirstYear) {
-            if(createPriceFirstYear != null) {
-                getInstance().createPriceFirstYear = createPriceFirstYear;
-            }
-            return this;
-        }
-        public Builder setIfNotNullCreatePriceRemainingYears(Money createPriceRemainingYears) {
-            if(createPriceRemainingYears != null) {
-                getInstance().createPriceRemainingYears = createPriceRemainingYears;
-            }
-            return this;
-        }
-        public Builder setIfNotNullRenewPrice(Money renewPrice) {
-            if(renewPrice != null) {
-                getInstance().renewPrice = renewPrice;
-            }
-            return this;
-        }
-        public Builder setIfNotNullTransferPrice(Money transferPrice) {
-            if(transferPrice != null) {
-                getInstance().transferPrice = transferPrice;
-            }
-            return this;
-        }
-        public Builder setIfNotNullRestorePrice(Money restorePrice) {
-            if(restorePrice != null) {
-                getInstance().restorePrice = restorePrice;
-            }
-            return this;
-        }
-        public Builder setIfNotNullEffectiveDate(DateTime effectiveDate) {
-            if(effectiveDate != null) {
-                getInstance().effectiveDate = effectiveDate;
-            }
-            return this;
-        }
-        public Builder setIfNotNullEndDate(DateTime endDate) {
-            if(endDate != null) {
-                getInstance().endDate = endDate;
-            }
-            return this;
-        }
+        public Builder setIfNotNullPriceTransitions(
+                                           Map<DateTime, DomainPrices> priceTransitionsMap) {
 
+            if(priceTransitionsMap != null) {
+                getInstance().priceTransitions =
+                    TimedTransitionProperty.fromValueMap(ImmutableSortedMap.copyOf(priceTransitionsMap), DomainPricesTransition.class);
+            }
+            return this;
+        }
+        public Builder setIfNotNullComments(String comments) {
+            if(comments != null) {
+                getInstance().comments = comments;
+            }
+            return this;
+        }
 
         public PricingCategory build() {
             final PricingCategory instance = getInstance();
 
             checkArgument((instance.getPricingCategoryName() != null), "pricingCategoryName cannot be null");
-            checkArgument((instance.getCreatePriceFirstYear() != null), "createPriceFirstYear cannot be null");
-            checkArgument((instance.getCreatePriceRemainingYears() != null), "createPriceRemainingYears cannot be null");
-            checkArgument((instance.getRenewPrice() != null), "renewPrice cannot be null");
-            checkArgument((instance.getTransferPrice() != null), "transferPrice cannot be null");
-            checkArgument((instance.getRestorePrice() != null), "restorePrice cannot be null");
-            checkArgument((instance.getEffectiveDate() != null), "effectiveDate cannot be null");
-            checkArgument((instance.getEndDate() != null), "endDate cannot be null");
+            checkArgument((instance.getPriceTransitions() != null), "priceTransitions cannot be null");
 
             return super.build();
         }
-
 
     }
 
@@ -226,10 +165,6 @@ public class PricingCategory extends ImmutableObject implements Jsonifiable {
             super("No pricing category named '" + cat + "' was found.");
         }
     }
-
-
-
-
 
 
 }

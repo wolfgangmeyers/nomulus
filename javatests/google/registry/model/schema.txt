@@ -600,13 +600,12 @@ class google.registry.model.poll.PollMessage$OneTime {
 class google.registry.model.pricing.PricingCategory {
   @Id java.lang.String pricingCategoryName;
   @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
-  org.joda.money.Money createPriceFirstYear;
-  org.joda.money.Money createPriceRemainingYears;
-  org.joda.money.Money renewPrice;
-  org.joda.money.Money restorePrice;
-  org.joda.money.Money transferPrice;
-  org.joda.time.DateTime effectiveDate;
-  org.joda.time.DateTime endDate;
+  google.registry.model.common.TimedTransitionProperty<google.registry.model.pricing.DomainPrices, google.registry.model.pricing.PricingCategory$DomainPricesTransition> priceTransitions;
+  java.lang.String comments;
+}
+class google.registry.model.pricing.PricingCategory$DomainPricesTransition {
+  google.registry.model.pricing.DomainPrices prices;
+  org.joda.time.DateTime transitionTime;
 }
 class google.registry.model.rde.RdeRevision {
   @Id java.lang.String id;
