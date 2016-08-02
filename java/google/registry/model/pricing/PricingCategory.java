@@ -28,6 +28,7 @@ import com.googlecode.objectify.annotation.Id;
 import com.googlecode.objectify.annotation.Mapify;
 import com.googlecode.objectify.annotation.Parent;
 
+import google.registry.model.Buildable;
 import google.registry.model.common.EntityGroupRoot;
 import google.registry.model.common.TimedTransitionProperty;
 import google.registry.model.common.TimedTransitionProperty.TimedTransition;
@@ -49,7 +50,7 @@ will be deferred to this category*/
 
 @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
 @Entity
-public class PricingCategory extends ImmutableObject {
+public class PricingCategory extends ImmutableObject implements Buildable{
 
     @Parent
     Key<EntityGroupRoot> parent = getCrossTldKey();
@@ -100,6 +101,11 @@ public class PricingCategory extends ImmutableObject {
     }
     public String getComments() {
         return comments;
+    }
+
+    @Override
+    public Builder asBuilder() {
+        return new Builder(clone(this));
     }
 
     public static class Builder extends Buildable.Builder<PricingCategory> {

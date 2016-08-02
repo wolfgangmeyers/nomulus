@@ -18,7 +18,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 
 import com.googlecode.objectify.annotation.Embed;
 
-import google.registry.model.Jsonifiable;
+import google.registry.model.ImmutableObject;
 import google.registry.model.Buildable;
 
 import org.joda.money.Money;
@@ -28,7 +28,7 @@ import java.util.HashMap;
 import java.util.Objects;
 
 @Embed
-public class DomainPrices {
+public class DomainPrices extends ImmutableObject{
 
     Money createPrice;
 
@@ -97,7 +97,9 @@ public class DomainPrices {
             final DomainPrices instance = getInstance();
 
             checkArgument((instance.getCreatePrice() != null), "createPrice cannot be null");
+            checkArgument((instance.getCreatePrice().isPositive()), "createPrice must be greater than 0");
             checkArgument((instance.getRenewPrice() != null), "renewPrice cannot be null");
+            checkArgument((instance.getRenewPrice().isPositive()), "renewPrice must be greater than 0");
 
             return super.build();
         }

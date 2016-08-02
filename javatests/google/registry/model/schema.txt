@@ -597,6 +597,10 @@ class google.registry.model.poll.PollMessage$OneTime {
   java.util.List<google.registry.model.transfer.TransferResponse$DomainTransferResponse> domainTransferResponses;
   org.joda.time.DateTime eventTime;
 }
+class google.registry.model.pricing.DomainPrices {
+  org.joda.money.Money createPrice;
+  org.joda.money.Money renewPrice;
+}
 class google.registry.model.pricing.PricingCategory {
   @Id java.lang.String pricingCategoryName;
   @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
