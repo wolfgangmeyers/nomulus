@@ -1,6 +1,7 @@
 package google.registry.model.user;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
 
 import com.google.common.base.Objects;
@@ -129,7 +130,12 @@ public class User extends ImmutableObject implements Jsonifiable, Buildable {
         .put("faxNumber", faxNumber)
         .put("role", role)
         .put("gaeUserId", gaeUserId)
+        .put("clientIdentifier", getRegistrar().getClientIdentifier())
         .build();
+  }
+
+  public Registrar getRegistrar() {
+    return ofy().load().key(parent).now();
   }
 
   @Override
