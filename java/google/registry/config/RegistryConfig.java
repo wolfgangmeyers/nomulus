@@ -17,13 +17,11 @@ package google.registry.config;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.HostAndPort;
-
+import java.net.URL;
 import org.joda.time.Duration;
 
-import java.net.URL;
-
 /**
- * Domain Registry configuration.
+ * Domain Registry configuration for global constants that can't be injected.
  *
  * <p>The goal of this custom configuration system is to have our project environments configured
  * in type-safe Java code that can be refactored, rather than XML files and system properties.
@@ -240,4 +238,6 @@ public interface RegistryConfig {
    * the logs from filling up with unnecessarily failures.
    */
   public Duration getAsyncFlowFailureBackoff();
+
+  // XXX: Please consider using ConfigModule instead of adding new methods to this file.
 }

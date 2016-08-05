@@ -24,10 +24,6 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.Closer;
 import com.google.common.io.Resources;
-
-import org.xml.sax.SAXException;
-import org.xml.sax.SAXParseException;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -38,7 +34,6 @@ import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-
 import javax.annotation.Nullable;
 import javax.xml.XMLConstants;
 import javax.xml.bind.JAXBContext;
@@ -59,6 +54,8 @@ import javax.xml.transform.stream.StreamResult;
 import javax.xml.transform.stream.StreamSource;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
+import org.xml.sax.SAXException;
+import org.xml.sax.SAXParseException;
 
 /** Static methods for marshaling, unmarshaling, and validating XML. */
 public class XmlTransformer {
@@ -136,21 +133,19 @@ public class XmlTransformer {
   }
 
   /**
-   * Turns XML text into an object, validating against {@link #schema}.
+   * Turns XML text into an object, validating against hard-coded xml {@link #schema}s.
    *
-   * <p>You must specify the XML class you expect to receive as the root element. Validation is
-   * performed in accordance with the hard-coded XML schemas.
-   *
+   * @param clazz the XML class you expect to receive as the root element
    * @throws XmlException if failed to read from {@code bytes}, XML input is invalid, or root
    *         element doesn't match {@code expect}.
    * @see com.google.common.io.Files#asByteSource
    * @see com.google.common.io.Resources#asByteSource
+   * @see "http://errorprone.info/bugpattern/TypeParameterUnusedInFormals"
    */
-  @SuppressWarnings("unchecked")
-  public <T> T unmarshal(InputStream stream) throws XmlException {
+  public <T> T unmarshal(Class<T> clazz, InputStream stream) throws XmlException {
     try (InputStream autoClosingStream = stream) {
-      return (T) getUnmarshaller().unmarshal(
-          XML_INPUT_FACTORY.createXMLStreamReader(new StreamSource(autoClosingStream, SYSTEM_ID)));
+      return clazz.cast(getUnmarshaller().unmarshal(
+          XML_INPUT_FACTORY.createXMLStreamReader(new StreamSource(autoClosingStream, SYSTEM_ID))));
     } catch (UnmarshalException e) {
       // Plain old parsing exceptions have a SAXParseException with no further cause.
       if (e.getLinkedException() instanceof SAXParseException

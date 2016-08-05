@@ -16,21 +16,20 @@ package google.registry.flows;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-
 import google.registry.model.eppcommon.Trid;
 import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppinput.EppInput.CommandExtension;
 import google.registry.model.eppoutput.EppOutput;
-import google.registry.model.eppoutput.Response;
-import google.registry.model.eppoutput.Response.ResponseData;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse;
+import google.registry.model.eppoutput.EppResponse.ResponseData;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.eppoutput.Result;
-
-import org.joda.time.DateTime;
-
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import javax.annotation.Nullable;
+import org.joda.time.DateTime;
 
 /**
  * An abstract EPP flow.
@@ -42,12 +41,12 @@ public abstract class Flow {
 
   protected EppInput eppInput;
   protected SessionMetadata sessionMetadata;
+  protected TransportCredentials credentials;
   protected Trid trid;
   protected DateTime now;
-  protected byte[] inputXmlBytes;
 
   /** Whether this flow is being run in a superuser mode that can skip some checks. */
-  protected boolean superuser;
+  protected boolean isSuperuser;
 
   /** The collection of allowed extensions for the flow. */
   private Set<Class<? extends CommandExtension>> validExtensions = new HashSet<>();
@@ -81,9 +80,9 @@ public abstract class Flow {
 
   protected EppOutput createOutput(
       Result.Code code,
-      ResponseData responseData,
-      ImmutableList<? extends ResponseExtension> extensions) {
-    return EppOutput.create(new Response.Builder()
+      @Nullable ResponseData responseData,
+      @Nullable ImmutableList<? extends ResponseExtension> extensions) {
+    return EppOutput.create(new EppResponse.Builder()
         .setTrid(trid)
         .setResult(Result.create(code))
         .setExecutionTime(now)
@@ -101,15 +100,15 @@ public abstract class Flow {
       EppInput eppInput,
       Trid trid,
       SessionMetadata sessionMetadata,
-      boolean superuser,
-      DateTime now,
-      byte[] inputXmlBytes) throws EppException {
+      TransportCredentials credentials,
+      boolean isSuperuser,
+      DateTime now) throws EppException {
     this.eppInput = eppInput;
     this.trid = trid;
     this.sessionMetadata = sessionMetadata;
+    this.credentials = credentials;
     this.now = now;
-    this.superuser = superuser;
-    this.inputXmlBytes = inputXmlBytes;
+    this.isSuperuser = isSuperuser;
     initFlow();
     validExtensions = ImmutableSet.copyOf(validExtensions);
     return this;
@@ -123,6 +122,11 @@ public abstract class Flow {
   @SafeVarargs
   protected final void registerExtensions(Class<? extends CommandExtension>... extensions) {
     Collections.addAll(validExtensions, extensions);
+  }
+
+  protected final <E extends CommandExtension>
+      void registerExtensions(List<Class<? extends E>> extensions) {
+    validExtensions.addAll(extensions);
   }
 
   /** Get the legal command extension types for this flow. */

@@ -17,15 +17,14 @@ package google.registry.flows.host;
 import static google.registry.model.EppResourceUtils.checkResourcesExist;
 
 import com.google.common.collect.ImmutableList;
-
 import google.registry.flows.ResourceCheckFlow;
 import google.registry.model.eppoutput.CheckData;
 import google.registry.model.eppoutput.CheckData.HostCheck;
 import google.registry.model.eppoutput.CheckData.HostCheckData;
 import google.registry.model.host.HostCommand.Check;
 import google.registry.model.host.HostResource;
-
 import java.util.Set;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that checks whether a host can be provisioned.
@@ -33,6 +32,9 @@ import java.util.Set;
  * @error {@link google.registry.flows.ResourceCheckFlow.TooManyResourceChecksException}
  */
 public class HostCheckFlow extends ResourceCheckFlow<HostResource, Check> {
+
+  @Inject HostCheckFlow() {}
+
   @Override
   protected CheckData getCheckData() {
     Set<String> existingIds = checkResourcesExist(resourceClass, targetIds, now);

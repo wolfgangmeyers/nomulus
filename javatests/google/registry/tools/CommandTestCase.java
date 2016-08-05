@@ -18,32 +18,28 @@ import static com.google.common.truth.Truth.assertThat;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.beust.jcommander.JCommander;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ObjectArrays;
 import com.google.common.io.Files;
 import com.google.common.reflect.TypeToken;
-
-import com.beust.jcommander.JCommander;
-
 import google.registry.model.poll.PollMessage;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.CertificateSamples;
 import google.registry.testing.ExceptionRule;
 import google.registry.tools.params.ParameterFactory;
-
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.rules.TemporaryFolder;
-import org.junit.runner.RunWith;
-import org.mockito.runners.MockitoJUnitRunner;
-
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.List;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.rules.TemporaryFolder;
+import org.junit.runner.RunWith;
+import org.mockito.runners.MockitoJUnitRunner;
 
 /**
  * Base class for all command tests.
@@ -53,7 +49,8 @@ import java.util.List;
 @RunWith(MockitoJUnitRunner.class)
 public abstract class CommandTestCase<C extends Command> {
 
-  private ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream stdout = new ByteArrayOutputStream();
+  private final ByteArrayOutputStream stderr = new ByteArrayOutputStream();
 
   protected C command;
 
@@ -75,6 +72,7 @@ public abstract class CommandTestCase<C extends Command> {
     RegistryToolEnvironment.UNITTEST.setup();
     command = newCommandInstance();
     System.setOut(new PrintStream(stdout));
+    System.setErr(new PrintStream(stderr));
   }
 
   void runCommandInEnvironment(RegistryToolEnvironment env, String... args) throws Exception {
@@ -93,12 +91,12 @@ public abstract class CommandTestCase<C extends Command> {
     }
   }
 
-  void runCommand(String... args) throws Exception {
+  protected void runCommand(String... args) throws Exception {
     runCommandInEnvironment(RegistryToolEnvironment.UNITTEST, args);
   }
 
   /** Adds "--force" as the first parameter, then runs the command. */
-  void runCommandForced(String... args) throws Exception {
+  protected void runCommandForced(String... args) throws Exception {
     runCommand(ObjectArrays.concat("--force", args));
   }
 
@@ -149,20 +147,47 @@ public abstract class CommandTestCase<C extends Command> {
     return ofy().load().type(PollMessage.class).count();
   }
 
-  void assertInStdout(String expected) throws Exception {
-    assertThat(stdout.toString(UTF_8.toString())).contains(expected);
+  /**
+   * Asserts whether standard out matches an expected string, allowing for differences in
+   * ImmutableObject hash codes (i.e. "(@1234567)").
+   */
+  protected void assertStdoutForImmutableObjectIs(String expected) throws Exception {
+    assertThat(stripImmutableObjectHashCodes(getStdoutAsString()).trim())
+        .isEqualTo(stripImmutableObjectHashCodes(expected).trim());
   }
 
-  void assertNotInStdout(String expected) throws Exception {
-    assertThat(stdout.toString(UTF_8.toString())).doesNotContain(expected);
+  protected void assertStdoutIs(String expected) throws Exception {
+    assertThat(getStdoutAsString()).isEqualTo(expected);
   }
 
-  String getStdoutAsString() {
+  protected void assertInStdout(String... expected) throws Exception {
+    String stdout = getStdoutAsString();
+    for (String line : expected) {
+      assertThat(stdout).contains(line);
+    }
+  }
+
+  protected void assertInStderr(String... expected) throws Exception {
+    String stderror = new String(stderr.toByteArray(), UTF_8);
+    for (String line : expected) {
+      assertThat(stderror).contains(line);
+    }
+  }
+
+  protected void assertNotInStdout(String expected) throws Exception {
+    assertThat(getStdoutAsString()).doesNotContain(expected);
+  }
+
+  protected String getStdoutAsString() {
     return new String(stdout.toByteArray(), UTF_8);
   }
 
   List<String> getStdoutAsLines() {
     return Splitter.on('\n').omitEmptyStrings().trimResults().splitToList(getStdoutAsString());
+  }
+
+  protected String stripImmutableObjectHashCodes(String string) {
+    return string.replaceAll("\\(@\\d+\\)", "(@)");
   }
 
   @SuppressWarnings("unchecked")

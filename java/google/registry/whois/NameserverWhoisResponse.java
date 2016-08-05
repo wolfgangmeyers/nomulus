@@ -19,13 +19,10 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.InetAddresses;
-
 import google.registry.model.host.HostResource;
 import google.registry.model.registrar.Registrar;
-
-import org.joda.time.DateTime;
-
 import java.net.InetAddress;
+import org.joda.time.DateTime;
 
 /** Container for WHOIS responses to a nameserver lookup queries. */
 final class NameserverWhoisResponse extends WhoisResponseImpl {
@@ -45,7 +42,7 @@ final class NameserverWhoisResponse extends WhoisResponseImpl {
   }
 
   @Override
-  public String getPlainTextOutput(boolean preferUnicode) {
+  public String getPlainTextOutput(boolean preferUnicode, String disclaimer) {
     BasicEmitter emitter = new BasicEmitter();
     for (int i = 0; i < hosts.size(); i++) {
       HostResource host = hosts.get(i);
@@ -66,6 +63,6 @@ final class NameserverWhoisResponse extends WhoisResponseImpl {
         emitter.emitNewline();
       }
     }
-    return emitter.emitLastUpdated(getTimestamp()).emitFooter().toString();
+    return emitter.emitLastUpdated(getTimestamp()).emitFooter(disclaimer).toString();
   }
 }

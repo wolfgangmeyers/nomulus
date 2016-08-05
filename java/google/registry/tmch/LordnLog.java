@@ -18,19 +18,17 @@ import static com.google.common.base.MoreObjects.toStringHelper;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
+import com.google.common.base.Ascii;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableMap;
 import com.google.re2j.Pattern;
-
-import org.joda.time.DateTime;
-
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.Immutable;
+import org.joda.time.DateTime;
 
 /**
  * Parser of LORDN log responses from the MarksDB server during the NORDN process.
@@ -221,7 +219,7 @@ public final class LordnLog implements Iterable<Entry<String, LordnLog.Result>> 
     // +  <Status flag>, whether the LORDN file has been accepted for
     //    processing by the TMDB.  Possible values are "accepted" or
     //    "rejected".
-    Status status = Status.valueOf(firstLine.get(4).toUpperCase());
+    Status status = Status.valueOf(Ascii.toUpperCase(firstLine.get(4)));
 
     // +  <Warning flag>, whether the LORDN Log has any warning result
     //    codes.  Possible values are "no-warnings" or "warnings-
@@ -232,8 +230,11 @@ public final class LordnLog implements Iterable<Entry<String, LordnLog.Result>> 
     //    processed in the LORDN file.
     int dnLines = Integer.parseInt(firstLine.get(6));
     int actual = lines.size() - 2;
-    checkArgument(dnLines == actual,
-        "Line 1: Number of entries (%d) differs from declaration (%d)", actual, dnLines);
+    checkArgument(
+        dnLines == actual,
+        "Line 1: Number of entries (%s) differs from declaration (%s)",
+        String.valueOf(actual),
+        String.valueOf(dnLines));
 
     // Second line contains headers: roid,result-code
     checkArgument(lines.get(1).equals("roid,result-code"),
@@ -247,8 +248,7 @@ public final class LordnLog implements Iterable<Entry<String, LordnLog.Result>> 
           "Line %d: Expected 2 elements, found %d", i + 1, currentLine.size()));
       String roid = currentLine.get(0);
       int code = Integer.parseInt(currentLine.get(1));
-      Result result = checkNotNull(RESULTS.get(code),
-          "Line %d: Unknown result code: %d", i, code);
+      Result result = checkNotNull(RESULTS.get(code), "Line %s: Unknown result code: %s", i, code);
       builder.put(roid, result);
     }
 

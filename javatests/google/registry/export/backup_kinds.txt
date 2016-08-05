@@ -11,6 +11,7 @@ ForeignKeyHostIndex
 HistoryEntry
 HostResource
 LogsExportCursor
+LrpToken
 Modification
 OneTime
 PermissionGroup
@@ -26,7 +27,6 @@ RegistrarContact
 RegistrarCredit
 RegistrarCreditBalance
 Registry
-RegistryCursor
 ReservedList
 User
 UserPermissionGroups

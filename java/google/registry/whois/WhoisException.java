@@ -17,9 +17,8 @@ package google.registry.whois;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import org.joda.time.DateTime;
-
 import javax.annotation.Nullable;
+import org.joda.time.DateTime;
 
 /** Exception that gets thrown when WHOIS command isn't successful. */
 public final class WhoisException extends Exception implements WhoisResponse {
@@ -61,11 +60,11 @@ public final class WhoisException extends Exception implements WhoisResponse {
   }
 
   @Override
-  public String getPlainTextOutput(boolean preferUnicode) {
+  public String getPlainTextOutput(boolean preferUnicode, String disclaimer) {
     return new WhoisResponseImpl.BasicEmitter()
         .emitRawLine(getMessage())
         .emitLastUpdated(getTimestamp())
-        .emitFooter()
+        .emitFooter(disclaimer)
         .toString();
   }
 }

@@ -18,19 +18,23 @@ import static google.registry.util.ResourceUtils.readResourceUtf8;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.beust.jcommander.ParameterException;
-
-import org.junit.Test;
-
+import google.registry.testing.InjectRule;
 import java.io.ByteArrayInputStream;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
 
 /** Unit tests for {@link ExecuteEppCommand}. */
 public class ExecuteEppCommandTest extends EppToolCommandTestCase<ExecuteEppCommand> {
 
+  @Rule
+  public InjectRule inject = new InjectRule();
+
   private String xmlInput;
   private String eppFile;
 
-  @Override
-  void initEppToolCommandTestCase() throws Exception {
+  @Before
+  public void initCommand() throws Exception {
     xmlInput = readResourceUtf8(ExecuteEppCommandTest.class, "testdata/contact_create.xml");
     eppFile = writeToNamedTmpFile("eppFile", xmlInput);
   }
@@ -38,19 +42,19 @@ public class ExecuteEppCommandTest extends EppToolCommandTestCase<ExecuteEppComm
   @Test
   public void testSuccess() throws Exception {
     runCommand("--client=NewRegistrar", "--force", eppFile);
-    eppVerifier().verifySent("testdata/contact_create.xml");
+    eppVerifier().verifySent("contact_create.xml");
   }
 
   @Test
   public void testSuccess_dryRun() throws Exception {
     runCommand("--client=NewRegistrar", "--dry_run", eppFile);
-    eppVerifier().asDryRun().verifySent("testdata/contact_create.xml");
+    eppVerifier().asDryRun().verifySent("contact_create.xml");
   }
 
   @Test
   public void testSuccess_withSuperuser() throws Exception {
     runCommand("--client=NewRegistrar", "--superuser", "--force", eppFile);
-    eppVerifier().asSuperuser().verifySent("testdata/contact_create.xml");
+    eppVerifier().asSuperuser().verifySent("contact_create.xml");
   }
 
   @Test
@@ -58,7 +62,7 @@ public class ExecuteEppCommandTest extends EppToolCommandTestCase<ExecuteEppComm
     inject.setStaticField(
         ExecuteEppCommand.class, "stdin", new ByteArrayInputStream(xmlInput.getBytes(UTF_8)));
     runCommand("--client=NewRegistrar", "--force");
-    eppVerifier().verifySent("testdata/contact_create.xml");
+    eppVerifier().verifySent("contact_create.xml");
   }
 
   @Test
@@ -66,7 +70,7 @@ public class ExecuteEppCommandTest extends EppToolCommandTestCase<ExecuteEppComm
     String xmlInput2 = readResourceUtf8(ExecuteEppCommandTest.class, "testdata/domain_check.xml");
     String eppFile2 = writeToNamedTmpFile("eppFile2", xmlInput2);
     runCommand("--client=NewRegistrar", "--force", eppFile, eppFile2);
-    eppVerifier().verifySent("testdata/contact_create.xml", "testdata/domain_check.xml");
+    eppVerifier().verifySent("contact_create.xml", "domain_check.xml");
   }
 
   @Test

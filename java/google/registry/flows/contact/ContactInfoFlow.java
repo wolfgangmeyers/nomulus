@@ -17,11 +17,14 @@ package google.registry.flows.contact;
 import google.registry.flows.ResourceInfoFlow;
 import google.registry.model.contact.ContactCommand.Info;
 import google.registry.model.contact.ContactResource;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that reads a contact.
  *
  * @error {@link google.registry.flows.ResourceQueryFlow.ResourceToQueryDoesNotExistException}
  */
-public class ContactInfoFlow extends ResourceInfoFlow<ContactResource, Info> {}
+public class ContactInfoFlow extends ResourceInfoFlow<ContactResource, Info> {
+  @Inject ContactInfoFlow() {}
+}
 

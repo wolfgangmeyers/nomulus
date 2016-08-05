@@ -20,13 +20,11 @@ import static java.lang.annotation.RetentionPolicy.RUNTIME;
 import com.google.common.base.Joiner;
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableSet;
-
 import google.registry.model.annotations.ExternalMessagingName;
 import google.registry.model.eppinput.EppInput.InnerCommand;
-import google.registry.model.eppinput.ResourceCommand;
+import google.registry.model.eppinput.EppInput.ResourceCommandWrapper;
 import google.registry.model.eppoutput.Result;
 import google.registry.model.eppoutput.Result.Code;
-
 import java.lang.annotation.Documented;
 import java.lang.annotation.Inherited;
 import java.lang.annotation.Retention;
@@ -211,11 +209,13 @@ public abstract class EppException extends Exception {
   /** Specified command is not implemented. */
   @EppResultCode(Code.UnimplementedCommand)
   public static class UnimplementedCommandException extends EppException {
-    public UnimplementedCommandException(InnerCommand command, ResourceCommand resourceCommand) {
+    public UnimplementedCommandException(InnerCommand command) {
       super(String.format(
           "No flow found for %s with extension %s",
           command.getClass().getSimpleName(),
-          resourceCommand == null ? null : resourceCommand.getClass().getSimpleName()));
+          command instanceof ResourceCommandWrapper
+              ? ((ResourceCommandWrapper) command).getResourceCommand().getClass().getSimpleName()
+              : null));
     }
   }
 

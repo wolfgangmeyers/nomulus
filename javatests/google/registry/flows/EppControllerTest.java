@@ -14,15 +14,15 @@
 
 package google.registry.flows;
 
-import static google.registry.flows.EppController.getErrorResponse;
 import static google.registry.flows.EppXmlTransformer.marshal;
 
 import google.registry.model.eppcommon.Trid;
 import google.registry.model.eppoutput.Result;
 import google.registry.model.eppoutput.Result.Code;
 import google.registry.testing.AppEngineRule;
+import google.registry.testing.ShardableTestCase;
+import google.registry.util.SystemClock;
 import google.registry.xml.ValidationMode;
-
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -30,7 +30,7 @@ import org.junit.runners.JUnit4;
 
 /** Unit tests for {@link EppController}. */
 @RunWith(JUnit4.class)
-public class EppControllerTest {
+public class EppControllerTest extends ShardableTestCase {
 
   @Rule
   public AppEngineRule appEngineRule = new AppEngineRule.Builder().build();
@@ -38,13 +38,8 @@ public class EppControllerTest {
   @Test
   public void testMarshallingUnknownError() throws Exception {
     marshal(
-        getErrorResponse(Result.create(Code.CommandFailed), Trid.create(null)),
+        EppController.getErrorResponse(
+            new SystemClock(), Result.create(Code.CommandFailed), Trid.create(null)),
         ValidationMode.STRICT);
   }
-
-  // Extra methods so the test runner doesn't produce empty shards.
-
-  @Test public void testNothing1() {}
-  @Test public void testNothing2() {}
-  @Test public void testNothing3() {}
 }

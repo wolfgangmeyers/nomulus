@@ -26,29 +26,24 @@ import static google.registry.request.RequestParameters.extractSetOfParameters;
 
 import com.google.appengine.api.taskqueue.Queue;
 import com.google.appengine.api.taskqueue.QueueFactory;
-
+import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
-
 import google.registry.dns.DnsConstants.TargetType;
-import google.registry.dns.writer.api.DnsWriterZone;
+import google.registry.model.dns.DnsWriterZone;
 import google.registry.request.Parameter;
 import google.registry.request.RequestParameters;
-
 import java.util.Set;
-
 import javax.inject.Named;
 import javax.servlet.http.HttpServletRequest;
 
 /** Dagger module for the dns package. */
 @Module
-public final class DnsModule {
+public abstract class DnsModule {
 
-  @Provides
+  @Binds
   @DnsWriterZone
-  static String provideZoneName(@Parameter(RequestParameters.PARAM_TLD) String tld) {
-    return tld;
-  }
+  abstract String provideZoneName(@Parameter(RequestParameters.PARAM_TLD) String tld);
 
   @Provides
   @Named(DNS_PULL_QUEUE_NAME)

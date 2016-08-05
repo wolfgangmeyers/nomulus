@@ -21,19 +21,18 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.net.InternetDomainName;
-
 import google.registry.flows.EppException;
 import google.registry.model.domain.launch.LaunchCheckExtension;
 import google.registry.model.domain.launch.LaunchCheckResponseExtension;
 import google.registry.model.domain.launch.LaunchCheckResponseExtension.LaunchCheck;
 import google.registry.model.domain.launch.LaunchCheckResponseExtension.LaunchCheckName;
 import google.registry.model.eppoutput.CheckData;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.tmch.ClaimsListShard;
-
 import java.util.Map.Entry;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that checks whether strings are trademarked.
@@ -47,6 +46,8 @@ public class ClaimsCheckFlow extends BaseDomainCheckFlow {
 
   public static final ImmutableSet<TldState> DISALLOWED_TLD_STATES = Sets.immutableEnumSet(
       TldState.PREDELEGATION, TldState.SUNRISE);
+
+  @Inject ClaimsCheckFlow() {}
 
   @Override
   protected void initDomainCheckFlow() throws EppException {

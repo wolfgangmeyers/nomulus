@@ -20,7 +20,6 @@ import static google.registry.flows.domain.DomainFlowUtils.verifyLaunchApplicati
 import static google.registry.flows.domain.DomainFlowUtils.verifyLaunchPhase;
 
 import com.google.common.collect.ImmutableSet;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
 import google.registry.flows.ResourceSyncDeleteFlow;
@@ -33,8 +32,8 @@ import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.reporting.HistoryEntry;
-
 import java.util.Set;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that deletes a domain application.
@@ -51,6 +50,8 @@ import java.util.Set;
 public class DomainApplicationDeleteFlow
     extends ResourceSyncDeleteFlow<DomainApplication, Builder, Delete> {
 
+  @Inject DomainApplicationDeleteFlow() {}
+
   @Override
   protected void initResourceCreateOrMutateFlow() throws EppException {
     registerExtensions(LaunchDeleteExtension.class);
@@ -66,7 +67,7 @@ public class DomainApplicationDeleteFlow
     // Don't allow deleting a sunrise application during landrush.
     if (existingResource.getPhase().equals(LaunchPhase.SUNRISE)
         && Registry.get(existingResource.getTld()).getTldState(now).equals(TldState.LANDRUSH)
-        && !superuser) {
+        && !isSuperuser) {
       throw new SunriseApplicationCannotBeDeletedInLandrushException();
     }
   }

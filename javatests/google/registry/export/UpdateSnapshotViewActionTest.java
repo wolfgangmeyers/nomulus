@@ -29,13 +29,12 @@ import com.google.api.services.bigquery.Bigquery;
 import com.google.api.services.bigquery.model.Dataset;
 import com.google.api.services.bigquery.model.Table;
 import com.google.appengine.api.taskqueue.QueueFactory;
-
 import google.registry.bigquery.BigqueryFactory;
 import google.registry.request.HttpException.InternalServerErrorException;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.ExceptionRule;
 import google.registry.testing.TaskQueueHelper.TaskMatcher;
-
+import java.io.IOException;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -43,8 +42,6 @@ import org.junit.runner.RunWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
-
-import java.io.IOException;
 
 /** Unit tests for {@link UpdateSnapshotViewAction}. */
 @RunWith(MockitoJUnitRunner.class)
@@ -82,18 +79,17 @@ public class UpdateSnapshotViewActionTest {
   public void before() throws Exception {
     when(bigqueryFactory.create(anyString(), anyString())).thenReturn(bigquery);
     when(bigquery.datasets()).thenReturn(bigqueryDatasets);
-    when(bigqueryDatasets.insert(eq("Project-Id"), any(Dataset.class)))
+    when(bigqueryDatasets.insert(anyString(), any(Dataset.class)))
         .thenReturn(bigqueryDatasetsInsert);
     when(bigquery.tables()).thenReturn(bigqueryTables);
-    when(bigqueryTables.update(
-            eq("Project-Id"), anyString(), anyString(), any(Table.class)))
+    when(bigqueryTables.update(anyString(), anyString(), anyString(), any(Table.class)))
         .thenReturn(bigqueryTablesUpdate);
 
     action = new UpdateSnapshotViewAction();
     action.bigqueryFactory = bigqueryFactory;
     action.datasetId = "some_dataset";
     action.kindName = "fookind";
-    action.projectId = "Project-Id";
+    action.projectId = "myproject";
     action.tableId = "12345_fookind";
   }
 
@@ -116,14 +112,14 @@ public class UpdateSnapshotViewActionTest {
 
     // Check that the BigQuery factory was called in such a way that the dataset would be created
     // if it didn't already exist.
-    verify(bigqueryFactory).create("Project-Id", "latest_snapshot");
+    verify(bigqueryFactory).create("myproject", "latest_snapshot");
 
     // Check that we updated the view.
     ArgumentCaptor<Table> tableArg = ArgumentCaptor.forClass(Table.class);
     verify(bigqueryTables).update(
-        eq("Project-Id"), eq("latest_snapshot"), eq("fookind"), tableArg.capture());
+        eq("myproject"), eq("latest_snapshot"), eq("fookind"), tableArg.capture());
     assertThat(tableArg.getValue().getView().getQuery())
-        .isEqualTo("SELECT * FROM [some_dataset.12345_fookind]");
+        .isEqualTo("SELECT * FROM [myproject:some_dataset.12345_fookind]");
   }
 
   @Test

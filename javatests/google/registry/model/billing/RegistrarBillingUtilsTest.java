@@ -24,14 +24,13 @@ import static org.joda.money.CurrencyUnit.JPY;
 import static org.joda.money.CurrencyUnit.USD;
 
 import com.google.common.collect.ImmutableSortedMap;
-
 import google.registry.model.ofy.Ofy;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.FakeClock;
 import google.registry.testing.InjectRule;
-
+import java.util.Map;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
@@ -41,8 +40,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.util.Map;
 
 /** Unit tests for {@link RegistrarBillingUtils}. */
 @RunWith(JUnit4.class)
@@ -67,6 +64,7 @@ public final class RegistrarBillingUtilsTest {
             .setCurrency(JPY)
             .setRenewBillingCostTransitions(
                 ImmutableSortedMap.of(START_OF_TIME, Money.parse("JPY 110")))
+            .setEapFeeSchedule(ImmutableSortedMap.of(START_OF_TIME, Money.parse("JPY 0")))
             .setCreateBillingCost(Money.parse("JPY 130"))
             .setRestoreBillingCost(Money.parse("JPY 170"))
             .setServerStatusChangeBillingCost(Money.parse("JPY 190"))

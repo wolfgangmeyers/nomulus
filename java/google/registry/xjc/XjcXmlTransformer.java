@@ -18,10 +18,8 @@ import static google.registry.xml.ValidationMode.LENIENT;
 import static google.registry.xml.ValidationMode.STRICT;
 
 import com.google.common.collect.ImmutableMap;
-
 import google.registry.xml.XmlException;
 import google.registry.xml.XmlTransformer;
-
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.Writer;
@@ -44,6 +42,9 @@ public class XjcXmlTransformer {
           .put("mark", "mark.xsd")
           .put("dsig", "dsig.xsd")
           .put("smd", "smd.xsd")
+          .put("fee06", "fee06.xsd")
+          .put("fee11", "fee11.xsd")
+          .put("fee12", "fee12.xsd")
           .put("launch", "launch.xsd")
           .put("rde", "rde.xsd")
           .put("rdeheader", "rde-header.xsd")
@@ -64,8 +65,8 @@ public class XjcXmlTransformer {
     return INSTANCE;
   }
 
-  public static <T> T unmarshal(InputStream stream) throws XmlException {
-    return INSTANCE.unmarshal(stream);
+  public static <T> T unmarshal(Class<T> clazz, InputStream stream) throws XmlException {
+    return INSTANCE.unmarshal(clazz, stream);
   }
 
   public static void marshalLenient(Object root, Writer writer) throws XmlException {

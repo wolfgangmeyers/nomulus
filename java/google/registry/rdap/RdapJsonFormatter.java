@@ -28,9 +28,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
 import com.google.common.net.InetAddresses;
-
 import com.googlecode.objectify.Key;
-
 import google.registry.model.EppResource;
 import google.registry.model.contact.ContactPhoneNumber;
 import google.registry.model.contact.ContactResource;
@@ -46,17 +44,14 @@ import google.registry.model.registrar.RegistrarAddress;
 import google.registry.model.registrar.RegistrarContact;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.util.Idn;
-
-import org.joda.time.DateTime;
-
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.URI;
 import java.util.Locale;
 import java.util.Map;
-
 import javax.annotation.Nullable;
+import org.joda.time.DateTime;
 
 /**
  * Helper class to create RDAP JSON objects for various registry entities and objects.
@@ -90,8 +85,9 @@ public class RdapJsonFormatter {
   static final String NOTICES = "notices";
   private static final String REMARKS = "remarks";
 
-  /** Status values specified in RFC 7483 § 10.2.2. */
   private enum RdapStatus {
+
+    // Status values specified in RFC 7483 § 10.2.2.
     VALIDATED("validated"),
     RENEW_PROHIBITED("renew prohibited"),
     UPDATE_PROHIBITED("update prohibited"),
@@ -109,7 +105,26 @@ public class RdapJsonFormatter {
     PENDING_RENEW("pending renew"),
     PENDING_TRANSFER("pending transfer"),
     PENDING_UPDATE("pending update"),
-    PENDING_DELETE("pending delete");
+    PENDING_DELETE("pending delete"),
+    
+    // Additional status values defined in
+    // https://tools.ietf.org/html/draft-ietf-regext-epp-rdap-status-mapping-01.
+    ADD_PERIOD("add period"),
+    AUTO_RENEW_PERIOD("auto renew period"),
+    CLIENT_DELETE_PROHIBITED("client delete prohibited"),
+    CLIENT_HOLD("client hold"),
+    CLIENT_RENEW_PROHIBITED("client renew prohibited"),
+    CLIENT_TRANSFER_PROHIBITED("client transfer prohibited"),
+    CLIENT_UPDATE_PROHIBITED("client update prohibited"),
+    PENDING_RESTORE("pending restore"),
+    REDEMPTION_PERIOD("redemption period"),
+    RENEW_PERIOD("renew period"),
+    SERVER_DELETE_PROHIBITED("server deleted prohibited"),
+    SERVER_RENEW_PROHIBITED("server renew prohibited"),
+    SERVER_TRANSFER_PROHIBITED("server transfer prohibited"),
+    SERVER_UPDATE_PROHIBITED("server update prohibited"),
+    SERVER_HOLD("server hold"),
+    TRANSFER_PERIOD("transfer period");
 
     /** Value as it appears in RDAP messages. */
     private final String rfc7483String;
@@ -128,23 +143,30 @@ public class RdapJsonFormatter {
   private static final ImmutableMap<StatusValue, RdapStatus> statusToRdapStatusMap =
       Maps.immutableEnumMap(
           new ImmutableMap.Builder<StatusValue, RdapStatus>()
-              .put(StatusValue.CLIENT_DELETE_PROHIBITED, RdapStatus.DELETE_PROHIBITED)
-              .put(StatusValue.CLIENT_HOLD, RdapStatus.INACTIVE)
-              .put(StatusValue.CLIENT_RENEW_PROHIBITED, RdapStatus.RENEW_PROHIBITED)
-              .put(StatusValue.CLIENT_TRANSFER_PROHIBITED, RdapStatus.TRANSFER_PROHIBITED)
-              .put(StatusValue.CLIENT_UPDATE_PROHIBITED, RdapStatus.UPDATE_PROHIBITED)
+              // StatusValue.ADD_PERIOD not defined in our system
+              // StatusValue.AUTO_RENEW_PERIOD not defined in our system
+              .put(StatusValue.CLIENT_DELETE_PROHIBITED, RdapStatus.CLIENT_DELETE_PROHIBITED)
+              .put(StatusValue.CLIENT_HOLD, RdapStatus.CLIENT_HOLD)
+              .put(StatusValue.CLIENT_RENEW_PROHIBITED, RdapStatus.CLIENT_RENEW_PROHIBITED)
+              .put(StatusValue.CLIENT_TRANSFER_PROHIBITED, RdapStatus.CLIENT_TRANSFER_PROHIBITED)
+              .put(StatusValue.CLIENT_UPDATE_PROHIBITED, RdapStatus.CLIENT_UPDATE_PROHIBITED)
               .put(StatusValue.INACTIVE, RdapStatus.INACTIVE)
               .put(StatusValue.LINKED, RdapStatus.ASSOCIATED)
               .put(StatusValue.OK, RdapStatus.ACTIVE)
               .put(StatusValue.PENDING_CREATE, RdapStatus.PENDING_CREATE)
               .put(StatusValue.PENDING_DELETE, RdapStatus.PENDING_DELETE)
+              // StatusValue.PENDING_RENEW not defined in our system
+              // StatusValue.PENDING_RESTORE not defined in our system
               .put(StatusValue.PENDING_TRANSFER, RdapStatus.PENDING_TRANSFER)
               .put(StatusValue.PENDING_UPDATE, RdapStatus.PENDING_UPDATE)
-              .put(StatusValue.SERVER_DELETE_PROHIBITED, RdapStatus.DELETE_PROHIBITED)
-              .put(StatusValue.SERVER_HOLD, RdapStatus.INACTIVE)
-              .put(StatusValue.SERVER_RENEW_PROHIBITED, RdapStatus.RENEW_PROHIBITED)
-              .put(StatusValue.SERVER_TRANSFER_PROHIBITED, RdapStatus.TRANSFER_PROHIBITED)
-              .put(StatusValue.SERVER_UPDATE_PROHIBITED, RdapStatus.UPDATE_PROHIBITED)
+              // StatusValue.REDEMPTION_PERIOD not defined in our system
+              // StatusValue.RENEW_PERIOD not defined in our system
+              .put(StatusValue.SERVER_DELETE_PROHIBITED, RdapStatus.SERVER_DELETE_PROHIBITED)
+              .put(StatusValue.SERVER_HOLD, RdapStatus.SERVER_HOLD)
+              .put(StatusValue.SERVER_RENEW_PROHIBITED, RdapStatus.SERVER_RENEW_PROHIBITED)
+              .put(StatusValue.SERVER_TRANSFER_PROHIBITED, RdapStatus.SERVER_TRANSFER_PROHIBITED)
+              .put(StatusValue.SERVER_UPDATE_PROHIBITED, RdapStatus.SERVER_UPDATE_PROHIBITED)
+              // StatusValue.TRANSFER_PERIOD not defined in our system
               .build());
 
   /** Role values specified in RFC 7483 § 10.2.4. */
@@ -194,7 +216,7 @@ public class RdapJsonFormatter {
     }
   }
 
-  /** Map of EPP status values to the RDAP equivalents. */
+  /** Map of EPP event values to the RDAP equivalents. */
   private static final ImmutableMap<HistoryEntry.Type, RdapEventAction>
       historyEntryTypeToRdapEventActionMap =
           Maps.immutableEnumMap(
@@ -814,6 +836,23 @@ public class RdapJsonFormatter {
     ImmutableList.Builder<Object> builder = new ImmutableList.Builder<>();
     builder.add(""); // PO box
     builder.add(""); // extended address
+
+    // The vCard spec allows several different ways to handle multiline street addresses. Per
+    // Gustavo Lozano of ICANN, the one we should use is an embedded array of street address lines
+    // if there is more than one line:
+    //
+    //   RFC7095 provides two examples of structured addresses, and one of the examples shows a
+    //   street JSON element that contains several data elements. The example showing (see below)
+    //   several data elements is the expected output when two or more <contact:street> elements
+    //   exists in the contact object.
+    //
+    //   ["adr", {}, "text",
+    //    [
+    //    "", "",
+    //    ["My Street", "Left Side", "Second Shack"],
+    //    "Hometown", "PA", "18252", "U.S.A."
+    //    ]
+    //   ]
     ImmutableList<String> street = address.getStreet();
     if (street.isEmpty()) {
       builder.add("");

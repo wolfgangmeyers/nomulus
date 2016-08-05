@@ -24,16 +24,14 @@ import static google.registry.testing.DatastoreHelper.persistResource;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableList;
-
 import com.googlecode.objectify.Key;
-
 import google.registry.model.pricing.StaticPremiumListPricingEngine;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.label.PremiumList.PremiumListEntry;
 import google.registry.model.registry.label.PremiumList.PremiumListRevision;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.ExceptionRule;
-
+import java.util.Map;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.junit.Before;
@@ -41,8 +39,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.util.Map;
 
 /** Unit tests for {@link PremiumList}. */
 @RunWith(JUnit4.class)
@@ -74,7 +70,7 @@ public class PremiumListTest {
     persistResource(
         new Registry.Builder()
             .setTldStr("ghost")
-            .setPricingEngineClass(StaticPremiumListPricingEngine.class)
+            .setPremiumPricingEngine(StaticPremiumListPricingEngine.NAME)
             .build());
     assertThat(Registry.get("ghost").getPremiumList()).isNull();
     assertThat(getPremiumPrice("blah", "ghost")).isAbsent();
@@ -177,6 +173,40 @@ public class PremiumListTest {
     assertThat(entry.comment).isEqualTo("yupper rooni");
     assertThat(entry.price).isEqualTo(Money.parse("USD 999"));
     assertThat(entry.label).isEqualTo("lol");
+  }
+
+  @Test
+  public void test_saveAndUpdateEntries_twiceOnUnchangedList() throws Exception {
+    PremiumList pl =
+        new PremiumList.Builder()
+            .setName("pl")
+            .setPremiumListMapFromLines(ImmutableList.of("test,USD 1"))
+            .build()
+            .saveAndUpdateEntries();
+    Map<String, PremiumListEntry> entries = pl.getPremiumListEntries();
+    assertThat(entries.keySet()).containsExactly("test");
+    assertThat(PremiumList.get("pl").get().getPremiumListEntries()).isEqualTo(entries);
+    // Save again with no changes, and clear the cache to force a re-load from datastore.
+    pl.saveAndUpdateEntries();
+    ofy().clearSessionCache();
+    assertThat(PremiumList.get("pl").get().getPremiumListEntries()).isEqualTo(entries);
+  }
+
+  @Test
+  public void test_saveAndUpdateEntries_twiceOnListWithOnlyMetadataChanges() throws Exception {
+    PremiumList pl =
+        new PremiumList.Builder()
+            .setName("pl")
+            .setPremiumListMapFromLines(ImmutableList.of("test,USD 1"))
+            .build()
+            .saveAndUpdateEntries();
+    Map<String, PremiumListEntry> entries = pl.getPremiumListEntries();
+    assertThat(entries.keySet()).containsExactly("test");
+    assertThat(PremiumList.get("pl").get().getPremiumListEntries()).isEqualTo(entries);
+    // Save again with description changed, and clear the cache to force a re-load from datastore.
+    pl.asBuilder().setDescription("foobar").build().saveAndUpdateEntries();
+    ofy().clearSessionCache();
+    assertThat(PremiumList.get("pl").get().getPremiumListEntries()).isEqualTo(entries);
   }
 
   @Test

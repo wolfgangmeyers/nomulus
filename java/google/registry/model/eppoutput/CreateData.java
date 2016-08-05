@@ -14,14 +14,12 @@
 
 package google.registry.model.eppoutput;
 
-import google.registry.model.eppoutput.Response.ResponseData;
-
-import org.joda.time.DateTime;
-
+import google.registry.model.eppoutput.EppResponse.ResponseData;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.bind.annotation.XmlType;
+import org.joda.time.DateTime;
 
 /** The {@link ResponseData} returned when creating a resource. */
 @XmlTransient

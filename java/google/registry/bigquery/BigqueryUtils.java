@@ -15,14 +15,12 @@
 package google.registry.bigquery;
 
 import com.google.api.services.bigquery.model.JobReference;
-
+import java.util.concurrent.TimeUnit;
 import org.joda.time.DateTime;
 import org.joda.time.format.DateTimeFormatter;
 import org.joda.time.format.DateTimeFormatterBuilder;
 import org.joda.time.format.DateTimeParser;
 import org.joda.time.format.ISODateTimeFormat;
-
-import java.util.concurrent.TimeUnit;
 
 /** Utilities related to Bigquery. */
 public class BigqueryUtils {
@@ -116,9 +114,8 @@ public class BigqueryUtils {
               ISODateTimeFormat.hourMinuteSecond().getParser()})
       // Print UTC as the empty string since BigQuery's TIMESTAMP() function does not accept any
       // time zone specification, but require "UTC" on parsing.  Since we force this formatter to
-      // always use UTC below, the other arguments do not matter.
-      //
-      // TODO(b/26162667): replace this with appendLiteral(" UTC") if b/16380363 gets resolved.
+      // always use UTC below, the other arguments do not matter.  If b/16380363 ever gets resolved
+      // this could be simplified to appendLiteral(" UTC").
       .appendTimeZoneOffset("", " UTC", false, 1, 1)
       .toFormatter()
       .withZoneUTC();

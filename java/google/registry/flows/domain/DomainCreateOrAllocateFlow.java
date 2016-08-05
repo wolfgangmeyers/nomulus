@@ -20,9 +20,7 @@ import static google.registry.util.DateTimeUtils.leapSafeAddYears;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Ref;
-
 import google.registry.dns.DnsQueue;
 import google.registry.flows.EppException;
 import google.registry.model.billing.BillingEvent;
@@ -31,14 +29,10 @@ import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.DomainResource.Builder;
 import google.registry.model.domain.Period;
-import google.registry.model.domain.fee.Fee;
-import google.registry.model.domain.fee.FeeCreateResponseExtension;
-import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.eppoutput.CreateData.DomainCreateData;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.eppoutput.Result;
 import google.registry.model.poll.PollMessage;
-
 import org.joda.time.DateTime;
 
 /** An EPP flow that creates or allocates a new domain resource. */
@@ -49,7 +43,6 @@ public abstract class DomainCreateOrAllocateFlow
 
   @Override
   protected final void initDomainCreateFlow() {
-    registerExtensions(MetadataExtension.class);
     isAnchorTenantViaExtension =
         (metadataExtension != null && metadataExtension.getIsAnchorTenant());
     initDomainCreateOrAllocateFlow();
@@ -114,9 +107,9 @@ public abstract class DomainCreateOrAllocateFlow
             now,
             newResource.getRegistrationExpirationTime()),
         (feeCreate == null) ? null : ImmutableList.of(
-            new FeeCreateResponseExtension.Builder()
-                .setCurrency(createCost.getCurrencyUnit())
-                .setFee(ImmutableList.of(Fee.create(createCost.getAmount(), "create")))
+            feeCreate.createResponseBuilder()
+                .setCurrency(commandOperations.getCurrency())
+                .setFees(commandOperations.getFees())
                 .build()));
   }
 }

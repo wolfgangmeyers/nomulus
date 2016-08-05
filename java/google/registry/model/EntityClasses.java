@@ -17,7 +17,6 @@ package google.registry.model;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
-
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.RegistrarBillingEntry;
 import google.registry.model.billing.RegistrarCredit;
@@ -29,6 +28,7 @@ import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.DomainResource;
+import google.registry.model.domain.LrpToken;
 import google.registry.model.export.LogsExportCursor;
 import google.registry.model.host.HostResource;
 import google.registry.model.index.DomainApplicationIndex;
@@ -42,13 +42,12 @@ import google.registry.model.ofy.CommitLogManifest;
 import google.registry.model.ofy.CommitLogMutation;
 import google.registry.model.permission.PermissionGroup;
 import google.registry.model.permission.UserPermissionGroups;
-import google.registry.model.pricing.PricingCategory;
 import google.registry.model.poll.PollMessage;
+import google.registry.model.pricing.PricingCategory;
 import google.registry.model.rde.RdeRevision;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarContact;
 import google.registry.model.registry.Registry;
-import google.registry.model.registry.RegistryCursor;
 import google.registry.model.registry.label.PremiumList;
 import google.registry.model.registry.label.ReservedList;
 import google.registry.model.reporting.HistoryEntry;
@@ -97,6 +96,7 @@ public final class EntityClasses {
           HostResource.class,
           Lock.class,
           LogsExportCursor.class,
+          LrpToken.class,
           PermissionGroup.class,
           PollMessage.class,
           PollMessage.Autorenew.class,
@@ -112,7 +112,6 @@ public final class EntityClasses {
           RegistrarCredit.class,
           RegistrarCreditBalance.class,
           Registry.class,
-          RegistryCursor.class,
           ReservedList.class,
           ServerSecret.class,
           SignedMarkRevocationList.class,

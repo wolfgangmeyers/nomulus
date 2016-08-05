@@ -29,19 +29,16 @@ import google.registry.testing.AppEngineRule;
 import google.registry.testing.ExceptionRule;
 import google.registry.testing.FakeClock;
 import google.registry.testing.InjectRule;
-
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
 import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.io.PrintWriter;
-import java.io.StringWriter;
-
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 
 /** Unit tests for Dagger injection of the DNS package. */
 @RunWith(JUnit4.class)
@@ -78,12 +75,12 @@ public final class DnsInjectionTest {
   }
 
   @Test
-  public void testWriteDnsAction_injectsAndWorks() throws Exception {
+  public void testReadDnsQueueAction_injectsAndWorks() throws Exception {
     persistActiveSubordinateHost("ns1.example.lol", persistActiveDomain("example.lol"));
     clock.advanceOneMilli();
     dnsQueue.addDomainRefreshTask("example.lol");
     when(req.getParameter("tld")).thenReturn("lol");
-    component.writeDnsAction().run();
+    component.readDnsQueueAction().run();
     assertNoDnsTasksEnqueued();
   }
 

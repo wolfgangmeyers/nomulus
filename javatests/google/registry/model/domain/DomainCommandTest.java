@@ -15,7 +15,6 @@
 package google.registry.model.domain;
 
 import google.registry.model.ResourceCommandTestCase;
-
 import org.junit.Test;
 
 /** Test xml roundtripping of commands. */
@@ -61,6 +60,11 @@ public class DomainCommandTest extends ResourceCommandTestCase {
   }
 
   @Test
+  public void testCreate_flags() throws Exception {
+    doXmlRoundtripTest("domain_create_flags.xml");
+  }
+
+  @Test
   public void testDelete() throws Exception {
     doXmlRoundtripTest("domain_delete.xml");
   }
@@ -73,6 +77,11 @@ public class DomainCommandTest extends ResourceCommandTestCase {
   @Test
   public void testUpdate_fee() throws Exception {
     doXmlRoundtripTest("domain_update_fee.xml");
+  }
+
+  @Test
+  public void testUpdate_flags() throws Exception {
+    doXmlRoundtripTest("domain_update_flags.xml");
   }
 
   @Test
@@ -121,6 +130,11 @@ public class DomainCommandTest extends ResourceCommandTestCase {
   }
 
   @Test
+  public void testCheck_flags() throws Exception {
+    doXmlRoundtripTest("domain_check_flags.xml");
+  }
+
+  @Test
   public void testTransferApprove() throws Exception {
     doXmlRoundtripTest("domain_transfer_approve.xml");
   }
@@ -148,6 +162,11 @@ public class DomainCommandTest extends ResourceCommandTestCase {
   @Test
   public void testTransferRequest_fee() throws Exception {
     doXmlRoundtripTest("domain_transfer_request_fee.xml");
+  }
+
+  @Test
+  public void testTransferRequest_flags() throws Exception {
+    doXmlRoundtripTest("domain_transfer_request_flags.xml");
   }
 
   @Test

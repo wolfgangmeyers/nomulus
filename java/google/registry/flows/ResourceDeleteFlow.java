@@ -18,15 +18,14 @@ import static google.registry.model.eppoutput.Result.Code.Success;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-
 import google.registry.model.EppResource;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.eppinput.ResourceCommand.SingleResourceCommand;
 import google.registry.model.eppoutput.EppOutput;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.eppoutput.Result.Code;
-
 import java.util.Set;
+import javax.annotation.Nullable;
 
 /**
  * An EPP flow that deletes an {@link EppResource}.
@@ -60,6 +59,7 @@ public abstract class ResourceDeleteFlow<R extends EppResource, C extends Single
   }
 
   /** Subclasses can override this to return response extensions. */
+  @Nullable
   protected ImmutableList<? extends ResponseExtension> getDeleteResponseExtensions() {
     return null;
   }

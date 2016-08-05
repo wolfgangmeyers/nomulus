@@ -25,14 +25,12 @@ import com.google.common.base.Converter;
 import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
-
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.EntitySubclass;
 import com.googlecode.objectify.annotation.Id;
 import com.googlecode.objectify.annotation.Index;
 import com.googlecode.objectify.annotation.Parent;
-
 import google.registry.model.Buildable;
 import google.registry.model.EppResource;
 import google.registry.model.ImmutableObject;
@@ -41,18 +39,16 @@ import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.DomainRenewData;
 import google.registry.model.domain.launch.LaunchInfoResponseExtension;
-import google.registry.model.eppoutput.Response.ResponseData;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse.ResponseData;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.poll.PendingActionNotificationResponse.ContactPendingActionNotificationResponse;
 import google.registry.model.poll.PendingActionNotificationResponse.DomainPendingActionNotificationResponse;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.transfer.TransferData.TransferServerApproveEntity;
 import google.registry.model.transfer.TransferResponse.ContactTransferResponse;
 import google.registry.model.transfer.TransferResponse.DomainTransferResponse;
-
-import org.joda.time.DateTime;
-
 import java.util.List;
+import org.joda.time.DateTime;
 
 /** A poll message that is pending for a registrar. */
 @Entity

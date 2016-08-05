@@ -21,7 +21,7 @@ import static google.registry.flows.domain.DomainFlowUtils.validateDomainName;
 import static google.registry.flows.domain.DomainFlowUtils.validateDomainNameWithIdnTables;
 import static google.registry.flows.domain.DomainFlowUtils.validateDsData;
 import static google.registry.flows.domain.DomainFlowUtils.validateNameserversAllowedOnTld;
-import static google.registry.flows.domain.DomainFlowUtils.validateNameserversCount;
+import static google.registry.flows.domain.DomainFlowUtils.validateNameserversCountForTld;
 import static google.registry.flows.domain.DomainFlowUtils.validateNoDuplicateContacts;
 import static google.registry.flows.domain.DomainFlowUtils.validateRegistrantAllowedOnTld;
 import static google.registry.flows.domain.DomainFlowUtils.validateRequiredContactsPresent;
@@ -33,17 +33,15 @@ import static google.registry.flows.domain.DomainFlowUtils.verifySignedMarks;
 import static google.registry.flows.domain.DomainFlowUtils.verifyUnitIsYears;
 import static google.registry.model.EppResourceUtils.createDomainRoid;
 import static google.registry.model.EppResourceUtils.loadByUniqueId;
+import static google.registry.model.domain.fee.Fee.FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.registry.Registries.findTldForName;
 import static google.registry.model.registry.label.ReservedList.matchesAnchorTenantReservation;
-import static google.registry.pricing.PricingEngineProxy.getDomainCreateCost;
 import static google.registry.util.CollectionUtils.nullToEmpty;
 
 import com.google.common.base.Optional;
 import com.google.common.net.InternetDomainName;
-
 import com.googlecode.objectify.Work;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ParameterValuePolicyErrorException;
 import google.registry.flows.EppException.ParameterValueRangeErrorException;
@@ -55,7 +53,7 @@ import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.DomainBase.Builder;
 import google.registry.model.domain.DomainCommand.Create;
 import google.registry.model.domain.DomainResource;
-import google.registry.model.domain.fee.FeeCreateExtension;
+import google.registry.model.domain.fee.FeeTransformCommandExtension;
 import google.registry.model.domain.launch.LaunchCreateExtension;
 import google.registry.model.domain.launch.LaunchNotice;
 import google.registry.model.domain.launch.LaunchNotice.InvalidChecksumException;
@@ -66,11 +64,9 @@ import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.smd.SignedMark;
 import google.registry.model.tmch.ClaimsListShard;
-
-import org.joda.money.Money;
-
+import google.registry.pricing.TldSpecificLogicProxy;
+import google.registry.pricing.TldSpecificLogicProxy.EppCommandOperations;
 import java.util.Set;
-
 import javax.annotation.Nullable;
 
 /**
@@ -88,8 +84,8 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
   protected String domainLabel;
   protected InternetDomainName domainName;
   protected String idnTableName;
-  protected FeeCreateExtension feeCreate;
-  protected Money createCost;
+  protected FeeTransformCommandExtension feeCreate;
+  protected EppCommandOperations commandOperations;
   protected boolean hasSignedMarks;
   protected SignedMark signedMark;
   protected boolean isAnchorTenantViaReservation;
@@ -101,7 +97,8 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
     registerExtensions(SecDnsCreateExtension.class);
     secDnsCreate = eppInput.getSingleExtension(SecDnsCreateExtension.class);
     launchCreate = eppInput.getSingleExtension(LaunchCreateExtension.class);
-    feeCreate = eppInput.getSingleExtension(FeeCreateExtension.class);
+    feeCreate =
+        eppInput.getFirstExtensionOfClasses(FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
     hasSignedMarks = launchCreate != null && !launchCreate.getSignedMarks().isEmpty();
     initDomainCreateFlow();
   }
@@ -181,13 +178,14 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
     tldState = registry.getTldState(now);
     checkRegistryStateForTld(tld);
     domainLabel = domainName.parts().get(0);
-    createCost = getDomainCreateCost(targetId, now, getClientId(), command.getPeriod().getValue());
+    commandOperations = TldSpecificLogicProxy.getCreatePrice(
+        registry, domainName.toString(), now, command.getPeriod().getValue());
     // The TLD should always be the parent of the requested domain name.
     isAnchorTenantViaReservation = matchesAnchorTenantReservation(
         domainLabel, tld, command.getAuthInfo().getPw().getValue());
     // Superusers can create reserved domains, force creations on domains that require a claims
     // notice without specifying a claims key, and override blocks on registering premium domains.
-    if (!superuser) {
+    if (!isSuperuser) {
       boolean isSunriseApplication =
           launchCreate != null && !launchCreate.getSignedMarks().isEmpty();
       if (!isAnchorTenantViaReservation) {
@@ -219,7 +217,7 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
     validateRequiredContactsPresent(command.getRegistrant(), command.getContacts());
     Set<String> fullyQualifiedHostNames =
         nullToEmpty(command.getNameserverFullyQualifiedHostNames());
-    validateNameserversCount(fullyQualifiedHostNames.size());
+    validateNameserversCountForTld(tld, fullyQualifiedHostNames.size());
     validateNameserversAllowedOnTld(tld, fullyQualifiedHostNames);
     validateLaunchCreateExtension();
     // If a signed mark was provided, then it must match the desired domain label.
@@ -254,7 +252,7 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
     if (launchCreate == null) {
       return;
     }
-    if (!superuser) {  // Superusers can ignore the phase.
+    if (!isSuperuser) {  // Superusers can ignore the phase.
       verifyLaunchPhase(getTld(), launchCreate, now);
     }
     if (launchCreate.hasCodeMarks()) {
@@ -269,7 +267,7 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
       throw new InvalidTrademarkValidatorException();
     }
     // Superuser can force domain creations regardless of the current date.
-    if (!superuser) {
+    if (!isSuperuser) {
       if (notice.getExpirationTime().isBefore(now)) {
         throw new ExpiredClaimException();
       }

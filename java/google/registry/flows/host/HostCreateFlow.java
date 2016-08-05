@@ -23,9 +23,7 @@ import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.util.CollectionUtils.isNullOrEmpty;
 
 import com.google.common.base.Optional;
-
 import com.googlecode.objectify.Ref;
-
 import google.registry.dns.DnsQueue;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ParameterValueRangeErrorException;
@@ -39,6 +37,7 @@ import google.registry.model.host.HostResource;
 import google.registry.model.host.HostResource.Builder;
 import google.registry.model.ofy.ObjectifyService;
 import google.registry.model.reporting.HistoryEntry;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that creates a new host resource.
@@ -66,6 +65,8 @@ public class HostCreateFlow extends ResourceCreateFlow<HostResource, Builder, Cr
    * domain ahead of time.
    */
   private Optional<Ref<DomainResource>> superordinateDomain;
+
+  @Inject HostCreateFlow() {}
 
   @Override
   protected void initResourceCreateOrMutateFlow() throws EppException {

@@ -20,14 +20,13 @@ import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.util.CollectionUtils.forceEmptyToNull;
 
 import com.googlecode.objectify.Key;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ParameterValueSyntaxErrorException;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.poll.MessageQueueInfo;
 import google.registry.model.poll.PollMessage;
-
 import java.util.List;
+import javax.inject.Inject;
 
 /**
  * An EPP flow for requesting poll messages.
@@ -35,6 +34,8 @@ import java.util.List;
  * @error {@link PollRequestFlow.UnexpectedMessageIdException}
  */
 public class PollRequestFlow extends PollFlow {
+
+  @Inject PollRequestFlow() {}
 
   @Override
   public final EppOutput run() throws EppException {

@@ -21,23 +21,20 @@ import static google.registry.util.DateTimeUtils.earliestOf;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.Iterables;
-
 import google.registry.dns.DnsQueue;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.DomainResource.Builder;
 import google.registry.model.domain.GracePeriod;
-import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.domain.secdns.SecDnsUpdateExtension;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.registry.Registry;
 import google.registry.model.reporting.HistoryEntry;
-
-import org.joda.time.DateTime;
-
 import java.util.Set;
+import javax.inject.Inject;
+import org.joda.time.DateTime;
 
 /**
  * An EPP flow that updates a domain resource.
@@ -62,15 +59,18 @@ import java.util.Set;
  * @error {@link DomainFlowUtils.MissingContactTypeException}
  * @error {@link DomainFlowUtils.MissingTechnicalContactException}
  * @error {@link DomainFlowUtils.NameserversNotAllowedException}
+ * @error {@link DomainFlowUtils.NameserversNotSpecifiedException}
  * @error {@link DomainFlowUtils.RegistrantNotAllowedException}
  * @error {@link DomainFlowUtils.TooManyDsRecordsException}
  * @error {@link DomainFlowUtils.TooManyNameserversException}
  */
 public class DomainUpdateFlow extends BaseDomainUpdateFlow<DomainResource, Builder> {
 
+  @Inject DomainUpdateFlow() {}
+
   @Override
   protected void initDomainUpdateFlow() {
-    registerExtensions(SecDnsUpdateExtension.class, MetadataExtension.class);
+    registerExtensions(SecDnsUpdateExtension.class);
   }
 
   @Override

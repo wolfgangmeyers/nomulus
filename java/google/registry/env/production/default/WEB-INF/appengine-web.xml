@@ -17,6 +17,8 @@
               value="WEB-INF/logging.properties"/>
     <property name="google.registry.environment"
               value="production"/>
+    <property name="com.google.domain.registry.config"
+              value="domains.donuts.config.DonutsRegistryConfig"/>
   </system-properties>
 
   <static-files>

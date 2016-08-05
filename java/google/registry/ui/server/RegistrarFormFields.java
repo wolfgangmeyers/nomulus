@@ -19,12 +19,12 @@ import static com.google.common.collect.Range.atMost;
 import static com.google.common.collect.Range.closed;
 import static google.registry.util.DomainNameUtils.canonicalizeDomainName;
 
+import com.google.common.base.Ascii;
 import com.google.common.base.Function;
 import com.google.common.base.Splitter;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.InternetDomainName;
 import com.google.re2j.Pattern;
-
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarAddress;
 import google.registry.model.registrar.RegistrarContact;
@@ -33,12 +33,10 @@ import google.registry.ui.forms.FormFieldException;
 import google.registry.ui.forms.FormFields;
 import google.registry.util.CidrAddressBlock;
 import google.registry.util.X509Utils;
-
 import java.security.cert.CertificateParsingException;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-
 import javax.annotation.Nullable;
 
 /** Form fields for validating input for the {@code Registrar} class. */
@@ -357,7 +355,7 @@ public final class RegistrarFormFields {
         }
         for (String state : stateField.extractUntyped(args).asSet()) {
           if ("US".equals(countryCode)) {
-            state = state.toUpperCase();
+            state = Ascii.toUpperCase(state);
             if (!StateCode.US_MAP.containsKey(state)) {
               throw new FormFieldException(stateField, "Unknown US state code.");
             }

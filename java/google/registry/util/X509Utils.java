@@ -23,7 +23,6 @@ import static java.nio.charset.StandardCharsets.US_ASCII;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterables;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -33,7 +32,6 @@ import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.cert.CRLException;
-import java.security.cert.CertificateEncodingException;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.CertificateParsingException;
@@ -44,7 +42,6 @@ import java.security.cert.X509CRLEntry;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 import java.util.NoSuchElementException;
-
 import javax.annotation.Tainted;
 
 /** X.509 Public Key Infrastructure (PKI) helper functions. */
@@ -140,12 +137,7 @@ public final class X509Utils {
       X509Certificate rootCert, X509CRL crl, @Tainted X509Certificate cert, Date now)
           throws GeneralSecurityException {
     cert.checkValidity(checkNotNull(now, "now"));
-    try {
-      cert.verify(rootCert.getPublicKey());
-    } catch (CertificateException e) {
-      propagateIfInstanceOf(e, CertificateException.class);
-      throw new CertificateEncodingException(e);  // Coercion by specification.
-    }
+    cert.verify(rootCert.getPublicKey());
     if (crl.isRevoked(cert)) {
       X509CRLEntry entry = crl.getRevokedCertificate(cert);
       throw new CertificateRevokedException(

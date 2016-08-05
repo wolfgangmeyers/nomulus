@@ -14,99 +14,110 @@
 
 package google.registry.flows;
 
+import static com.google.common.base.Strings.nullToEmpty;
 import static com.google.common.base.Throwables.getStackTraceAsString;
-import static com.google.common.base.Throwables.propagateIfInstanceOf;
 import static com.google.common.io.BaseEncoding.base64;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.xml.XmlTransformer.prettyPrint;
 
 import com.google.common.base.Strings;
-
+import com.google.common.collect.ImmutableMap;
 import com.googlecode.objectify.Work;
-
+import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.FlowModule.DryRun;
+import google.registry.flows.FlowModule.InputXml;
+import google.registry.flows.FlowModule.Superuser;
+import google.registry.flows.FlowModule.Transactional;
 import google.registry.model.eppcommon.Trid;
 import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.monitoring.whitebox.EppMetrics;
 import google.registry.util.Clock;
 import google.registry.util.FormattingLogger;
-import google.registry.util.NonFinalForTesting;
-import google.registry.util.SystemClock;
-import google.registry.util.TypeUtils;
-
+import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.inject.Provider;
 import org.joda.time.DateTime;
+import org.json.simple.JSONValue;
 
 /** Run a flow, either transactionally or not, with logging and retrying as needed. */
 public class FlowRunner {
 
-  private static final String COMMAND_LOG_FORMAT = "EPP Command" + Strings.repeat("\n\t%s", 4);
+  /** Log format used by legacy ICANN reporting parsing - DO NOT CHANGE. */
+  // TODO(b/20725722): remove this log format entirely once we've transitioned to using the
+  //   JSON log line below instead, or change this one to be for human consumption only.
+  private static final String COMMAND_LOG_FORMAT = "EPP Command" + Strings.repeat("\n\t%s", 7);
 
-  /** Whether to actually write to the datastore or just simulate. */
-  public enum CommitMode { LIVE, DRY_RUN }
-
-  /** Whether to run in normal or superuser mode. */
-  public enum UserPrivileges { NORMAL, SUPERUSER }
+  /**
+   * Log signature used by reporting pipelines to extract matching log lines.
+   *
+   * <p><b>WARNING:<b/> DO NOT CHANGE this value unless you want to break reporting.
+   */
+  private static final String REPORTING_LOG_SIGNATURE = "EPP-REPORTING-LOG-SIGNATURE";
 
   private static final FormattingLogger logger = FormattingLogger.getLoggerForCallerClass();
 
-  @NonFinalForTesting
-  private static Clock clock = new SystemClock();
+  @Inject @Nullable @ClientId String clientId;
+  @Inject Clock clock;
+  @Inject TransportCredentials credentials;
+  @Inject EppInput eppInput;
+  @Inject EppRequestSource eppRequestSource;
+  @Inject Provider<Flow> flowProvider;
+  @Inject @InputXml byte[] inputXmlBytes;
+  @Inject @DryRun boolean isDryRun;
+  @Inject @Superuser boolean isSuperuser;
+  @Inject @Transactional boolean isTransactional;
+  @Inject EppMetrics metrics;
+  @Inject SessionMetadata sessionMetadata;
+  @Inject Trid trid;
+  @Inject FlowRunner() {}
 
-  private final Class<? extends Flow> flowClass;
-  private final EppInput eppInput;
-  private final Trid trid;
-  private final SessionMetadata sessionMetadata;
-  private final byte[] inputXmlBytes;
-  private final EppMetrics metrics;
-
-  public FlowRunner(
-      Class<? extends Flow> flowClass,
-      EppInput eppInput,
-      Trid trid,
-      SessionMetadata sessionMetadata,
-      byte[] inputXmlBytes,
-      final EppMetrics metrics) {
-    this.flowClass = flowClass;
-    this.eppInput = eppInput;
-    this.trid = trid;
-    this.sessionMetadata = sessionMetadata;
-    this.inputXmlBytes = inputXmlBytes;
-    this.metrics = metrics;
-  }
-
-  public EppOutput run(
-      final CommitMode commitMode, final UserPrivileges userPrivileges) throws EppException {
-    String clientId = sessionMetadata.getClientId();
-    final boolean isSuperuser = UserPrivileges.SUPERUSER.equals(userPrivileges);
+  public EppOutput run() throws EppException {
+    String prettyXml = prettyPrint(inputXmlBytes);
+    String xmlBase64 = base64().encode(inputXmlBytes);
+    // This log line is very fragile since it's used for ICANN reporting - DO NOT CHANGE.
+    // New data to be logged should be added only to the JSON log statement below.
+    // TODO(b/20725722): remove this log statement entirely once we've transitioned to using the
+    //   log line below instead, or change this one to be for human consumption only.
     logger.infofmt(
         COMMAND_LOG_FORMAT,
         trid.getServerTransactionId(),
         clientId,
         sessionMetadata,
-        prettyPrint(inputXmlBytes).replaceAll("\n", "\n\t"));
-    if (!isTransactional()) {
-      if (metrics != null) {
-        metrics.incrementAttempts();
-      }
-      return createAndInitFlow(isSuperuser, clock.nowUtc()).run();
+        prettyXml.replaceAll("\n", "\n\t"),
+        credentials,
+        eppRequestSource,
+        isDryRun ? "DRY_RUN" : "LIVE",
+        isSuperuser ? "SUPERUSER" : "NORMAL");
+    // WARNING: This JSON log statement is parsed by reporting pipelines - be careful when changing.
+    // It should be safe to add new keys, but be very cautious in changing existing keys.
+    logger.infofmt(
+        "%s: %s",
+        REPORTING_LOG_SIGNATURE,
+        JSONValue.toJSONString(ImmutableMap.<String, Object>of(
+            "trid", trid.getServerTransactionId(),
+            "clientId", nullToEmpty(clientId),
+            "xml", prettyXml,
+            "xmlBytes", xmlBase64)));
+    if (!isTransactional) {
+      metrics.incrementAttempts();
+      return createAndInitFlow(clock.nowUtc()).run();
     }
     // We log the command in a structured format. Note that we do this before the transaction;
     // if we did it after, we might miss a transaction that committed successfully but then crashed
     // before it could log.
     logger.info("EPP_Mutation " + new JsonLogStatement(trid)
         .add("client", clientId)
-        .add("privileges", userPrivileges.toString())
-        .add("xmlBytes", base64().encode(inputXmlBytes)));
+        .add("privileges", isSuperuser ? "SUPERUSER" : "NORMAL")
+        .add("xmlBytes", xmlBase64));
     try {
       EppOutput flowResult = ofy().transact(new Work<EppOutput>() {
         @Override
         public EppOutput run() {
-          if (metrics != null) {
-            metrics.incrementAttempts();
-          }
+          metrics.incrementAttempts();
           try {
-            EppOutput output = createAndInitFlow(isSuperuser, ofy().getTransactionTime()).run();
-            if (CommitMode.DRY_RUN.equals(commitMode)) {
+            EppOutput output = createAndInitFlow(ofy().getTransactionTime()).run();
+            if (isDryRun) {
               throw new DryRunException(output);
             }
             return output;
@@ -123,23 +134,21 @@ public class FlowRunner {
     } catch (RuntimeException e) {
       logger.warning("EPP_Mutation_Failed " + new JsonLogStatement(trid));
       logger.warning(getStackTraceAsString(e));
-      propagateIfInstanceOf(e.getCause(), EppException.class);
+      if (e.getCause() instanceof EppException) {
+        throw (EppException) e.getCause();
+      }
       throw e;
     }
   }
 
-  private Flow createAndInitFlow(boolean superuser, DateTime now) throws EppException {
-      return TypeUtils.<Flow>instantiate(flowClass).init(
+  private Flow createAndInitFlow(DateTime now) throws EppException {
+      return flowProvider.get().init(
           eppInput,
           trid,
           sessionMetadata,
-          superuser,
-          now,
-          inputXmlBytes);
-  }
-
-  public boolean isTransactional() {
-    return TransactionalFlow.class.isAssignableFrom(flowClass);
+          credentials,
+          isSuperuser,
+          now);
   }
 
   /**
@@ -182,7 +191,7 @@ public class FlowRunner {
   }
 
   /** Exception for canceling a transaction while capturing what the output would have been. */
-  private class DryRunException extends RuntimeException {
+  private static class DryRunException extends RuntimeException {
     final EppOutput output;
 
     DryRunException(EppOutput output) {

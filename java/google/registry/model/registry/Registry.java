@@ -23,6 +23,7 @@ import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
 import static google.registry.util.CollectionUtils.nullToEmptyImmutableCopy;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
+import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static google.registry.util.PreconditionsUtils.checkArgumentNotNull;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 import static org.joda.money.CurrencyUnit.USD;
@@ -37,8 +38,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Ordering;
+import com.google.common.collect.Range;
 import com.google.common.net.InternetDomainName;
-
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Work;
 import com.googlecode.objectify.annotation.Cache;
@@ -49,7 +50,6 @@ import com.googlecode.objectify.annotation.Mapify;
 import com.googlecode.objectify.annotation.OnLoad;
 import com.googlecode.objectify.annotation.OnSave;
 import com.googlecode.objectify.annotation.Parent;
-
 import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.CreateAutoTimestamp;
@@ -57,18 +57,16 @@ import google.registry.model.ImmutableObject;
 import google.registry.model.common.EntityGroupRoot;
 import google.registry.model.common.TimedTransitionProperty;
 import google.registry.model.common.TimedTransitionProperty.TimedTransition;
-import google.registry.model.pricing.PricingEngine;
+import google.registry.model.domain.fee.EapFee;
 import google.registry.model.pricing.StaticPremiumListPricingEngine;
 import google.registry.model.registry.label.PremiumList;
 import google.registry.model.registry.label.ReservedList;
 import google.registry.util.Idn;
-
+import java.util.Set;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
-
-import java.util.Set;
 
 /** Persisted per-TLD configuration data. */
 @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
@@ -111,6 +109,7 @@ public class Registry extends ImmutableObject implements Buildable {
   public static final Duration DEFAULT_ANCHOR_TENANT_ADD_GRACE_PERIOD = Duration.standardDays(30);
   public static final CurrencyUnit DEFAULT_CURRENCY = USD;
   public static final Money DEFAULT_CREATE_BILLING_COST = Money.of(USD, 8);
+  public static final Money DEFAULT_EAP_BILLING_COST = Money.of(USD, 0);
   public static final Money DEFAULT_RENEW_BILLING_COST = Money.of(USD, 8);
   public static final Money DEFAULT_RESTORE_BILLING_COST = Money.of(USD, 100);
   public static final Money DEFAULT_SERVER_STATUS_CHANGE_BILLING_COST = Money.of(USD, 20);
@@ -158,7 +157,10 @@ public class Registry extends ImmutableObject implements Buildable {
      */
     QUIET_PERIOD,
 
-    /** The steady state of a TLD in which all SLDs are available via first-come, first-serve. */
+    /**
+     * The steady state of a TLD in which all domain names are available via first-come,
+     * first-serve.
+     */
     GENERAL_AVAILABILITY,
 
     /** A "fake" state for use in predelegation testing. Acts like {@link #GENERAL_AVAILABILITY}. */
@@ -249,15 +251,18 @@ public class Registry extends ImmutableObject implements Buildable {
   @OnLoad
   void backfillPricingEngine() {
     if (pricingEngineClassName == null) {
-      pricingEngineClassName = StaticPremiumListPricingEngine.class.getCanonicalName();
+      pricingEngineClassName = StaticPremiumListPricingEngine.NAME;
     }
   }
 
   /**
-   * The fully qualified canonical classname of the pricing engine that this TLD uses.
+   * The name of the pricing engine that this TLD uses.
    *
    * <p>This must be a valid key for the map of pricing engines injected by
-   * <code>@Inject Map<String, PricingEngine></code>
+   * {@code @Inject Map<String, PricingEngine>}.
+   *
+   * <p>Note that it used to be the canonical class name, hence the name of this field, but this
+   * restriction has since been relaxed and it may now be any unique string.
    */
   String pricingEngineClassName;
 
@@ -356,6 +361,13 @@ public class Registry extends ImmutableObject implements Buildable {
   @Mapify(TimedTransitionProperty.TimeMapper.class)
   TimedTransitionProperty<Money, BillingCostTransition> renewBillingCostTransitions =
       TimedTransitionProperty.forMapify(DEFAULT_RENEW_BILLING_COST, BillingCostTransition.class);
+
+  /**
+   * A property that tracks the EAP fee schedule (if any) for the TLD.
+   */
+  @Mapify(TimedTransitionProperty.TimeMapper.class)
+  TimedTransitionProperty<Money, BillingCostTransition> eapFeeSchedule =
+      TimedTransitionProperty.forMapify(DEFAULT_EAP_BILLING_COST, BillingCostTransition.class);
 
   String lordnUsername;
 
@@ -466,7 +478,7 @@ public class Registry extends ImmutableObject implements Buildable {
   }
 
   /**
-   * Use <code>PricingUtils.getDomainCreateCost</code> instead of this to find the cost for a
+   * Use <code>PricingEngineProxy.getDomainCreateCost</code> instead of this to find the cost for a
    * domain create.
    */
   @VisibleForTesting
@@ -483,8 +495,8 @@ public class Registry extends ImmutableObject implements Buildable {
   }
 
   /**
-   * Use <code>PricingUtils.getDomainRenewCost</code> instead of this to find the cost for a domain
-   * renewal, and all derived costs (i.e. autorenews, transfers, and the per-domain part of a
+   * Use <code>PricingEngineProxy.getDomainRenewCost</code> instead of this to find the cost for a
+   * domain renewal, and all derived costs (i.e. autorenews, transfers, and the per-domain part of a
    * restore cost).
    */
   @VisibleForTesting
@@ -507,6 +519,20 @@ public class Registry extends ImmutableObject implements Buildable {
     return renewBillingCostTransitions.toValueMap();
   }
 
+  /**
+   * Returns the EAP fee for the registry at the given time.
+   */
+  public EapFee getEapFeeFor(DateTime now) {
+    ImmutableSortedMap<DateTime, Money> valueMap = eapFeeSchedule.toValueMap();
+    DateTime periodStart = valueMap.floorKey(now);
+    DateTime periodEnd = valueMap.ceilingKey(now);
+    return EapFee.create(
+        eapFeeSchedule.getValueAtTime(now),
+        Range.closedOpen(
+            periodStart != null ? periodStart : START_OF_TIME,
+            periodEnd != null ? periodEnd : END_OF_TIME));
+  }
+
   public String getLordnUsername() {
     return lordnUsername;
   }
@@ -515,7 +541,7 @@ public class Registry extends ImmutableObject implements Buildable {
     return claimsPeriodEnd;
   }
 
-  public String getPricingEngineClassName() {
+  public String getPremiumPricingEngineClassName() {
     return pricingEngineClassName;
   }
 
@@ -585,9 +611,8 @@ public class Registry extends ImmutableObject implements Buildable {
       return this;
     }
 
-    public Builder setPricingEngineClass(Class<? extends PricingEngine> pricingEngineClass) {
-      getInstance().pricingEngineClassName =
-          checkArgumentNotNull(pricingEngineClass).getCanonicalName();
+    public Builder setPremiumPricingEngine(String pricingEngineClass) {
+      getInstance().pricingEngineClassName = checkArgumentNotNull(pricingEngineClass);
       return this;
     }
 
@@ -711,7 +736,7 @@ public class Registry extends ImmutableObject implements Buildable {
      */
     public Builder setRenewBillingCostTransitions(
         ImmutableSortedMap<DateTime, Money> renewCostsMap) {
-      checkNotNull(renewCostsMap, "renew billing costs map cannot be null");
+      checkArgumentNotNull(renewCostsMap, "renew billing costs map cannot be null");
       checkArgument(Iterables.all(
           renewCostsMap.values(),
           new Predicate<Money>() {
@@ -722,6 +747,25 @@ public class Registry extends ImmutableObject implements Buildable {
           "renew billing cost cannot be negative");
       getInstance().renewBillingCostTransitions =
           TimedTransitionProperty.fromValueMap(renewCostsMap, BillingCostTransition.class);
+      return this;
+    }
+
+    /**
+     * Sets the EAP fee schedule for the TLD.
+     */
+    public Builder setEapFeeSchedule(
+        ImmutableSortedMap<DateTime, Money> eapFeeSchedule) {
+      checkArgumentNotNull(eapFeeSchedule, "EAP schedule map cannot be null");
+      checkArgument(Iterables.all(
+          eapFeeSchedule.values(),
+          new Predicate<Money>() {
+            @Override
+            public boolean apply(Money amount) {
+              return amount.isPositiveOrZero();
+            }}),
+          "EAP fee cannot be negative");
+      getInstance().eapFeeSchedule =
+          TimedTransitionProperty.fromValueMap(eapFeeSchedule, BillingCostTransition.class);
       return this;
     }
 
@@ -776,6 +820,7 @@ public class Registry extends ImmutableObject implements Buildable {
       // cloned it into a new builder, to block re-building a Registry in an invalid state.
       instance.tldStateTransitions.checkValidity();
       instance.renewBillingCostTransitions.checkValidity();
+      instance.eapFeeSchedule.checkValidity();
       // All costs must be in the expected currency.
       // TODO(b/21854155): When we move PremiumList into datastore, verify its currency too.
       checkArgument(
@@ -787,15 +832,19 @@ public class Registry extends ImmutableObject implements Buildable {
       checkArgument(
           instance.getServerStatusChangeCost().getCurrencyUnit().equals(instance.currency),
           "Server status change cost must be in the registry's currency");
+      Predicate<Money> currencyCheck = new Predicate<Money>(){
+          @Override
+          public boolean apply(Money money) {
+            return money.getCurrencyUnit().equals(instance.currency);
+          }};
       checkArgument(
           Iterables.all(
-              instance.getRenewBillingCostTransitions().values(),
-              new Predicate<Money>(){
-                @Override
-                public boolean apply(Money money) {
-                  return money.getCurrencyUnit().equals(instance.currency);
-                }}),
+              instance.getRenewBillingCostTransitions().values(), currencyCheck),
           "Renew cost must be in the registry's currency");
+      checkArgument(
+          Iterables.all(
+              instance.eapFeeSchedule.toValueMap().values(), currencyCheck),
+          "All EAP fees must be in the registry's currency");
       checkArgumentNotNull(
           instance.pricingEngineClassName, "All registries must have a configured pricing engine");
       instance.tldStrId = tldName;

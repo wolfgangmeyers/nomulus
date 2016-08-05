@@ -17,7 +17,6 @@ package google.registry.flows.domain;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.base.Predicates.equalTo;
-import static com.google.common.base.Strings.emptyToNull;
 import static com.google.common.collect.Iterables.any;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Sets.difference;
@@ -25,9 +24,7 @@ import static google.registry.flows.EppXmlTransformer.unmarshal;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.registry.Registries.findTldForName;
 import static google.registry.model.registry.label.ReservedList.getReservation;
-import static google.registry.pricing.PricingEngineProxy.getDomainCreateCost;
-import static google.registry.pricing.PricingEngineProxy.getDomainRenewCost;
-import static google.registry.pricing.PricingEngineProxy.isPremiumName;
+import static google.registry.pricing.PricingEngineProxy.getPricesForDomainName;
 import static google.registry.tldconfig.idn.IdnLabelValidator.findValidIdnTableForTld;
 import static google.registry.util.CollectionUtils.nullToEmpty;
 import static google.registry.util.DateTimeUtils.isAtOrAfter;
@@ -42,10 +39,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.net.InternetDomainName;
-
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Ref;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.AuthorizationErrorException;
 import google.registry.flows.EppException.ObjectDoesNotExistException;
@@ -67,11 +62,12 @@ import google.registry.model.domain.DomainCommand.CreateOrUpdate;
 import google.registry.model.domain.DomainCommand.InvalidReferencesException;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.Period;
-import google.registry.model.domain.fee.BaseFeeCommand;
-import google.registry.model.domain.fee.BaseFeeRequest;
-import google.registry.model.domain.fee.BaseFeeResponse;
 import google.registry.model.domain.fee.Fee;
-import google.registry.model.domain.fee.FeeCommandDescriptor;
+import google.registry.model.domain.fee.FeeCheckCommandExtensionItem;
+import google.registry.model.domain.fee.FeeCheckResponseExtensionItem;
+import google.registry.model.domain.fee.FeeQueryCommandExtensionItem;
+import google.registry.model.domain.fee.FeeQueryResponseExtensionItem;
+import google.registry.model.domain.fee.FeeTransformCommandExtension;
 import google.registry.model.domain.launch.LaunchExtension;
 import google.registry.model.domain.launch.LaunchPhase;
 import google.registry.model.domain.secdns.DelegationSignerData;
@@ -91,14 +87,10 @@ import google.registry.model.smd.AbstractSignedMark;
 import google.registry.model.smd.EncodedSignedMark;
 import google.registry.model.smd.SignedMark;
 import google.registry.model.smd.SignedMarkRevocationList;
+import google.registry.pricing.TldSpecificLogicProxy;
 import google.registry.tmch.TmchXmlSignature;
 import google.registry.tmch.TmchXmlSignature.CertificateSignatureException;
 import google.registry.util.Idn;
-
-import org.joda.money.Money;
-import org.joda.time.DateTime;
-import org.xml.sax.SAXException;
-
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.security.GeneralSecurityException;
@@ -110,10 +102,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
-
+import javax.annotation.Nullable;
 import javax.xml.crypto.MarshalException;
 import javax.xml.crypto.dsig.XMLSignatureException;
 import javax.xml.parsers.ParserConfigurationException;
+import org.joda.money.CurrencyUnit;
+import org.joda.money.Money;
+import org.joda.time.DateTime;
+import org.xml.sax.SAXException;
 
 /** Static utility functions for domain flows. */
 public class DomainFlowUtils {
@@ -281,7 +277,13 @@ public class DomainFlowUtils {
     }
   }
 
-  static void validateNameserversCount(int count) throws EppException {
+  static void validateNameserversCountForTld(String tld, int count) throws EppException {
+    ImmutableSet<String> whitelist = Registry.get(tld).getAllowedFullyQualifiedHostNames();
+    // For TLDs with a nameserver whitelist, all domains must have at least 1 nameserver.
+    if (!whitelist.isEmpty() && count == 0) {
+      throw new NameserversNotSpecifiedException();
+    }
+
     if (count > MAX_NAMESERVERS_PER_DOMAIN) {
       throw new TooManyNameserversException(String.format(
           "Only %d nameservers are allowed per domain", MAX_NAMESERVERS_PER_DOMAIN));
@@ -321,8 +323,9 @@ public class DomainFlowUtils {
   static void validateRegistrantAllowedOnTld(String tld, String registrantContactId)
       throws RegistrantNotAllowedException {
     ImmutableSet<String> whitelist = Registry.get(tld).getAllowedRegistrantContactIds();
-    // Empty whitelists are ignored.
-    if (!whitelist.isEmpty() && !whitelist.contains(registrantContactId)) {
+    // Empty whitelist or null registrantContactId are ignored.
+    if (registrantContactId != null && !whitelist.isEmpty() 
+        && !whitelist.contains(registrantContactId)) {
       throw new RegistrantNotAllowedException(registrantContactId);
     }
   }
@@ -330,12 +333,12 @@ public class DomainFlowUtils {
   static void validateNameserversAllowedOnTld(String tld, Set<String> fullyQualifiedHostNames)
       throws EppException {
     ImmutableSet<String> whitelist = Registry.get(tld).getAllowedFullyQualifiedHostNames();
-    if (whitelist.isEmpty()) {  // Empty whitelists are ignored.
-      return;
-    }
-    Set<String> disallowedNameservers = difference(nullToEmpty(fullyQualifiedHostNames), whitelist);
-    if (!disallowedNameservers.isEmpty()) {
-      throw new NameserversNotAllowedException(disallowedNameservers);
+    Set<String> hostnames = nullToEmpty(fullyQualifiedHostNames);
+    if (!whitelist.isEmpty()) { // Empty whitelist is ignored.
+      Set<String> disallowedNameservers = difference(hostnames, whitelist);
+      if (!disallowedNameservers.isEmpty()) {
+        throw new NameserversNotAllowedException(disallowedNameservers);
+      }
     }
   }
 
@@ -388,7 +391,7 @@ public class DomainFlowUtils {
    */
   static void verifyPremiumNameIsNotBlocked(
       String domainName, DateTime priceTime, String clientIdentifier) throws EppException {
-    if (isPremiumName(domainName, priceTime, clientIdentifier)) {
+    if (getPricesForDomainName(domainName, priceTime).isPremium()) {
       // NB: The load of the Registar object is transactionless, which means that it should hit
       // memcache most of the time.
       if (Registrar.loadByClientId(clientIdentifier).getBlockPremiumNames()) {
@@ -500,7 +503,7 @@ public class DomainFlowUtils {
 
     SignedMark signedMark;
     try {
-      signedMark = unmarshal(signedMarkData);
+      signedMark = unmarshal(SignedMark.class, signedMarkData);
     } catch (EppException e) {
       throw new SignedMarkParsingErrorException();
     }
@@ -555,71 +558,65 @@ public class DomainFlowUtils {
   }
 
   /**
-   * Validates a {@link BaseFeeRequest} and sets the appropriate fields on a {@link BaseFeeResponse}
-   * builder.
+   * Validates a {@link FeeCheckCommandExtensionItem} and sets the appropriate fields on a
+   * {@link FeeCheckResponseExtensionItem} builder.
    */
   static void handleFeeRequest(
-      BaseFeeRequest feeRequest,
-      BaseFeeResponse.Builder<?, ?> builder,
+      FeeQueryCommandExtensionItem feeRequest,
+      FeeQueryResponseExtensionItem.Builder builder,
       String domainName,
       String tld,
-      String clientIdentifier,
+      @Nullable CurrencyUnit topLevelCurrency,
       DateTime now) throws EppException {
     InternetDomainName domain = InternetDomainName.from(domainName);
-    FeeCommandDescriptor feeCommand = feeRequest.getCommand();
     Registry registry = Registry.get(tld);
     int years = verifyUnitIsYears(feeRequest.getPeriod()).getValue();
     boolean isSunrise = registry.getTldState(now).equals(TldState.SUNRISE);
-    boolean isNameCollisionInSunrise =
-        isSunrise && getReservationType(domain) == ReservationType.NAME_COLLISION;
 
-    if (feeCommand.getPhase() != null || feeCommand.getSubphase() != null) {
+    if (feeRequest.getPhase() != null || feeRequest.getSubphase() != null) {
       throw new FeeChecksDontSupportPhasesException();
     }
-    if (feeRequest.getCurrency() != null
-        && !feeRequest.getCurrency().equals(registry.getCurrency())) {
+    
+    CurrencyUnit currency =
+        feeRequest.isCurrencySupported() ? feeRequest.getCurrency() : topLevelCurrency;
+    if ((currency != null) && !currency.equals(registry.getCurrency())) {
       throw new CurrencyUnitMismatchException();
     }
 
     builder
-        .setCommand(feeCommand)
-        .setCurrency(registry.getCurrency())
+        .setCommand(feeRequest.getCommandName(), feeRequest.getPhase(), feeRequest.getSubphase())
+        .setCurrencyIfSupported(registry.getCurrency())
         .setPeriod(feeRequest.getPeriod())
-        // Choose from four classes: premium, premium-collision, collision, or null (standard case).
-        .setClass(emptyToNull(Joiner.on('-').skipNulls().join(
-            isPremiumName(domainName, now, clientIdentifier) ? "premium" : null,
-            isNameCollisionInSunrise ? "collision" : null)));
+        .setClass(TldSpecificLogicProxy.getFeeClass(domainName, now).orNull());
 
-    switch (feeCommand.getCommand()) {
+    switch (feeRequest.getCommandName()) {
       case UNKNOWN:
-        throw new UnknownFeeCommandException(feeCommand.getUnparsedCommandName());
+        throw new UnknownFeeCommandException(feeRequest.getUnparsedCommandName());
       case CREATE:
         if (isReserved(domain, isSunrise)) {  // Don't return a create price for reserved names.
           builder.setClass("reserved");  // Override whatever class we've set above.
+          builder.setAvailIfSupported(false);
+          builder.setReasonIfSupported("reserved");
         } else {
-          builder.setFee(
-              Fee.create(
-                  getDomainCreateCost(domainName, now, clientIdentifier, years).getAmount(),
-                  "create"));
+          builder.setAvailIfSupported(true);
+          builder.setFees(
+              TldSpecificLogicProxy.getCreatePrice(registry, domainName, now, years).getFees());
         }
         break;
       case RESTORE:
         if (years != 1) {
           throw new RestoresAreAlwaysForOneYearException();
         }
-        // Restores have a "renew" and a "restore" fee.
-        builder.setFee(
-            Fee.create(
-                getDomainRenewCost(domainName, now, clientIdentifier, years).getAmount(),
-                "renew"),
-            Fee.create(registry.getStandardRestoreCost().getAmount(), "restore"));
+        builder.setAvailIfSupported(true);
+        builder.setFees(
+            TldSpecificLogicProxy.getRestorePrice(registry, domainName, now, years).getFees());
         break;
+      // TODO(mountford): handle UPDATE
       default:
         // Anything else (transfer|renew) will have a "renew" fee.
-        builder.setFee(
-            Fee.create(
-                getDomainRenewCost(domainName, now, clientIdentifier, years).getAmount(),
-                "renew"));
+        builder.setAvailIfSupported(true);
+        builder.setFees(
+            TldSpecificLogicProxy.getRenewPrice(registry, domainName, now, years).getFees());
     }
   }
 
@@ -627,14 +624,13 @@ public class DomainFlowUtils {
       String domainName,
       String tld,
       DateTime priceTime,
-      String clientIdentifier,
-      final BaseFeeCommand feeCommand,
+      final FeeTransformCommandExtension feeCommand,
       Money cost,
       Money... otherCosts)
       throws EppException {
     Registry registry = Registry.get(tld);
     if (registry.getPremiumPriceAckRequired()
-        && isPremiumName(domainName, priceTime, clientIdentifier)
+        && getPricesForDomainName(domainName, priceTime).isPremium()
         && feeCommand == null) {
       throw new FeesRequiredForPremiumNameException();
     }
@@ -1020,5 +1016,13 @@ public class DomainFlowUtils {
           Joiner.on(',').join(fullyQualifiedHostNames)));
     }
   }
+
+  /** Nameservers not specified for this TLD with whitelist. */
+  public static class NameserversNotSpecifiedException extends StatusProhibitsOperationException {
+    public NameserversNotSpecifiedException() {
+      super("At least one nameserver must be specified for this TLD");
+    }
+  }
+
 }
 

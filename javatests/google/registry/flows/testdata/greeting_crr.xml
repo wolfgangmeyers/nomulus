@@ -1,7 +1,7 @@
 <epp xmlns="urn:ietf:params:xml:ns:epp-1.0">
   <greeting>
     <svID>Charleston Road Registry</svID>
-    <svDate>2000-06-08T22:00:00.0Z</svDate>
+    <svDate>%DATE%</svDate>
     <svcMenu>
       <version>1.0</version>
       <lang>en</lang>
@@ -13,6 +13,9 @@
         <extURI>urn:ietf:params:xml:ns:rgp-1.0</extURI>
         <extURI>urn:ietf:params:xml:ns:secDNS-1.1</extURI>
         <extURI>urn:ietf:params:xml:ns:fee-0.6</extURI>
+        <extURI>urn:ietf:params:xml:ns:fee-0.11</extURI>
+        <extURI>urn:ietf:params:xml:ns:fee-0.12</extURI>
+        <extURI>urn:google:params:xml:ns:flags-0.1</extURI>
       </svcExtension>
     </svcMenu>
     <dcp>

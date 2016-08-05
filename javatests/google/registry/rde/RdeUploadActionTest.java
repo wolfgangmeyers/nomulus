@@ -42,15 +42,13 @@ import com.google.appengine.tools.cloudstorage.GcsServiceFactory;
 import com.google.common.io.ByteSource;
 import com.google.common.io.CharStreams;
 import com.google.common.io.Files;
-
 import com.googlecode.objectify.VoidWork;
-
 import google.registry.gcs.GcsUtils;
 import google.registry.keyring.api.Keyring;
+import google.registry.model.common.Cursor;
+import google.registry.model.common.Cursor.CursorType;
 import google.registry.model.rde.RdeRevision;
 import google.registry.model.registry.Registry;
-import google.registry.model.registry.RegistryCursor;
-import google.registry.model.registry.RegistryCursor.CursorType;
 import google.registry.rde.JSchSshSession.JSchSshSessionFactory;
 import google.registry.request.HttpException.ServiceUnavailableException;
 import google.registry.request.RequestParameters;
@@ -66,7 +64,14 @@ import google.registry.testing.TaskQueueHelper.TaskMatcher;
 import google.registry.testing.sftp.SftpServerRule;
 import google.registry.util.Retrier;
 import google.registry.util.TaskEnqueuer;
-
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.Socket;
+import java.net.URI;
 import org.bouncycastle.openpgp.PGPKeyPair;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.joda.time.DateTime;
@@ -76,15 +81,6 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
-
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.net.Socket;
-import java.net.URI;
 
 /** Unit tests for {@link RdeUploadAction}. */
 @RunWith(MockitoJUnitRunner.class)
@@ -264,7 +260,7 @@ public class RdeUploadActionTest {
     DateTime stagingCursor = DateTime.parse("2010-10-18TZ");
     DateTime uploadCursor = DateTime.parse("2010-10-17TZ");
     persistResource(
-        RegistryCursor.create(Registry.get("tld"), CursorType.RDE_STAGING, stagingCursor));
+        Cursor.create(CursorType.RDE_STAGING, stagingCursor, Registry.get("tld")));
     createAction(uploadUrl).runWithLock(uploadCursor);
     assertThat(response.getStatus()).isEqualTo(200);
     assertThat(response.getContentType()).isEqualTo(PLAIN_TEXT_UTF_8);
@@ -283,7 +279,7 @@ public class RdeUploadActionTest {
     DateTime stagingCursor = DateTime.parse("2010-10-18TZ");
     DateTime uploadCursor = DateTime.parse("2010-10-17TZ");
     persistResource(
-        RegistryCursor.create(Registry.get("tld"), CursorType.RDE_STAGING, stagingCursor));
+        Cursor.create(CursorType.RDE_STAGING, stagingCursor, Registry.get("tld")));
     createAction(uploadUrl).runWithLock(uploadCursor);
     assertThat(response.getStatus()).isEqualTo(200);
     assertThat(response.getContentType()).isEqualTo(PLAIN_TEXT_UTF_8);
@@ -311,7 +307,7 @@ public class RdeUploadActionTest {
     DateTime stagingCursor = DateTime.parse("2010-10-18TZ");
     DateTime uploadCursor = DateTime.parse("2010-10-17TZ");
     persistSimpleResource(
-        RegistryCursor.create(Registry.get("tld"), CursorType.RDE_STAGING, stagingCursor));
+        Cursor.create(CursorType.RDE_STAGING, stagingCursor, Registry.get("tld")));
     createAction(uploadUrl).runWithLock(uploadCursor);
     assertThat(response.getStatus()).isEqualTo(200);
     assertThat(response.getContentType()).isEqualTo(PLAIN_TEXT_UTF_8);
@@ -331,7 +327,7 @@ public class RdeUploadActionTest {
     DateTime stagingCursor = DateTime.parse("2010-10-18TZ");
     DateTime uploadCursor = DateTime.parse("2010-10-17TZ");
     persistResource(
-        RegistryCursor.create(Registry.get("tld"), CursorType.RDE_STAGING, stagingCursor));
+        Cursor.create(CursorType.RDE_STAGING, stagingCursor, Registry.get("tld")));
     createAction(uploadUrl).runWithLock(uploadCursor);
     // Only verify signature for SFTP versions, since we check elsewhere that the GCS files are
     // identical to the ones sent over SFTP.
@@ -349,7 +345,7 @@ public class RdeUploadActionTest {
     DateTime stagingCursor = DateTime.parse("2010-10-17TZ");
     DateTime uploadCursor = DateTime.parse("2010-10-17TZ");
     persistResource(
-        RegistryCursor.create(Registry.get("tld"), CursorType.RDE_STAGING, stagingCursor));
+        Cursor.create(CursorType.RDE_STAGING, stagingCursor, Registry.get("tld")));
     thrown.expect(ServiceUnavailableException.class, "Waiting for RdeStagingAction to complete");
     createAction(null).runWithLock(uploadCursor);
   }

@@ -18,7 +18,6 @@ import static com.google.common.collect.Sets.difference;
 import static google.registry.util.CollectionUtils.nullToEmpty;
 
 import com.google.common.collect.ImmutableSet;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.AuthenticationErrorClosingConnectionException;
 import google.registry.flows.EppException.AuthenticationErrorException;
@@ -29,7 +28,6 @@ import google.registry.flows.EppException.UnimplementedExtensionException;
 import google.registry.flows.EppException.UnimplementedObjectServiceException;
 import google.registry.flows.EppException.UnimplementedOptionException;
 import google.registry.flows.Flow;
-import google.registry.flows.TransportCredentials;
 import google.registry.model.eppcommon.ProtocolDefinition;
 import google.registry.model.eppcommon.ProtocolDefinition.ServiceExtension;
 import google.registry.model.eppinput.EppInput.Login;
@@ -39,25 +37,24 @@ import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.eppoutput.Result.Code;
 import google.registry.model.registrar.Registrar;
 import google.registry.util.FormattingLogger;
-
-import java.util.Objects;
 import java.util.Set;
+import javax.inject.Inject;
 
 /**
  * An EPP flow for login.
  *
- * @error {@link google.registry.flows.EppConsoleServlet.GaeUserCredentials.BadGaeUserIdException}
- * @error {@link google.registry.flows.EppConsoleServlet.GaeUserCredentials.UserNotLoggedInException}
  * @error {@link google.registry.flows.EppException.UnimplementedExtensionException}
  * @error {@link google.registry.flows.EppException.UnimplementedObjectServiceException}
  * @error {@link google.registry.flows.EppException.UnimplementedProtocolVersionException}
+ * @error {@link google.registry.flows.GaeUserCredentials.BadGaeUserIdException}
+ * @error {@link google.registry.flows.GaeUserCredentials.UserNotLoggedInException}
  * @error {@link google.registry.flows.TlsCredentials.BadRegistrarCertificateException}
  * @error {@link google.registry.flows.TlsCredentials.BadRegistrarIpAddressException}
  * @error {@link google.registry.flows.TlsCredentials.MissingRegistrarCertificateException}
  * @error {@link google.registry.flows.TlsCredentials.NoSniException}
+ * @error {@link google.registry.flows.TransportCredentials.BadRegistrarPasswordException}
  * @error {@link LoginFlow.AlreadyLoggedInException}
  * @error {@link LoginFlow.BadRegistrarClientIdException}
- * @error {@link LoginFlow.BadRegistrarPasswordException}
  * @error {@link LoginFlow.TooManyFailedLoginsException}
  * @error {@link LoginFlow.PasswordChangesNotSupportedException}
  * @error {@link LoginFlow.RegistrarAccountNotActiveException}
@@ -67,11 +64,10 @@ public class LoginFlow extends Flow {
 
   private static final FormattingLogger logger = FormattingLogger.getLoggerForCallerClass();
 
-  /** This is the IANA ID used for the internal account of the registry. */
-  private static final long INTERNAL_IANA_REGISTRAR_ID = 9999L;
-
   /** Maximum number of failed login attempts allowed per connection. */
   private static final int MAX_FAILED_LOGIN_ATTEMPTS_PER_CONNECTION = 3;
+
+  @Inject LoginFlow() {}
 
   /** Run the flow and log errors. */
   @Override
@@ -114,24 +110,15 @@ public class LoginFlow extends Flow {
       throw new BadRegistrarClientIdException(login.getClientId());
     }
 
-    TransportCredentials credentials = sessionMetadata.getTransportCredentials();
     // AuthenticationErrorExceptions will propagate up through here.
-    if (credentials != null) {  // Allow no-credential logins, for load-testing and RDE.
-      try {
-        credentials.validate(registrar);
-      } catch (AuthenticationErrorException e) {
-        sessionMetadata.incrementFailedLoginAttempts();
-        throw e;
-      }
-    }
-
-    final boolean requiresLoginCheck = credentials == null || !credentials.performsLoginCheck();
-    if (requiresLoginCheck && !registrar.testPassword(login.getPassword())) {
+    try {
+      credentials.validate(registrar, login.getPassword());
+    } catch (AuthenticationErrorException e) {
       sessionMetadata.incrementFailedLoginAttempts();
       if (sessionMetadata.getFailedLoginAttempts() > MAX_FAILED_LOGIN_ATTEMPTS_PER_CONNECTION) {
         throw new TooManyFailedLoginsException();
       } else {
-        throw new BadRegistrarPasswordException();
+        throw e;
       }
     }
     if (registrar.getState().equals(Registrar.State.PENDING)) {
@@ -144,8 +131,6 @@ public class LoginFlow extends Flow {
     // We are in!
     sessionMetadata.resetFailedLoginAttempts();
     sessionMetadata.setClientId(login.getClientId());
-    sessionMetadata.setSuperuser(
-        Objects.equals(INTERNAL_IANA_REGISTRAR_ID, registrar.getIanaIdentifier()));
     sessionMetadata.setServiceExtensionUris(serviceExtensionUrisBuilder.build());
     return createOutput(Code.Success);
   }
@@ -154,13 +139,6 @@ public class LoginFlow extends Flow {
   static class BadRegistrarClientIdException extends AuthenticationErrorException {
     public BadRegistrarClientIdException(String clientId) {
       super("Registrar with this client ID could not be found: " + clientId);
-    }
-  }
-
-  /** Registrar password is incorrect. */
-  static class BadRegistrarPasswordException extends AuthenticationErrorException {
-    public BadRegistrarPasswordException() {
-      super("Registrar password is incorrect");
     }
   }
 

@@ -17,6 +17,7 @@ package google.registry.flows.domain;
 import google.registry.flows.ResourceTransferQueryFlow;
 import google.registry.model.domain.DomainCommand.Transfer;
 import google.registry.model.domain.DomainResource;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that queries a pending transfer on a {@link DomainResource}.
@@ -26,4 +27,6 @@ import google.registry.model.domain.DomainResource;
  * @error {@link google.registry.flows.ResourceTransferQueryFlow.NoTransferHistoryToQueryException}
  * @error {@link google.registry.flows.ResourceTransferQueryFlow.NotAuthorizedToViewTransferException}
  */
-public class DomainTransferQueryFlow extends ResourceTransferQueryFlow<DomainResource, Transfer> {}
+public class DomainTransferQueryFlow extends ResourceTransferQueryFlow<DomainResource, Transfer> {
+  @Inject DomainTransferQueryFlow() {}
+}

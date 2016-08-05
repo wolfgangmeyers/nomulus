@@ -22,7 +22,6 @@ import static google.registry.testing.TaskQueueHelper.assertTasksEnqueued;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.ExceptionRule;
 import google.registry.testing.TaskQueueHelper.TaskMatcher;
-
 import org.joda.time.Duration;
 import org.junit.Before;
 import org.junit.Rule;
@@ -58,7 +57,7 @@ public class DnsQueueTest {
     createTld("tld");
     dnsQueue.addHostRefreshTask("octopus.tld");
     assertTasksEnqueued("dns-pull",
-        new TaskMatcher().tag("tld").payload("Target-Type=HOST&Target-Name=octopus.tld&tld=tld"));
+        new TaskMatcher().payload("Target-Type=HOST&Target-Name=octopus.tld&tld=tld"));
   }
 
   @Test
@@ -77,7 +76,7 @@ public class DnsQueueTest {
     createTld("tld");
     dnsQueue.addDomainRefreshTask("octopus.tld");
     assertTasksEnqueued("dns-pull",
-        new TaskMatcher().tag("tld").payload("Target-Type=DOMAIN&Target-Name=octopus.tld&tld=tld"));
+        new TaskMatcher().payload("Target-Type=DOMAIN&Target-Name=octopus.tld&tld=tld"));
   }
 
   @Test

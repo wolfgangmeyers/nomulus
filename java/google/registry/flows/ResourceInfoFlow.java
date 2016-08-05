@@ -18,12 +18,11 @@ import static google.registry.model.EppResourceUtils.cloneResourceWithLinkedStat
 import static google.registry.model.eppoutput.Result.Code.Success;
 
 import com.google.common.collect.ImmutableList;
-
 import google.registry.model.EppResource;
 import google.registry.model.eppinput.ResourceCommand.SingleResourceCommand;
 import google.registry.model.eppoutput.EppOutput;
-import google.registry.model.eppoutput.Response.ResponseData;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse.ResponseData;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 
 /**
  * An EPP flow that reads a storable resource.

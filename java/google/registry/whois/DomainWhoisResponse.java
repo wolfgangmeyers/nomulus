@@ -23,9 +23,7 @@ import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Ref;
-
 import google.registry.model.contact.ContactPhoneNumber;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.contact.PostalInfo;
@@ -37,12 +35,9 @@ import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.translators.EnumToAttributeAdapter.EppEnum;
 import google.registry.util.FormattingLogger;
-
-import org.joda.time.DateTime;
-
 import java.util.Set;
-
 import javax.annotation.Nullable;
+import org.joda.time.DateTime;
 
 /** Represents a WHOIS response to a domain query. */
 final class DomainWhoisResponse extends WhoisResponseImpl {
@@ -66,39 +61,41 @@ final class DomainWhoisResponse extends WhoisResponseImpl {
   }
 
   @Override
-  public String getPlainTextOutput(final boolean preferUnicode) {
+  public String getPlainTextOutput(final boolean preferUnicode, String disclaimer) {
     Registrar registrar = getRegistrar(domain.getCurrentSponsorClientId());
     return new DomainEmitter()
-      .emitField("Domain Name",
-          maybeFormatHostname(domain.getFullyQualifiedDomainName(), preferUnicode))
-      .emitField("Domain ID", domain.getRepoId())
-      .emitField("WHOIS Server", registrar.getWhoisServer())
-      .emitField("Referral URL", registrar.getReferralUrl())
-      .emitField("Updated Date", getFormattedString(domain.getLastEppUpdateTime()))
-      .emitField("Creation Date", getFormattedString(domain.getCreationTime()))
-      .emitField("Registry Expiry Date",
-          getFormattedString(domain.getRegistrationExpirationTime()))
-      .emitField("Sponsoring Registrar", registrar.getRegistrarName())
-      .emitField("Sponsoring Registrar IANA ID",
-          registrar.getIanaIdentifier() == null ? null : registrar.getIanaIdentifier().toString())
-      .emitStatusValues(domain.getStatusValues(), domain.getGracePeriods())
-      .emitContact("Registrant", domain.getRegistrant(), preferUnicode)
-      .emitContact("Admin", getContactReference(Type.ADMIN), preferUnicode)
-      .emitContact("Tech", getContactReference(Type.TECH), preferUnicode)
-      .emitContact("Billing", getContactReference(Type.BILLING), preferUnicode)
-      .emitSet(
-          "Name Server",
-          domain.loadNameserverFullyQualifiedHostNames(),
-          new Function<String, String>() {
-            @Override
-            public String apply(String hostName) {
-              return maybeFormatHostname(hostName, preferUnicode);
-            }})
-      .emitField("DNSSEC", isNullOrEmpty(domain.getDsData()) ? "unsigned" : "signedDelegation")
-      .emitLastUpdated(getTimestamp())
-      .emitAwipMessage()
-      .emitFooter()
-      .toString();
+        .emitField(
+            "Domain Name", maybeFormatHostname(domain.getFullyQualifiedDomainName(), preferUnicode))
+        .emitField("Domain ID", domain.getRepoId())
+        .emitField("WHOIS Server", registrar.getWhoisServer())
+        .emitField("Referral URL", registrar.getReferralUrl())
+        .emitField("Updated Date", getFormattedString(domain.getLastEppUpdateTime()))
+        .emitField("Creation Date", getFormattedString(domain.getCreationTime()))
+        .emitField(
+            "Registry Expiry Date", getFormattedString(domain.getRegistrationExpirationTime()))
+        .emitField("Sponsoring Registrar", registrar.getRegistrarName())
+        .emitField(
+            "Sponsoring Registrar IANA ID",
+            registrar.getIanaIdentifier() == null ? null : registrar.getIanaIdentifier().toString())
+        .emitStatusValues(domain.getStatusValues(), domain.getGracePeriods())
+        .emitContact("Registrant", domain.getRegistrant(), preferUnicode)
+        .emitContact("Admin", getContactReference(Type.ADMIN), preferUnicode)
+        .emitContact("Tech", getContactReference(Type.TECH), preferUnicode)
+        .emitContact("Billing", getContactReference(Type.BILLING), preferUnicode)
+        .emitSet(
+            "Name Server",
+            domain.loadNameserverFullyQualifiedHostNames(),
+            new Function<String, String>() {
+              @Override
+              public String apply(String hostName) {
+                return maybeFormatHostname(hostName, preferUnicode);
+              }
+            })
+        .emitField("DNSSEC", isNullOrEmpty(domain.getDsData()) ? "unsigned" : "signedDelegation")
+        .emitLastUpdated(getTimestamp())
+        .emitAwipMessage()
+        .emitFooter(disclaimer)
+        .toString();
   }
 
   /** Returns the contact of the given type, or null if it does not exist. */

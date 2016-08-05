@@ -17,15 +17,14 @@ package google.registry.flows.contact;
 import static google.registry.model.EppResourceUtils.checkResourcesExist;
 
 import com.google.common.collect.ImmutableList;
-
 import google.registry.flows.ResourceCheckFlow;
 import google.registry.model.contact.ContactCommand.Check;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.eppoutput.CheckData;
 import google.registry.model.eppoutput.CheckData.ContactCheck;
 import google.registry.model.eppoutput.CheckData.ContactCheckData;
-
 import java.util.Set;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that checks whether a contact can be provisioned.
@@ -33,6 +32,9 @@ import java.util.Set;
  * @error {@link google.registry.flows.ResourceCheckFlow.TooManyResourceChecksException}
  */
 public class ContactCheckFlow extends ResourceCheckFlow<ContactResource, Check> {
+
+  @Inject ContactCheckFlow() {}
+
   @Override
   protected CheckData getCheckData() {
     Set<String> existingIds = checkResourcesExist(resourceClass, targetIds, now);

@@ -23,7 +23,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Throwables;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
-
 import google.registry.flows.EppException.ParameterValueRangeErrorException;
 import google.registry.flows.EppException.ParameterValueSyntaxErrorException;
 import google.registry.flows.EppException.SyntaxErrorException;
@@ -39,7 +38,6 @@ import google.registry.util.FormattingLogger;
 import google.registry.xml.ValidationMode;
 import google.registry.xml.XmlException;
 import google.registry.xml.XmlTransformer;
-
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 
@@ -57,13 +55,16 @@ public class EppXmlTransformer  {
       "domain.xsd",
       "rgp.xsd",
       "secdns.xsd",
-      "fee.xsd",
+      "fee06.xsd",
+      "fee11.xsd",
+      "fee12.xsd",
       "metadata.xsd",
       "mark.xsd",
       "dsig.xsd",
       "smd.xsd",
       "launch.xsd",
-      "allocate.xsd");
+      "allocate.xsd",
+      "flags.xsd");
 
   private static final XmlTransformer INPUT_TRANSFORMER =
       new XmlTransformer(SCHEMAS, EppInput.class);
@@ -75,9 +76,15 @@ public class EppXmlTransformer  {
     OUTPUT_TRANSFORMER.validate(xml);
   }
 
-  public static <T> T unmarshal(byte[] bytes) throws EppException {
+  /**
+   * Unmarshal bytes into Epp classes.
+   *
+   * @param clazz type to return, specified as a param to enforce typesafe generics
+   * @see "http://errorprone.info/bugpattern/TypeParameterUnusedInFormals"
+   */
+  public static <T> T unmarshal(Class<T> clazz, byte[] bytes) throws EppException {
     try {
-      return INPUT_TRANSFORMER.unmarshal(new ByteArrayInputStream(bytes));
+      return INPUT_TRANSFORMER.unmarshal(clazz, new ByteArrayInputStream(bytes));
     } catch (XmlException e) {
       // If this XmlException is wrapping a known type find it. If not, it's a syntax error.
       FluentIterable<Throwable> causalChain = FluentIterable.from(Throwables.getCausalChain(e));
@@ -168,4 +175,3 @@ public class EppXmlTransformer  {
     }
   }
 }
-

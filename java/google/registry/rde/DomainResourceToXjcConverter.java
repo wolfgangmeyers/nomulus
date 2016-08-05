@@ -14,11 +14,10 @@
 
 package google.registry.rde;
 
+import com.google.common.base.Ascii;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Ref;
-
 import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.DomainResource;
@@ -42,7 +41,6 @@ import google.registry.xjc.rgp.XjcRgpStatusType;
 import google.registry.xjc.rgp.XjcRgpStatusValueType;
 import google.registry.xjc.secdns.XjcSecdnsDsDataType;
 import google.registry.xjc.secdns.XjcSecdnsDsOrKeyType;
-
 import org.joda.time.DateTime;
 
 /** Utility class that turns {@link DomainResource} as {@link XjcRdeDomainElement}. */
@@ -283,7 +281,7 @@ final class DomainResourceToXjcConverter {
   private static XjcDomainContactType convertDesignatedContact(DesignatedContact model) {
     XjcDomainContactType bean = new XjcDomainContactType();
     ContactResource contact = model.getContactRef().get();
-    bean.setType(XjcDomainContactAttrType.fromValue(model.getType().toString().toLowerCase()));
+    bean.setType(XjcDomainContactAttrType.fromValue(Ascii.toLowerCase(model.getType().toString())));
     bean.setValue(contact.getContactId());
     return bean;
   }

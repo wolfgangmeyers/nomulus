@@ -31,16 +31,13 @@ import static org.joda.money.CurrencyUnit.USD;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
-
 import com.googlecode.objectify.Key;
-
 import google.registry.model.EntityTestCase;
 import google.registry.model.registry.Registry.RegistryNotFoundException;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.registry.label.PremiumList;
 import google.registry.model.registry.label.ReservedList;
 import google.registry.testing.ExceptionRule;
-
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.junit.Before;
@@ -412,5 +409,38 @@ public class RegistryTest extends EntityTestCase {
   public void testFailure_serverStatusChangeBillingCost_wrongCurrency() {
     thrown.expect(IllegalArgumentException.class, "cost must be in the registry's currency");
     Registry.get("tld").asBuilder().setServerStatusChangeBillingCost(Money.of(EUR, 42)).build();
+  }
+
+  @Test
+  public void testEapFee_undefined() {
+    assertThat(Registry.get("tld").getEapFeeFor(clock.nowUtc()).getCost())
+        .isEqualTo(Money.of(USD, 0));
+  }
+
+  @Test
+  public void testEapFee_specified() {
+    DateTime a = clock.nowUtc().minusDays(1);
+    DateTime b = clock.nowUtc().plusDays(1);
+    Registry registry =
+        Registry.get("tld").asBuilder().setEapFeeSchedule(
+            ImmutableSortedMap.of(
+                START_OF_TIME, Money.of(USD, 0),
+                a, Money.of(USD, 100),
+                b, Money.of(USD, 50))).build();
+
+    assertThat(registry.getEapFeeFor(clock.nowUtc()).getCost()).isEqualTo(Money.of(USD, 100));
+    assertThat(registry.getEapFeeFor(clock.nowUtc().minusDays(2)).getCost())
+        .isEqualTo(Money.of(USD, 0));
+    assertThat(registry.getEapFeeFor(clock.nowUtc().plusDays(2)).getCost())
+        .isEqualTo(Money.of(USD, 50));
+  }
+
+  @Test
+  public void testFailure_eapFee_wrongCurrency() {
+    thrown.expect(
+        IllegalArgumentException.class, "All EAP fees must be in the registry's currency");
+    Registry.get("tld").asBuilder()
+        .setEapFeeSchedule(ImmutableSortedMap.of(START_OF_TIME, Money.zero(EUR)))
+        .build();
   }
 }

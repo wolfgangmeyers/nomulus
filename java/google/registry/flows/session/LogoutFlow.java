@@ -19,6 +19,7 @@ import static google.registry.model.eppoutput.Result.Code.SuccessAndClose;
 import google.registry.flows.EppException;
 import google.registry.flows.LoggedInFlow;
 import google.registry.model.eppoutput.EppOutput;
+import javax.inject.Inject;
 
 /**
  * An EPP flow for logout.
@@ -26,6 +27,9 @@ import google.registry.model.eppoutput.EppOutput;
  * @error {@link google.registry.flows.LoggedInFlow.NotLoggedInException}
  */
 public class LogoutFlow extends LoggedInFlow {
+
+  @Inject LogoutFlow() {}
+
   @Override
   public final EppOutput run() throws EppException {
     sessionMetadata.invalidate();

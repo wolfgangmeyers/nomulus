@@ -26,23 +26,21 @@ import static org.joda.money.CurrencyUnit.USD;
 import static org.joda.time.DateTimeZone.UTC;
 import static org.joda.time.Duration.standardMinutes;
 
-import com.google.common.collect.Range;
-
 import com.beust.jcommander.ParameterException;
-
+import com.google.common.collect.Range;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
-
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Test;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
-
 /** Unit tests for {@link CreateTldCommand}. */
 public class CreateTldCommandTest extends CommandTestCase<CreateTldCommand> {
+
+  private static final String DATETIME_FORMAT = "YYYY-MM-dd'T'HH:mm:ssZZ";
 
   @Before
   public void init() {
@@ -89,6 +87,26 @@ public class CreateTldCommandTest extends CommandTestCase<CreateTldCommand> {
         "--initial_renew_billing_cost=\"USD 42.42\"", "--roid_suffix=Q9JYB4C", "xn--q9jyb4c");
     assertThat(Registry.get("xn--q9jyb4c").getStandardRenewCost(DateTime.now(UTC)))
         .isEqualTo(Money.of(USD, 42.42));
+  }
+
+  @Test
+  public void testSuccess_eapFeeSchedule() throws Exception {
+    DateTime now = DateTime.now(UTC);
+    DateTime tomorrow = now.plusDays(1);
+    runCommandForced(
+        String.format(
+            "--eap_fee_schedule=\"%s=USD 0.00,%s=USD 50.00,%s=USD 10.00\"",
+            START_OF_TIME.toString(DATETIME_FORMAT),
+            now.toString(DATETIME_FORMAT),
+            tomorrow.toString(DATETIME_FORMAT)),
+        "--roid_suffix=Q9JYB4C",
+        "xn--q9jyb4c");
+
+    Registry registry = Registry.get("xn--q9jyb4c");
+    assertThat(registry.getEapFeeFor(now.minusHours(1)).getCost()).isEqualTo(Money.zero(USD));
+    assertThat(registry.getEapFeeFor(now.plusHours(1)).getCost()).isEqualTo(Money.of(USD, 50));
+    assertThat(registry.getEapFeeFor(now.plusDays(1).plusHours(1)).getCost())
+        .isEqualTo(Money.of(USD, 10));
   }
 
   @Test
@@ -224,10 +242,31 @@ public class CreateTldCommandTest extends CommandTestCase<CreateTldCommand> {
   }
 
   @Test
+  public void testFailure_bothTldStateFlags() throws Exception {
+    thrown.expect(IllegalArgumentException.class);
+    DateTime now = DateTime.now(UTC);
+    runCommandForced(
+        String.format("--tld_state_transitions=%s=PREDELEGATION,%s=SUNRISE", now, now.plus(1)),
+        "--initial_tld_state=GENERAL_AVAILABILITY",
+        "xn--q9jyb4c");
+    }
+
+  @Test
   public void testFailure_negativeInitialRenewBillingCost() throws Exception {
     thrown.expect(IllegalArgumentException.class);
     runCommandForced(
         "--initial_renew_billing_cost=USD -42", "--roid_suffix=Q9JYB4C", "xn--q9jyb4c");
+  }
+
+  @Test
+  public void testFailure_invalidEapCurrency() throws Exception {
+    thrown.expect(IllegalArgumentException.class);
+    runCommandForced(
+        String.format(
+            "--eap_fee_schedule=\"%s=JPY 123456\"",
+            START_OF_TIME.toString(DATETIME_FORMAT)),
+        "--roid_suffix=Q9JYB4C",
+        "xn--q9jyb4c");
   }
 
   @Test

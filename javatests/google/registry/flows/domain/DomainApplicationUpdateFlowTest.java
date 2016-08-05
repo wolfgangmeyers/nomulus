@@ -29,12 +29,8 @@ import static google.registry.testing.DomainApplicationSubject.assertAboutApplic
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
 
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Ref;
-
 import google.registry.flows.EppException.UnimplementedExtensionException;
-import google.registry.flows.FlowRunner.CommitMode;
-import google.registry.flows.FlowRunner.UserPrivileges;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
 import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
@@ -70,7 +66,6 @@ import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.reporting.HistoryEntry;
-
 import org.junit.Before;
 import org.junit.Test;
 
@@ -567,7 +562,6 @@ public class DomainApplicationUpdateFlowTest
 
   @Test
   public void testSuccess_superuserUnauthorizedClient() throws Exception {
-    sessionMetadata.setSuperuser(true);
     sessionMetadata.setClientId("NewRegistrar");
     persistReferencedEntities();
     persistApplication();

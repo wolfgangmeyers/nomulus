@@ -18,6 +18,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 
+import com.google.common.base.Ascii;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Function;
 import com.google.common.base.Functions;
@@ -28,12 +29,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Range;
 import com.google.re2j.Pattern;
-
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
-
 import javax.annotation.Detainted;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -562,7 +562,7 @@ public final class FormField<I, O> {
           @Nullable
           @Override
           public String apply(@Nullable String input) {
-            return input != null ? input.toUpperCase() : null;
+            return input != null ? input.toUpperCase(Locale.ENGLISH) : null;
           }};
 
     private static final Function<String, String> LOWERCASE_FUNCTION =
@@ -570,7 +570,7 @@ public final class FormField<I, O> {
           @Nullable
           @Override
           public String apply(@Nullable String input) {
-            return input != null ? input.toLowerCase() : null;
+            return input != null ? input.toLowerCase(Locale.ENGLISH) : null;
           }};
 
     private static final Function<Object, Object> REQUIRED_FUNCTION =
@@ -589,8 +589,8 @@ public final class FormField<I, O> {
           @Nullable
           @Override
           public Object apply(@Nullable Object input) {
-            return input instanceof CharSequence && ((CharSequence) input).length() == 0
-                || input instanceof Collection && ((Collection<?>) input).isEmpty()
+            return ((input instanceof CharSequence) && (((CharSequence) input).length() == 0))
+                || ((input instanceof Collection) && ((Collection<?>) input).isEmpty())
                 ? null : input;
           }};
 
@@ -711,7 +711,7 @@ public final class FormField<I, O> {
       @Override
       public C apply(@Nullable O input) {
         try {
-          return input != null ? Enum.valueOf(enumClass, ((String) input).toUpperCase()) : null;
+          return input != null ? Enum.valueOf(enumClass, Ascii.toUpperCase((String) input)) : null;
         } catch (IllegalArgumentException e) {
           throw new FormFieldException(
               String.format("Enum %s does not contain '%s'", enumClass.getSimpleName(), input));

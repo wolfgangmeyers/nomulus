@@ -17,6 +17,7 @@ package google.registry.rde;
 import static com.google.appengine.api.urlfetch.HTTPMethod.PUT;
 import static com.google.common.net.MediaType.PLAIN_TEXT_UTF_8;
 import static com.google.common.truth.Truth.assertThat;
+import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.testing.GcsTestingUtils.writeGcsFile;
@@ -37,15 +38,15 @@ import com.google.appengine.api.urlfetch.URLFetchService;
 import com.google.appengine.tools.cloudstorage.GcsFilename;
 import com.google.appengine.tools.cloudstorage.GcsService;
 import com.google.appengine.tools.cloudstorage.GcsServiceFactory;
+import com.google.common.base.Ascii;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.io.ByteSource;
-
 import google.registry.config.RegistryConfig;
 import google.registry.config.RegistryEnvironment;
 import google.registry.gcs.GcsUtils;
+import google.registry.model.common.Cursor;
+import google.registry.model.common.Cursor.CursorType;
 import google.registry.model.registry.Registry;
-import google.registry.model.registry.RegistryCursor;
-import google.registry.model.registry.RegistryCursor.CursorType;
 import google.registry.request.HttpException.InternalServerErrorException;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.BouncyCastleProviderRule;
@@ -54,7 +55,8 @@ import google.registry.testing.FakeResponse;
 import google.registry.xjc.XjcXmlTransformer;
 import google.registry.xjc.rdereport.XjcRdeReportReport;
 import google.registry.xml.XmlException;
-
+import java.io.ByteArrayInputStream;
+import java.util.Map;
 import org.bouncycastle.openpgp.PGPPublicKey;
 import org.joda.time.DateTime;
 import org.junit.Before;
@@ -63,9 +65,6 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
 import org.mockito.ArgumentCaptor;
-
-import java.io.ByteArrayInputStream;
-import java.util.Map;
 
 /** Unit tests for {@link RdeReportAction}. */
 @RunWith(JUnit4.class)
@@ -121,11 +120,13 @@ public class RdeReportActionTest {
   public void before() throws Exception {
     PGPPublicKey encryptKey = new RdeKeyringModule().get().getRdeStagingEncryptionKey();
     createTld("test");
-    persistResource(RegistryCursor.create(
-        Registry.get("test"), CursorType.RDE_REPORT, DateTime.parse("2006-06-06TZ")));
-    persistResource(RegistryCursor.create(
-        Registry.get("test"), CursorType.RDE_UPLOAD, DateTime.parse("2006-06-07TZ")));
-    writeGcsFile(gcsService, reportFile,
+    persistResource(
+        Cursor.create(CursorType.RDE_REPORT, DateTime.parse("2006-06-06TZ"), Registry.get("test")));
+    persistResource(
+        Cursor.create(CursorType.RDE_UPLOAD, DateTime.parse("2006-06-07TZ"), Registry.get("test")));
+    writeGcsFile(
+        gcsService,
+        reportFile,
         Ghostryde.encode(REPORT_XML.read(), encryptKey, "darkside.xml", DateTime.now()));
   }
 
@@ -184,20 +185,24 @@ public class RdeReportActionTest {
   }
 
   private DateTime loadRdeReportCursor() {
-    return RegistryCursor.load(Registry.get("test"), CursorType.RDE_REPORT).get();
+    return ofy()
+        .load()
+        .key(Cursor.createKey(CursorType.RDE_REPORT, Registry.get("test")))
+        .now()
+        .getCursorTime();
   }
 
   private static ImmutableMap<String, String> mapifyHeaders(Iterable<HTTPHeader> headers) {
     ImmutableMap.Builder<String, String> builder = new ImmutableMap.Builder<>();
     for (HTTPHeader header : headers) {
-      builder.put(header.getName().replace('-', '_').toUpperCase(), header.getValue());
+      builder.put(Ascii.toUpperCase(header.getName().replace('-', '_')), header.getValue());
     }
     return builder.build();
   }
 
   private static XjcRdeReportReport parseReport(byte[] data) {
     try {
-      return XjcXmlTransformer.unmarshal(new ByteArrayInputStream(data));
+      return XjcXmlTransformer.unmarshal(XjcRdeReportReport.class, new ByteArrayInputStream(data));
     } catch (XmlException e) {
       throw new RuntimeException(e);
     }

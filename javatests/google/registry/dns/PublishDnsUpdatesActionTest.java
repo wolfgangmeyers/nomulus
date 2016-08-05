@@ -22,26 +22,22 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 
 import com.google.common.collect.ImmutableSet;
-
-import google.registry.dns.writer.api.DnsWriter;
+import google.registry.model.dns.DnsWriter;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.ofy.Ofy;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.FakeClock;
 import google.registry.testing.InjectRule;
-
+import javax.inject.Provider;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
 
-import javax.inject.Provider;
-
-/** Unit tests for {@link WriteDnsAction}. */
+/** Unit tests for {@link PublishDnsUpdatesAction}. */
 @RunWith(MockitoJUnitRunner.class)
 public class PublishDnsUpdatesActionTest {
 
@@ -53,9 +49,6 @@ public class PublishDnsUpdatesActionTest {
 
   @Rule
   public final InjectRule inject = new InjectRule();
-
-  @Rule
-  public final ExpectedException thrown = ExpectedException.none();
 
   private final FakeClock clock = new FakeClock(DateTime.parse("1971-01-01TZ"));
   private final DnsWriter dnsWriter = mock(DnsWriter.class);

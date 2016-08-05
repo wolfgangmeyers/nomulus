@@ -21,7 +21,7 @@ import static google.registry.dns.DnsConstants.DNS_TARGET_NAME_PARAM;
 import static google.registry.dns.DnsConstants.DNS_TARGET_TYPE_PARAM;
 import static google.registry.model.registry.Registries.assertTldExists;
 import static google.registry.request.RequestParameters.PARAM_TLD;
-import static google.registry.util.DomainNameUtils.getTldFromSld;
+import static google.registry.util.DomainNameUtils.getTldFromDomainName;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.appengine.api.taskqueue.Queue;
@@ -35,20 +35,16 @@ import com.google.apphosting.api.DeadlineExceededException;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.InternetDomainName;
-
 import google.registry.config.ConfigModule.Config;
 import google.registry.dns.DnsConstants.TargetType;
 import google.registry.model.registry.Registries;
 import google.registry.util.FormattingLogger;
-
-import org.joda.time.Duration;
-
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-
 import javax.annotation.Nullable;
 import javax.inject.Inject;
 import javax.inject.Named;
+import org.joda.time.Duration;
 
 /** Methods for manipulating the queue used for DNS write tasks. */
 public class DnsQueue {
@@ -62,13 +58,11 @@ public class DnsQueue {
   long writeBatchSize = QueueConstants.maxLeaseCount();
 
   /**
-   * Enqueues the given task type with the given target name to the DNS queue, tagged with the
-   * specified TLD.
+   * Enqueues the given task type with the given target name to the DNS queue.
    */
   private TaskHandle addToQueue(TargetType targetType, String targetName, String tld) {
     return queue.add(TaskOptions.Builder
-        // TODO(b/24564175): don't set the tag
-        .withTag(tld)
+        .withDefaults()
         .method(Method.PULL)
         .param(DNS_TARGET_TYPE_PARAM, targetType.toString())
         .param(DNS_TARGET_NAME_PARAM, targetName)
@@ -91,7 +85,7 @@ public class DnsQueue {
     return addToQueue(
         TargetType.DOMAIN,
         fullyQualifiedDomainName,
-        assertTldExists(getTldFromSld(fullyQualifiedDomainName)));
+        assertTldExists(getTldFromDomainName(fullyQualifiedDomainName)));
   }
 
   /** Adds a task to the queue to refresh the DNS information for the specified zone. */

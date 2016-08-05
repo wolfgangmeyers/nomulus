@@ -22,18 +22,15 @@ import static org.joda.time.DateTimeZone.UTC;
 
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.ImmutableSortedMap;
-
 import google.registry.testing.ExceptionRule;
-
+import java.util.Map;
+import java.util.Set;
 import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.util.Map;
-import java.util.Set;
 
 /** Unit tests for {@link TimedTransitionProperty}. */
 @RunWith(JUnit4.class)
@@ -104,6 +101,17 @@ public class TimedTransitionPropertyTest {
   @Test
   public void testSuccess_getValueAtTime() throws Exception {
     testGetValueAtTime(timedString);
+  }
+
+  @Test
+  public void testSuccess_getNextTransitionAfter() throws Exception {
+    assertThat(timedString.getNextTransitionAfter(A_LONG_TIME_AGO)).isEqualTo(DATE_1);
+    assertThat(timedString.getNextTransitionAfter(START_OF_TIME.plusMillis(1))).isEqualTo(DATE_1);
+    assertThat(timedString.getNextTransitionAfter(DATE_1.minusMillis(1))).isEqualTo(DATE_1);
+    assertThat(timedString.getNextTransitionAfter(DATE_1)).isEqualTo(DATE_2);
+    assertThat(timedString.getNextTransitionAfter(DATE_2.minusMillis(1))).isEqualTo(DATE_2);
+    assertThat(timedString.getNextTransitionAfter(DATE_2)).isEqualTo(DATE_3);
+    assertThat(timedString.getNextTransitionAfter(DATE_3)).isNull();
   }
 
   @Test

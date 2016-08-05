@@ -25,9 +25,7 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
-
 import com.googlecode.objectify.Ref;
-
 import google.registry.flows.EppException;
 import google.registry.flows.ResourceTransferApproveFlow;
 import google.registry.model.billing.BillingEvent;
@@ -42,7 +40,7 @@ import google.registry.model.poll.PollMessage;
 import google.registry.model.registry.Registry;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.transfer.TransferData;
-
+import javax.inject.Inject;
 import org.joda.time.DateTime;
 
 /**
@@ -60,6 +58,8 @@ import org.joda.time.DateTime;
 public class DomainTransferApproveFlow extends
     ResourceTransferApproveFlow<DomainResource, Builder, Transfer> {
 
+  @Inject DomainTransferApproveFlow() {}
+
   @Override
   protected void verifyOwnedResourcePendingTransferMutationAllowed() throws EppException {
     checkAllowedAccessToTld(getAllowedTlds(), existingResource.getTld());
@@ -72,20 +72,18 @@ public class DomainTransferApproveFlow extends
     String tld = existingResource.getTld();
     int extraYears = transferData.getExtendedRegistrationYears();
     // Bill for the transfer.
-    BillingEvent.OneTime billingEvent = new BillingEvent.OneTime.Builder()
-        .setReason(Reason.TRANSFER)
-        .setTargetId(targetId)
-        .setClientId(gainingClientId)
-        .setPeriodYears(extraYears)
-        .setCost(getDomainRenewCost(
-            targetId,
-            transferData.getTransferRequestTime(),
-            transferData.getGainingClientId(),
-            extraYears))
-        .setEventTime(now)
-        .setBillingTime(now.plus(Registry.get(tld).getTransferGracePeriodLength()))
-        .setParent(historyEntry)
-        .build();
+    BillingEvent.OneTime billingEvent =
+        new BillingEvent.OneTime.Builder()
+            .setReason(Reason.TRANSFER)
+            .setTargetId(targetId)
+            .setClientId(gainingClientId)
+            .setPeriodYears(extraYears)
+            .setCost(
+                getDomainRenewCost(targetId, transferData.getTransferRequestTime(), extraYears))
+            .setEventTime(now)
+            .setBillingTime(now.plus(Registry.get(tld).getTransferGracePeriodLength()))
+            .setParent(historyEntry)
+            .build();
     ofy().save().entity(billingEvent);
     // If we are within an autorenew grace period, cancel the autorenew billing event and reduce
     // the number of years to extend the registration by one.

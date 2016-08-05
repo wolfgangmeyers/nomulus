@@ -14,19 +14,13 @@
 
 package google.registry.tools;
 
-import com.google.common.base.Joiner;
-
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
-
+import com.google.common.base.Joiner;
 import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.Command.RemoteApiCommand;
 import google.registry.whois.Whois;
-import google.registry.whois.WhoisException;
-import google.registry.whois.WhoisResponse;
-
 import java.util.List;
-
 import javax.inject.Inject;
 
 /** Command to execute a WHOIS query. */
@@ -48,12 +42,6 @@ final class WhoisQueryCommand implements RemoteApiCommand, GtechCommand {
 
   @Override
   public void run() {
-    WhoisResponse response;
-    try {
-      response = whois.lookup(Joiner.on(' ').join(mainParameters));
-    } catch (WhoisException e) {
-      response = e;
-    }
-    System.out.println(response.getPlainTextOutput(unicode));
+    System.out.println(whois.lookup(Joiner.on(' ').join(mainParameters), unicode));
   }
 }

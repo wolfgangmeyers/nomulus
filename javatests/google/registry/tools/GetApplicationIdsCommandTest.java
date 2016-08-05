@@ -21,9 +21,7 @@ import static google.registry.testing.DatastoreHelper.persistResource;
 import static org.joda.time.DateTimeZone.UTC;
 
 import com.beust.jcommander.ParameterException;
-
 import google.registry.model.domain.launch.LaunchPhase;
-
 import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Test;
@@ -62,7 +60,7 @@ public class GetApplicationIdsCommandTest extends CommandTestCase<GetApplication
 
   @Test
   public void testFailure_tldDoesNotExist() throws Exception {
-    thrown.expect(NullPointerException.class);
+    thrown.expect(IllegalArgumentException.class, "Domain name is not under a recognized TLD");
     runCommand("example.foo");
   }
 

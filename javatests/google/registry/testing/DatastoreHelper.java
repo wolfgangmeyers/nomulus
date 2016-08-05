@@ -31,11 +31,12 @@ import static google.registry.util.CollectionUtils.union;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static google.registry.util.DomainNameUtils.ACE_PREFIX_REGEX;
-import static google.registry.util.DomainNameUtils.getTldFromSld;
+import static google.registry.util.DomainNameUtils.getTldFromDomainName;
 import static google.registry.util.ResourceUtils.readResourceUtf8;
 import static java.util.Arrays.asList;
 import static org.joda.money.CurrencyUnit.USD;
 
+import com.google.common.base.Ascii;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.base.Predicate;
@@ -46,13 +47,11 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Iterables;
-
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Ref;
 import com.googlecode.objectify.VoidWork;
 import com.googlecode.objectify.Work;
 import com.googlecode.objectify.cmd.Saver;
-
 import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.EppResource;
@@ -91,11 +90,9 @@ import google.registry.model.transfer.TransferData.Builder;
 import google.registry.model.transfer.TransferData.TransferServerApproveEntity;
 import google.registry.model.transfer.TransferStatus;
 import google.registry.tmch.LordnTask;
-
+import java.util.List;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
-
-import java.util.List;
 
 /** Static utils for setting up test resources. */
 public class DatastoreHelper {
@@ -120,13 +117,13 @@ public class DatastoreHelper {
   }
 
   public static DomainResource newDomainResource(String domainName) {
-    String repoId = generateNewDomainRoid(getTldFromSld(domainName));
+    String repoId = generateNewDomainRoid(getTldFromDomainName(domainName));
     return newDomainResource(domainName, repoId, persistActiveContact("contact1234"));
   }
 
   public static DomainResource newDomainResource(String domainName, ContactResource contact) {
     return newDomainResource(
-        domainName, generateNewDomainRoid(getTldFromSld(domainName)), contact);
+        domainName, generateNewDomainRoid(getTldFromDomainName(domainName)), contact);
   }
 
   public static DomainResource newDomainResource(
@@ -152,7 +149,7 @@ public class DatastoreHelper {
     // contact does, which is usually the applicationId 1.
     return newDomainApplication(
         domainName,
-        generateNewDomainRoid(getTldFromSld(domainName)),
+        generateNewDomainRoid(getTldFromDomainName(domainName)),
         persistActiveContact("contact1234"),
         LaunchPhase.SUNRISE);
   }
@@ -165,7 +162,7 @@ public class DatastoreHelper {
       String domainName, ContactResource contact, LaunchPhase phase) {
     return newDomainApplication(
         domainName,
-        generateNewDomainRoid(getTldFromSld(domainName)),
+        generateNewDomainRoid(getTldFromDomainName(domainName)),
         contact,
         phase);
   }
@@ -230,12 +227,13 @@ public class DatastoreHelper {
       .setTldStateTransitions(tldStates)
       // Set billing costs to distinct small primes to avoid masking bugs in tests.
       .setRenewBillingCostTransitions(ImmutableSortedMap.of(START_OF_TIME, Money.of(USD, 11)))
+      .setEapFeeSchedule(ImmutableSortedMap.of(START_OF_TIME, Money.zero(USD)))
       .setCreateBillingCost(Money.of(USD, 13))
       .setRestoreBillingCost(Money.of(USD, 17))
       .setServerStatusChangeBillingCost(Money.of(USD, 19))
       // Always set a default premium list. Tests that don't want it can delete it.
       .setPremiumList(persistPremiumList(tld, DEFAULT_PREMIUM_LIST_CONTENTS.get()))
-      .setPricingEngineClass(StaticPremiumListPricingEngine.class)
+      .setPremiumPricingEngine(StaticPremiumListPricingEngine.NAME)
       .build();
   }
 
@@ -363,7 +361,7 @@ public class DatastoreHelper {
   }
 
   public static void createTld(String tld, ImmutableSortedMap<DateTime, TldState> tldStates) {
-    createTld(tld, tld.replaceFirst(ACE_PREFIX_REGEX, "").toUpperCase(), tldStates);
+    createTld(tld, Ascii.toUpperCase(tld.replaceFirst(ACE_PREFIX_REGEX, "")), tldStates);
   }
 
   public static void createTld(
@@ -428,7 +426,6 @@ public class DatastoreHelper {
   public static BillingEvent.OneTime createBillingEventForTransfer(
       DomainResource domain,
       HistoryEntry historyEntry,
-      String gainingClientId,
       DateTime costLookupTime,
       DateTime eventTime,
       Integer extendedRegistrationYears) {
@@ -440,11 +437,9 @@ public class DatastoreHelper {
             eventTime.plus(Registry.get(domain.getTld()).getTransferGracePeriodLength()))
         .setClientId("NewRegistrar")
         .setPeriodYears(extendedRegistrationYears)
-        .setCost(getDomainRenewCost(
-            domain.getFullyQualifiedDomainName(),
-            costLookupTime,
-            gainingClientId,
-            extendedRegistrationYears))
+        .setCost(
+            getDomainRenewCost(
+                domain.getFullyQualifiedDomainName(), costLookupTime, extendedRegistrationYears))
         .setParent(historyEntry)
         .build();
   }
@@ -505,7 +500,6 @@ public class DatastoreHelper {
     BillingEvent.OneTime transferBillingEvent = persistResource(createBillingEventForTransfer(
             domain,
             historyEntryDomainTransfer,
-            "NewRegistrar",
             requestTime,
             expirationTime,
             extendedRegistrationYears));
@@ -577,6 +571,16 @@ public class DatastoreHelper {
             .setExtendedRegistrationYears(extendedRegistrationYears)
             .build())
         .build());
+  }
+
+  /** Creates a stripped-down {@link Registrar} with the specified clientId and ianaIdentifier */
+  public static Registrar persistNewRegistrar(String clientId, long ianaIdentifier) {
+    return persistSimpleResource(
+        new Registrar.Builder()
+          .setClientIdentifier(clientId)
+          .setType(Registrar.Type.REAL)
+          .setIanaIdentifier(ianaIdentifier)
+          .build());
   }
 
   private static Iterable<BillingEvent> getBillingEvents() {

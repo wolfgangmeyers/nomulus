@@ -22,6 +22,7 @@ import static google.registry.flows.domain.DomainFlowUtils.updateAutorenewRecurr
 import static google.registry.flows.domain.DomainFlowUtils.validateFeeChallenge;
 import static google.registry.flows.domain.DomainFlowUtils.verifyUnitIsYears;
 import static google.registry.model.domain.DomainResource.MAX_REGISTRATION_YEARS;
+import static google.registry.model.domain.fee.Fee.FEE_RENEW_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
 import static google.registry.model.eppoutput.Result.Code.Success;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.pricing.PricingEngineProxy.getDomainRenewCost;
@@ -29,9 +30,7 @@ import static google.registry.util.DateTimeUtils.leapSafeAddYears;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Ref;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ObjectPendingTransferException;
 import google.registry.flows.EppException.ParameterValueRangeErrorException;
@@ -44,8 +43,7 @@ import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.Period;
 import google.registry.model.domain.fee.Fee;
-import google.registry.model.domain.fee.FeeRenewExtension;
-import google.registry.model.domain.fee.FeeRenewResponseExtension;
+import google.registry.model.domain.fee.FeeTransformCommandExtension;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.eppoutput.EppOutput;
@@ -53,11 +51,10 @@ import google.registry.model.poll.PollMessage;
 import google.registry.model.registry.Registry;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.transfer.TransferStatus;
-
+import java.util.Set;
+import javax.inject.Inject;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
-
-import java.util.Set;
 
 /**
  * An EPP flow that updates a domain resource.
@@ -83,8 +80,10 @@ public class DomainRenewFlow extends OwnedResourceMutateFlow<DomainResource, Ren
       StatusValue.PENDING_DELETE,
       StatusValue.SERVER_RENEW_PROHIBITED);
 
-  protected FeeRenewExtension feeRenew;
+  protected FeeTransformCommandExtension feeRenew;
   protected Money renewCost;
+
+  @Inject DomainRenewFlow() {}
 
   @Override
   protected Set<StatusValue> getDisallowedStatuses() {
@@ -93,8 +92,9 @@ public class DomainRenewFlow extends OwnedResourceMutateFlow<DomainResource, Ren
 
   @Override
   public final void initResourceCreateOrMutateFlow() throws EppException {
-    registerExtensions(FeeRenewExtension.class);
-    feeRenew = eppInput.getSingleExtension(FeeRenewExtension.class);
+    registerExtensions(FEE_RENEW_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
+    feeRenew =
+        eppInput.getFirstExtensionOfClasses(FEE_RENEW_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
   }
 
   @Override
@@ -110,9 +110,9 @@ public class DomainRenewFlow extends OwnedResourceMutateFlow<DomainResource, Ren
         existingResource.getRegistrationExpirationTime().toLocalDate())) {
       throw new IncorrectCurrentExpirationDateException();
     }
-    renewCost = getDomainRenewCost(targetId, now, getClientId(), command.getPeriod().getValue());
+    renewCost = getDomainRenewCost(targetId, now, command.getPeriod().getValue());
     validateFeeChallenge(
-        targetId, existingResource.getTld(), now, getClientId(), feeRenew, renewCost);
+        targetId, existingResource.getTld(), now, feeRenew, renewCost);
   }
 
   @Override
@@ -177,9 +177,9 @@ public class DomainRenewFlow extends OwnedResourceMutateFlow<DomainResource, Ren
             newResource.getFullyQualifiedDomainName(),
             newResource.getRegistrationExpirationTime()),
         (feeRenew == null) ? null : ImmutableList.of(
-            new FeeRenewResponseExtension.Builder()
+            feeRenew.createResponseBuilder()
                 .setCurrency(renewCost.getCurrencyUnit())
-                .setFee(ImmutableList.of(Fee.create(renewCost.getAmount(), "renew")))
+                .setFees(ImmutableList.of(Fee.create(renewCost.getAmount(), "renew")))
                 .build()));
   }
 

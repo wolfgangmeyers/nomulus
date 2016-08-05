@@ -16,8 +16,10 @@ java_library(
         "//third_party/java/jsr305_annotations",
         "//third_party/java/jsr330_inject",
         "//third_party/java/servlet/servlet_api",
+        "//java/domains/donuts/config",
         "//java/google/registry/braintree",
         "//java/google/registry/config",
+        "//java/google/registry/flows",
         "//java/google/registry/keyring/api",
         "//java/google/registry/rdap",
         "//java/google/registry/request",
@@ -38,7 +40,7 @@ java_binary(
     create_executable = 0,
     runtime_deps = [
         ":frontend",
-        "//java/google/registry/ui/server/api",  # CheckApiServlet
+        "//java/domains/donuts/config",  # DonutsRegistryConfig
         "//java/google/registry/ui/server/registrar",  # ResourceServlet
     ],
 )

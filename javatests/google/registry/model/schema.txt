@@ -43,9 +43,9 @@ class google.registry.model.billing.BillingEvent$Modification {
 class google.registry.model.billing.BillingEvent$OneTime {
   @Id long id;
   @Parent com.googlecode.objectify.Key<google.registry.model.reporting.HistoryEntry> parent;
+  com.googlecode.objectify.Key<? extends google.registry.model.billing.BillingEvent> cancellationMatchingBillingEvent;
   google.registry.model.billing.BillingEvent$Reason reason;
   java.lang.Integer periodYears;
-  java.lang.Long cancellationTargetId;
   java.lang.String clientId;
   java.lang.String targetId;
   java.util.Set<google.registry.model.billing.BillingEvent$Flag> flags;
@@ -283,6 +283,13 @@ class google.registry.model.domain.GracePeriod {
   google.registry.model.domain.rgp.GracePeriodStatus type;
   java.lang.String clientId;
   org.joda.time.DateTime expirationTime;
+}
+class google.registry.model.domain.LrpToken {
+  @Id java.lang.String assignee;
+  com.googlecode.objectify.Key<google.registry.model.reporting.HistoryEntry> redemptionHistoryEntry;
+  google.registry.model.UpdateAutoTimestamp updateTimestamp;
+  java.lang.String token;
+  java.util.Set<java.lang.String> validTlds;
 }
 class google.registry.model.domain.Period {
   google.registry.model.domain.Period$Unit unit;
@@ -703,6 +710,7 @@ class google.registry.model.registry.Registry {
   com.googlecode.objectify.Key<google.registry.model.registry.label.PremiumList> premiumList;
   google.registry.model.CreateAutoTimestamp creationTime;
   google.registry.model.common.TimedTransitionProperty<google.registry.model.registry.Registry$TldState, google.registry.model.registry.Registry$TldStateTransition> tldStateTransitions;
+  google.registry.model.common.TimedTransitionProperty<org.joda.money.Money, google.registry.model.registry.Registry$BillingCostTransition> eapFeeSchedule;
   google.registry.model.common.TimedTransitionProperty<org.joda.money.Money, google.registry.model.registry.Registry$BillingCostTransition> renewBillingCostTransitions;
   google.registry.model.registry.Registry$TldType tldType;
   java.lang.String driveFolderId;
@@ -749,11 +757,6 @@ class google.registry.model.registry.Registry$TldStateTransition {
 enum google.registry.model.registry.Registry$TldType {
   REAL;
   TEST;
-}
-class google.registry.model.registry.RegistryCursor {
-  @Id java.lang.String cursorType;
-  @Parent com.googlecode.objectify.Key<google.registry.model.registry.Registry> registry;
-  org.joda.time.DateTime date;
 }
 class google.registry.model.registry.label.PremiumList {
   @Id java.lang.String name;

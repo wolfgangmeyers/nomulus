@@ -24,16 +24,13 @@ import com.google.common.collect.ForwardingMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Ordering;
-
 import com.googlecode.objectify.mapper.Mapper;
-
 import google.registry.model.ImmutableObject;
 import google.registry.util.TypeUtils;
-
-import org.joda.time.DateTime;
-
 import java.util.NavigableMap;
 import java.util.TreeMap;
+import javax.annotation.Nullable;
+import org.joda.time.DateTime;
 
 /**
  * An entity property whose value transitions over time.  Each value it takes on becomes active
@@ -202,5 +199,13 @@ public class TimedTransitionProperty<V, T extends TimedTransitionProperty.TimedT
     // Retrieve the current value by finding the latest transition before or at the given time,
     // where any given time earlier than START_OF_TIME is replaced by START_OF_TIME.
     return backingMap.floorEntry(latestOf(START_OF_TIME, time)).getValue().getValue();
+  }
+
+  /**
+   * Returns the time of the next transition.  Returns null if there is no subsequent transition.
+   */
+  @Nullable
+  public DateTime getNextTransitionAfter(DateTime time) {
+    return backingMap.higherKey(latestOf(START_OF_TIME, time));
   }
 }
