@@ -60,7 +60,9 @@ public final class DonutsRegistryConfig implements RegistryConfig {
 
   @Override
   public int getCommitLogBucketCount() {
-    return 100;  // if you decrease this number, the world ends
+    // TODO: Increase to 100 after merging Google fix to CommitLogCheckpoint.
+    //       See: https://github.com/DonutsInc/domain-registry/pull/21#issuecomment-238730780
+    return 1;  // if you decrease this number, the world ends
   }
 
   /**
