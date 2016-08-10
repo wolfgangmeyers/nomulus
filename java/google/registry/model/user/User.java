@@ -130,7 +130,7 @@ public class User extends ImmutableObject implements Jsonifiable, Buildable {
         .put("faxNumber", faxNumber)
         .put("role", role)
         .put("gaeUserId", gaeUserId)
-        .put("clientIdentifier", getRegistrar().getClientIdentifier())
+        .put("clientId", getRegistrar().getClientIdentifier())
         .build();
   }
 
