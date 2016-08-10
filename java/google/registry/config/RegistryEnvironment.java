@@ -15,7 +15,7 @@
 package google.registry.config;
 
 import com.google.common.annotations.VisibleForTesting;
-
+import com.google.common.base.Ascii;
 import javax.annotation.Nullable;
 
 /** Registry environments. */
@@ -51,7 +51,7 @@ public enum RegistryEnvironment {
 
   /** Returns environment configured by system property {@value #PROPERTY}. */
   public static RegistryEnvironment get() {
-    return valueOf(System.getProperty(PROPERTY, UNITTEST.name()).toUpperCase());
+    return valueOf(Ascii.toUpperCase(System.getProperty(PROPERTY, UNITTEST.name())));
   }
 
   /**
@@ -79,11 +79,8 @@ public enum RegistryEnvironment {
   @Nullable
   private static RegistryConfig configOverride;
 
-  // TODO(b/19247780) Use true dependency injection for this. In the mean time, if you're not
-  // Google, you'll need to change this to include your own config class implementation at compile
-  // time.
   private static final RegistryConfig testingConfig = new TestRegistryConfig();
-  private final RegistryConfig config = new TestRegistryConfig();
+  private final RegistryConfig config = RegistryConfigLoader.load(this);
 
   /** System property for configuring which environment we should use. */
   public static final String PROPERTY = "google.registry.environment";

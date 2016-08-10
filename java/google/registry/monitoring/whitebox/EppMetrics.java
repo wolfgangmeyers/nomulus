@@ -14,14 +14,20 @@
 
 package google.registry.monitoring.whitebox;
 
+import static com.google.apphosting.api.ApiProxy.getCurrentEnvironment;
+
 import com.google.api.services.bigquery.model.TableFieldSchema;
 import com.google.common.collect.ImmutableList;
-
 import google.registry.bigquery.BigqueryUtils.FieldType;
 import google.registry.model.eppoutput.Result.Code;
+import google.registry.request.RequestScope;
+import javax.inject.Inject;
 
 /** The EPP Metrics collector. See {@link Metrics}. */
+@RequestScope
 public class EppMetrics extends Metrics {
+
+  private static final String REQUEST_LOG_ID = "com.google.appengine.runtime.request_log_id";
 
   static final String EPPMETRICS_TABLE_ID = "eppMetrics";
 
@@ -37,9 +43,11 @@ public class EppMetrics extends Metrics {
           new TableFieldSchema().setName("eppStatus").setType(FieldType.INTEGER.name()),
           new TableFieldSchema().setName("attempts").setType(FieldType.INTEGER.name()));
 
+  @Inject
   public EppMetrics() {
     setTableId(EPPMETRICS_TABLE_ID);
     fields.put("attempts", 0);
+    fields.put("requestId", getCurrentEnvironment().getAttributes().get(REQUEST_LOG_ID).toString());
   }
 
   public void setCommandName(String name) {
@@ -58,16 +66,11 @@ public class EppMetrics extends Metrics {
     fields.put("eppTarget", eppTarget);
   }
 
-  public void setRequestId(String requestId) {
-    fields.put("requestId", requestId);
-  }
-
   public void setEppStatus(Code status) {
     fields.put("eppStatus", String.valueOf(status.code));
   }
 
   public void incrementAttempts() {
-    int attempts = (int) fields.get("attempts");
-    fields.put("attempts", attempts + 1);
+    fields.put("attempts", ((int) fields.get("attempts")) + 1);
   }
 }

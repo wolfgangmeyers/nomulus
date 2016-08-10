@@ -51,6 +51,15 @@
       </nameXmlTransform>
     </schemaBindings>
   </bindings>
+  <bindings schemaLocation="flags.xsd" node="/xsd:schema">
+    <schemaBindings>
+      <package name="google.registry.xjc.flags"/>
+      <nameXmlTransform>
+        <elementName prefix="XjcDomain"/>
+        <typeName prefix="XjcDomain"/>
+      </nameXmlTransform>
+    </schemaBindings>
+  </bindings>
   <bindings schemaLocation="host.xsd" node="/xsd:schema">
     <schemaBindings>
       <package name="google.registry.xjc.host"/>
@@ -134,6 +143,33 @@
       <nameXmlTransform>
         <elementName prefix="XjcDsig"/>
         <typeName prefix="XjcDsig"/>
+      </nameXmlTransform>
+    </schemaBindings>
+  </bindings>
+  <bindings schemaLocation="fee06.xsd" node="/xsd:schema">
+    <schemaBindings>
+      <package name="google.registry.xjc.fee06"/>
+      <nameXmlTransform>
+        <elementName prefix="XjcFee06"/>
+        <typeName prefix="XjcFee06"/>
+      </nameXmlTransform>
+    </schemaBindings>
+  </bindings>
+  <bindings schemaLocation="fee11.xsd" node="/xsd:schema">
+    <schemaBindings>
+      <package name="google.registry.xjc.fee11"/>
+      <nameXmlTransform>
+        <elementName prefix="XjcFee11"/>
+        <typeName prefix="XjcFee11"/>
+      </nameXmlTransform>
+    </schemaBindings>
+  </bindings>
+  <bindings schemaLocation="fee12.xsd" node="/xsd:schema">
+    <schemaBindings>
+      <package name="google.registry.xjc.fee12"/>
+      <nameXmlTransform>
+        <elementName prefix="XjcFee12"/>
+        <typeName prefix="XjcFee12"/>
       </nameXmlTransform>
     </schemaBindings>
   </bindings>

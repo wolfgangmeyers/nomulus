@@ -20,19 +20,20 @@ import static google.registry.model.registry.Registries.getTlds;
 import static google.registry.util.CollectionUtils.nullToEmpty;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
+import com.google.common.base.Optional;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
-
-import com.beust.jcommander.Parameter;
-import com.beust.jcommander.Parameters;
-
+import com.google.common.collect.Maps;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
-
-import org.joda.money.Money;
-
+import java.util.Map;
 import javax.annotation.Nullable;
+import org.joda.money.CurrencyUnit;
+import org.joda.money.Money;
+import org.joda.time.DateTime;
 
 /** Command to create a TLD. */
 @Parameters(separators = " =", commandDescription = "Create new TLD(s)")
@@ -55,9 +56,6 @@ class CreateTldCommand extends CreateOrUpdateTldCommand {
   protected void initTldCommand() throws Exception {
     checkArgument(initialTldState == null || tldStateTransitions.isEmpty(),
         "Don't pass both --initial_tld_state and --tld_state_transitions");
-    if (initialTldState != null) {
-      tldStateTransitions = ImmutableSortedMap.of(START_OF_TIME, initialTldState);
-    }
     checkArgument(initialRenewBillingCost == null || renewBillingCostTransitions.isEmpty(),
         "Don't pass both --initial_renew_billing_cost and --renew_billing_cost_transitions");
     if (initialRenewBillingCost != null) {
@@ -73,9 +71,17 @@ class CreateTldCommand extends CreateOrUpdateTldCommand {
   void setCommandSpecificProperties(Registry.Builder builder) {
     // Pick up the currency from the create cost. Since all costs must be in one currency, and that
     // condition is enforced by the builder, it doesn't matter which cost we choose it from.
-    builder.setCurrency(createBillingCost != null
+    CurrencyUnit currency = createBillingCost != null
         ? createBillingCost.getCurrencyUnit()
-        : Registry.DEFAULT_CURRENCY);
+        : Registry.DEFAULT_CURRENCY;
+
+    builder.setCurrency(currency);
+
+    // If this is a non-default currency and the user hasn't specified an EAP fee schedule, set the
+    // EAP fee schedule to a matching currency.
+    if (!currency.equals(Registry.DEFAULT_CURRENCY) && eapFeeSchedule.isEmpty()) {
+      builder.setEapFeeSchedule(ImmutableSortedMap.of(START_OF_TIME, Money.zero(currency)));
+    }
   }
 
   @Override
@@ -97,5 +103,12 @@ class CreateTldCommand extends CreateOrUpdateTldCommand {
   @Override
   ImmutableSet<String> getReservedLists(Registry oldRegistry) {
     return ImmutableSet.copyOf(nullToEmpty(reservedListNames));
+  }
+
+  @Override
+  Optional<Map.Entry<DateTime, TldState>> getTldStateTransitionToAdd() {
+    return initialTldState != null
+        ? Optional.of(Maps.immutableEntry(START_OF_TIME, initialTldState))
+        : Optional.<Map.Entry<DateTime, TldState>>absent();
   }
 }

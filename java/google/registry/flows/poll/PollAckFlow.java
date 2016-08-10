@@ -21,7 +21,6 @@ import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.util.DateTimeUtils.isBeforeOrAt;
 
 import com.googlecode.objectify.Key;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.AuthorizationErrorException;
 import google.registry.flows.EppException.ObjectDoesNotExistException;
@@ -32,7 +31,7 @@ import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.poll.MessageQueueInfo;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.poll.PollMessageExternalKeyConverter.PollMessageExternalKeyParseException;
-
+import javax.inject.Inject;
 import org.joda.time.DateTime;
 
 /**
@@ -44,6 +43,8 @@ import org.joda.time.DateTime;
  * @error {@link PollAckFlow.NotAuthorizedToAckMessageException}
  */
 public class PollAckFlow extends PollFlow implements TransactionalFlow {
+
+  @Inject PollAckFlow() {}
 
   @Override
   public final EppOutput run() throws EppException {

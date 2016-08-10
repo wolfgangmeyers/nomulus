@@ -27,11 +27,7 @@ import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.testing.TaskQueueHelper.assertTasksEnqueued;
 
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Key;
-
-import google.registry.flows.FlowRunner.CommitMode;
-import google.registry.flows.FlowRunner.UserPrivileges;
 import google.registry.flows.ResourceAsyncDeleteFlow.ResourceToDeleteIsReferencedException;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
@@ -43,7 +39,6 @@ import google.registry.model.contact.ContactResource;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.testing.TaskQueueHelper.TaskMatcher;
-
 import org.joda.time.Duration;
 import org.junit.Before;
 import org.junit.Test;
@@ -144,7 +139,6 @@ public class ContactDeleteFlowTest
 
   @Test
   public void testSuccess_superuserUnauthorizedClient() throws Exception {
-    sessionMetadata.setSuperuser(true);
     sessionMetadata.setClientId("NewRegistrar");
     persistActiveContact(getUniqueIdFromCommand());
     clock.advanceOneMilli();

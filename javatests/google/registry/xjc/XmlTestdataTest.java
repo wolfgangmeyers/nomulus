@@ -19,17 +19,15 @@ import static google.registry.util.ResourceUtils.readResourceUtf8;
 import static google.registry.xjc.XjcXmlTransformer.unmarshal;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import google.registry.testing.ExceptionRule;
 import google.registry.xjc.epp.XjcEpp;
 import google.registry.xjc.rde.XjcRdeDeposit;
-
+import java.io.ByteArrayInputStream;
 import org.junit.Rule;
 import org.junit.experimental.theories.DataPoints;
 import org.junit.experimental.theories.Theories;
 import org.junit.experimental.theories.Theory;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
-
-import java.io.ByteArrayInputStream;
 
 /**
  * Unit tests that ensure {@link XjcObject} is able to unmarshal XML in {@code testdata/} and
@@ -39,7 +37,7 @@ import java.io.ByteArrayInputStream;
 public class XmlTestdataTest {
 
   @Rule
-  public final ExpectedException thrown = ExpectedException.none();
+  public final ExceptionRule thrown = new ExceptionRule();
 
   private static class Example {
     final ByteArrayInputStream xmlStream;
@@ -147,13 +145,13 @@ public class XmlTestdataTest {
 
   @Theory
   public void testValid(Good v) throws Exception {
-    XjcObject xml = unmarshal(v.xmlStream);
+    XjcObject xml = unmarshal(XjcObject.class, v.xmlStream);
     assertThat(xml).isInstanceOf(v.clazz);
   }
 
   @Theory
   public void testInvalid(Evil v) throws Exception {
-    thrown.expectMessage(v.error);
-    unmarshal(v.xmlStream);
+    thrown.expect(Throwable.class, v.error);
+    unmarshal(XjcObject.class, v.xmlStream);
   }
 }

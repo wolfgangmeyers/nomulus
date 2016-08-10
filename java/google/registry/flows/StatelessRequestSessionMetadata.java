@@ -14,53 +14,24 @@
 
 package google.registry.flows;
 
+import static com.google.common.base.MoreObjects.toStringHelper;
+import static com.google.common.base.Preconditions.checkNotNull;
+import static google.registry.util.CollectionUtils.nullToEmpty;
+
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 
 /** A read-only {@link SessionMetadata} that doesn't support login/logout. */
-public class StatelessRequestSessionMetadata extends SessionMetadata {
+public class StatelessRequestSessionMetadata implements SessionMetadata {
 
   private final String clientId;
-  private final boolean isSuperuser;
-  private final boolean isDryRun;
-  private final Set<String> serviceExtensionUris;
-  private final SessionSource sessionSource;
+  private final ImmutableSet<String> serviceExtensionUris;
 
   public StatelessRequestSessionMetadata(
-      String clientId,
-      boolean isSuperuser,
-      boolean isDryRun,
-      Set<String> serviceExtensionUris,
-      SessionSource source) {
-    this.clientId = clientId;
-    this.isSuperuser = isSuperuser;
-    this.isDryRun = isDryRun;
-    this.serviceExtensionUris = serviceExtensionUris;
-    this.sessionSource = source;
-  }
-
-  @Override
-  public String getClientId() {
-    return clientId;
-  }
-
-  @Override
-  public boolean isSuperuser() {
-    return isSuperuser;
-  }
-
-  @Override
-  public boolean isDryRun() {
-    return isDryRun;
-  }
-
-  @Override
-  public Set<String> getServiceExtensionUris() {
-    return serviceExtensionUris;
-  }
-
-  @Override
-  public SessionSource getSessionSource() {
-    return sessionSource;
+      String clientId, ImmutableSet<String> serviceExtensionUris) {
+    this.clientId = checkNotNull(clientId);
+    this.serviceExtensionUris = checkNotNull(serviceExtensionUris);
   }
 
   @Override
@@ -69,19 +40,47 @@ public class StatelessRequestSessionMetadata extends SessionMetadata {
   }
 
   @Override
-  public void setTransportCredentials(TransportCredentials credentials) {
+  public String getClientId() {
+    return clientId;
+  }
+
+  @Override
+  public Set<String> getServiceExtensionUris() {
+    return serviceExtensionUris;
+  }
+
+  @Override
+  public int getFailedLoginAttempts() {
+    return 0;
+  }
+
+  @Override
+  public void setClientId(String clientId) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  protected void setProperty(String key, Object value) {
+  public void setServiceExtensionUris(Set<String> serviceExtensionUris) {
     throw new UnsupportedOperationException();
   }
 
   @Override
-  protected Object getProperty(String key) {
-    // We've overridden the getters of all of the properties that we care about. Return null for
-    // everything else so that toString() continues to work.
-    return null;
+  public void incrementFailedLoginAttempts() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public void resetFailedLoginAttempts() {
+    throw new UnsupportedOperationException();
+  }
+
+  @Override
+  public String toString() {
+    return toStringHelper(getClass())
+        .add("clientId", getClientId())
+        .add("failedLoginAttempts", getFailedLoginAttempts())
+        .add("serviceExtensionUris", Joiner.on('.').join(nullToEmpty(getServiceExtensionUris())))
+        .toString();
   }
 }
+

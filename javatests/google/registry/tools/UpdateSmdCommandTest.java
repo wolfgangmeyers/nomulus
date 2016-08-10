@@ -26,7 +26,6 @@ import static org.joda.time.DateTimeZone.UTC;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-
 import google.registry.flows.EppException.ParameterValuePolicyErrorException;
 import google.registry.flows.EppException.ParameterValueSyntaxErrorException;
 import google.registry.flows.EppException.RequiredParameterMissingException;
@@ -35,7 +34,6 @@ import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.smd.EncodedSignedMark;
 import google.registry.model.smd.SignedMarkRevocationList;
 import google.registry.tmch.TmchData;
-
 import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Test;
@@ -77,7 +75,7 @@ public class UpdateSmdCommandTest extends CommandTestCase<UpdateSmdCommand> {
   public void testSuccess() throws Exception {
     DateTime before = new DateTime(UTC);
     String smdFile = writeToTmpFile(ACTIVE_SMD);
-    runCommand("--id=2-Q9JYB4C", "--smd=" + smdFile);
+    runCommand("--id=2-Q9JYB4C", "--smd=" + smdFile, "--reason=testing");
 
     EncodedSignedMark encodedSignedMark = TmchData.readEncodedSignedMark(ACTIVE_SMD);
     assertAboutApplications().that(reloadDomainApplication())
@@ -86,7 +84,9 @@ public class UpdateSmdCommandTest extends CommandTestCase<UpdateSmdCommand> {
         .hasLastEppUpdateClientId("TheRegistrar").and()
         .hasOnlyOneHistoryEntryWhich()
             .hasType(HistoryEntry.Type.DOMAIN_APPLICATION_UPDATE).and()
-            .hasClientId("TheRegistrar");
+            .hasClientId("TheRegistrar").and()
+            .hasMetadataReason("UpdateSmdCommand: testing").and()
+            .hasNoXml();
   }
 
   @Test

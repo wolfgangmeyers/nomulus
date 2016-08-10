@@ -21,9 +21,7 @@ import static google.registry.request.Action.Method.HEAD;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.re2j.Pattern;
-
 import com.googlecode.objectify.Key;
-
 import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DesignatedContact;
 import google.registry.model.registrar.Registrar;
@@ -32,7 +30,6 @@ import google.registry.request.HttpException;
 import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.HttpException.NotFoundException;
 import google.registry.util.Clock;
-
 import javax.inject.Inject;
 
 /**
@@ -69,6 +66,8 @@ public class RdapEntityAction extends RdapActionBase {
       wasValidKey = true;
       Key<ContactResource> contactKey = Key.create(ContactResource.class, pathSearchString);
       ContactResource contactResource = ofy().load().key(contactKey).now();
+      // As per Andy Newton on the regext mailing list, contacts by themselves have no role, since
+      // they are global, and might have different roles for different domains.
       if ((contactResource != null) && clock.nowUtc().isBefore(contactResource.getDeletionTime())) {
         return RdapJsonFormatter.makeRdapJsonForContact(
             contactResource,

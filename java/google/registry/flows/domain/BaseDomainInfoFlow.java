@@ -17,14 +17,13 @@ package google.registry.flows.domain;
 import static google.registry.util.CollectionUtils.forceEmptyToNull;
 
 import com.google.common.collect.ImmutableList;
-
 import google.registry.flows.EppException;
 import google.registry.flows.ResourceInfoFlow;
 import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.DomainBase.Builder;
 import google.registry.model.domain.DomainCommand;
 import google.registry.model.domain.secdns.SecDnsInfoExtension;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 
 /**
  * An EPP flow that reads a domain resource or application.

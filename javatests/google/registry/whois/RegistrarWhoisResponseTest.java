@@ -21,13 +21,11 @@ import static google.registry.whois.WhoisHelper.loadWhoisTestFile;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarAddress;
 import google.registry.model.registrar.RegistrarContact;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.FakeClock;
-
 import org.joda.time.DateTime;
 import org.junit.Rule;
 import org.junit.Test;
@@ -115,7 +113,7 @@ public class RegistrarWhoisResponseTest {
 
     RegistrarWhoisResponse registrarWhoisResponse =
         new RegistrarWhoisResponse(registrar, clock.nowUtc());
-    assertThat(registrarWhoisResponse.getPlainTextOutput(false))
+    assertThat(registrarWhoisResponse.getPlainTextOutput(false, "Doodle Disclaimer"))
         .isEqualTo(loadWhoisTestFile("whois_registrar.txt"));
   }
 
@@ -131,6 +129,6 @@ public class RegistrarWhoisResponseTest {
     RegistrarWhoisResponse registrarWhoisResponse =
         new RegistrarWhoisResponse(registrar, clock.nowUtc());
     // Just make sure this doesn't NPE.
-    registrarWhoisResponse.getPlainTextOutput(false);
+    registrarWhoisResponse.getPlainTextOutput(false, "Doodle Disclaimer");
   }
 }

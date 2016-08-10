@@ -15,9 +15,9 @@
 package google.registry.rde;
 
 import static com.google.common.truth.Truth.assertThat;
+import static google.registry.model.common.Cursor.CursorType.BRDA;
+import static google.registry.model.common.Cursor.CursorType.RDE_STAGING;
 import static google.registry.model.ofy.ObjectifyService.ofy;
-import static google.registry.model.registry.RegistryCursor.CursorType.BRDA;
-import static google.registry.model.registry.RegistryCursor.CursorType.RDE_STAGING;
 import static google.registry.rde.RdeFixtures.makeContactResource;
 import static google.registry.rde.RdeFixtures.makeDomainResource;
 import static google.registry.rde.RdeFixtures.makeHostResource;
@@ -40,17 +40,15 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InetAddresses;
-
 import com.googlecode.objectify.VoidWork;
-
 import google.registry.keyring.api.Keyring;
 import google.registry.keyring.api.PgpHelper;
 import google.registry.mapreduce.MapreduceRunner;
+import google.registry.model.common.Cursor;
+import google.registry.model.common.Cursor.CursorType;
 import google.registry.model.host.HostResource;
 import google.registry.model.ofy.Ofy;
 import google.registry.model.registry.Registry;
-import google.registry.model.registry.RegistryCursor;
-import google.registry.model.registry.RegistryCursor.CursorType;
 import google.registry.request.RequestParameters;
 import google.registry.testing.FakeClock;
 import google.registry.testing.FakeResponse;
@@ -73,7 +71,11 @@ import google.registry.xjc.rdeidn.XjcRdeIdn;
 import google.registry.xjc.rderegistrar.XjcRdeRegistrar;
 import google.registry.xml.XmlException;
 import google.registry.xml.XmlTestUtils;
-
+import java.io.ByteArrayInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import javax.xml.bind.JAXBElement;
 import org.bouncycastle.openpgp.PGPException;
 import org.bouncycastle.openpgp.PGPPrivateKey;
 import org.bouncycastle.openpgp.PGPPublicKey;
@@ -87,13 +89,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.io.ByteArrayInputStream;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
-
-import javax.xml.bind.JAXBElement;
 
 /** Unit tests for {@link RdeStagingAction}. */
 @RunWith(JUnit4.class)
@@ -200,8 +195,9 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     action.run();
     executeTasksUntilEmpty("mapreduce", clock);
 
-    XjcRdeDeposit deposit =
-        unmarshal(Ghostryde.decode(readGcsFile(gcsService, XML_FILE), decryptKey).getData());
+    XjcRdeDeposit deposit = unmarshal(
+        XjcRdeDeposit.class,
+        Ghostryde.decode(readGcsFile(gcsService, XML_FILE), decryptKey).getData());
     XjcRdeHeader header = extractAndRemoveContentWithType(XjcRdeHeader.class, deposit);
 
     assertThat(header.getTld()).isEqualTo("lol");
@@ -230,8 +226,9 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     action.run();
     executeTasksUntilEmpty("mapreduce", clock);
 
-    XjcRdeDeposit deposit =
-        unmarshal(Ghostryde.decode(readGcsFile(gcsService, XML_FILE), decryptKey).getData());
+    XjcRdeDeposit deposit = unmarshal(
+        XjcRdeDeposit.class,
+        Ghostryde.decode(readGcsFile(gcsService, XML_FILE), decryptKey).getData());
     assertThat(deposit.getType()).isEqualTo(XjcRdeDepositTypeType.FULL);
     assertThat(deposit.getId()).isEqualTo(RdeUtil.timestampToId(DateTime.parse("2000-01-01TZ")));
     assertThat(deposit.getWatermark()).isEqualTo(DateTime.parse("2000-01-01TZ"));
@@ -271,8 +268,9 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     action.run();
     executeTasksUntilEmpty("mapreduce", clock);
 
-    XjcRdeDeposit deposit =
-        unmarshal(Ghostryde.decode(readGcsFile(gcsService, XML_FILE), decryptKey).getData());
+    XjcRdeDeposit deposit = unmarshal(
+        XjcRdeDeposit.class,
+        Ghostryde.decode(readGcsFile(gcsService, XML_FILE), decryptKey).getData());
     XjcRdeRegistrar registrar1 = extractAndRemoveContentWithType(XjcRdeRegistrar.class, deposit);
     XjcRdeRegistrar registrar2 = extractAndRemoveContentWithType(XjcRdeRegistrar.class, deposit);
     XjcRdeHeader header = extractAndRemoveContentWithType(XjcRdeHeader.class, deposit);
@@ -292,10 +290,15 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     clock.setTo(DateTime.parse("2000-01-01TZ")); // Saturday
     action.run();
     executeTasksUntilEmpty("mapreduce", clock);
-    assertThat(RegistryCursor.load(Registry.get("lol"), RDE_STAGING))
-        .hasValue(DateTime.parse("2000-01-02TZ"));
-    assertThat(RegistryCursor.load(Registry.get("lol"), BRDA))
-        .hasValue(DateTime.parse("2000-01-04TZ"));
+    assertThat(
+            ofy()
+                .load()
+                .key(Cursor.createKey(RDE_STAGING, Registry.get("lol")))
+                .now()
+                .getCursorTime())
+        .isEqualTo(DateTime.parse("2000-01-02TZ"));
+    assertThat(ofy().load().key(Cursor.createKey(BRDA, Registry.get("lol"))).now().getCursorTime())
+        .isEqualTo(DateTime.parse("2000-01-04TZ"));
   }
 
   @Test
@@ -308,10 +311,15 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     clock.setTo(DateTime.parse("2000-01-04TZ")); // Tuesday
     action.run();
     executeTasksUntilEmpty("mapreduce", clock);
-    assertThat(RegistryCursor.load(Registry.get("lol"), RDE_STAGING))
-        .hasValue(DateTime.parse("2000-01-05TZ"));
-    assertThat(RegistryCursor.load(Registry.get("lol"), BRDA))
-        .hasValue(DateTime.parse("2000-01-11TZ"));
+    assertThat(
+            ofy()
+                .load()
+                .key(Cursor.createKey(RDE_STAGING, Registry.get("lol")))
+                .now()
+                .getCursorTime())
+        .isEqualTo(DateTime.parse("2000-01-05TZ"));
+    assertThat(ofy().load().key(Cursor.createKey(BRDA, Registry.get("lol"))).now().getCursorTime())
+        .isEqualTo(DateTime.parse("2000-01-11TZ"));
   }
 
   @Test
@@ -349,8 +357,9 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     for (GcsFilename filename : asList(
         new GcsFilename("rde-bucket", "fop_1971-01-01_full_S1_R0.xml.ghostryde"),
         new GcsFilename("rde-bucket", "fop_1971-01-05_thin_S1_R0.xml.ghostryde"))) {
-      XjcRdeDeposit deposit =
-          unmarshal(Ghostryde.decode(readGcsFile(gcsService, filename), decryptKey).getData());
+      XjcRdeDeposit deposit = unmarshal(
+          XjcRdeDeposit.class,
+          Ghostryde.decode(readGcsFile(gcsService, filename), decryptKey).getData());
       XjcRdeRegistrar registrar1 = extractAndRemoveContentWithType(XjcRdeRegistrar.class, deposit);
       XjcRdeRegistrar registrar2 = extractAndRemoveContentWithType(XjcRdeRegistrar.class, deposit);
       XjcRdeHeader header = extractAndRemoveContentWithType(XjcRdeHeader.class, deposit);
@@ -359,11 +368,14 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
           .containsExactly("New Registrar", "The Registrar");
       assertThat(mapifyCounts(header)).containsEntry(RdeResourceType.REGISTRAR.getUri(), 2L);
     }
+    
+    assertThat(
+            ofy().load().key(Cursor.createKey(RDE_STAGING, Registry.get("fop"))).now()
+                .getCursorTime())
+        .isEqualTo(DateTime.parse("1971-01-02TZ"));
 
-    assertThat(RegistryCursor.load(Registry.get("fop"), RDE_STAGING))
-        .hasValue(DateTime.parse("1971-01-02TZ"));
-    assertThat(RegistryCursor.load(Registry.get("fop"), BRDA))
-        .hasValue(DateTime.parse("1971-01-12TZ"));
+    assertThat(ofy().load().key(Cursor.createKey(BRDA, Registry.get("fop"))).now().getCursorTime())
+        .isEqualTo(DateTime.parse("1971-01-12TZ"));
   }
 
   @Test
@@ -377,8 +389,9 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     executeTasksUntilEmpty("mapreduce", clock);
 
     GcsFilename filename = new GcsFilename("rde-bucket", "fop_2000-01-01_full_S1_R0.xml.ghostryde");
-    XjcRdeDeposit deposit =
-        unmarshal(Ghostryde.decode(readGcsFile(gcsService, filename), decryptKey).getData());
+    XjcRdeDeposit deposit = unmarshal(
+        XjcRdeDeposit.class,
+        Ghostryde.decode(readGcsFile(gcsService, filename), decryptKey).getData());
     XjcRdeDomain domain = extractAndRemoveContentWithType(XjcRdeDomain.class, deposit);
     XjcRdeIdn firstIdn = extractAndRemoveContentWithType(XjcRdeIdn.class, deposit);
     XjcRdeHeader header = extractAndRemoveContentWithType(XjcRdeHeader.class, deposit);
@@ -494,16 +507,17 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     action.run();
     executeTasksUntilEmpty("mapreduce", clock);
 
-    XjcRdeDeposit deposit =
-        unmarshal(readXml("fop_2000-01-01_full_S1_R0.xml.ghostryde").getBytes(UTF_8));
+    XjcRdeDeposit deposit = unmarshal(
+        XjcRdeDeposit.class,
+        readXml("fop_2000-01-01_full_S1_R0.xml.ghostryde").getBytes(UTF_8));
     assertThat(deposit.getResend()).isEqualTo(0);
 
     setCursor(Registry.get("fop"), RDE_STAGING, DateTime.parse("2000-01-01TZ"));
     action.response = new FakeResponse();
     action.run();
     executeTasksUntilEmpty("mapreduce", clock);
-
-    deposit = unmarshal(readXml("fop_2000-01-01_full_S1_R1.xml.ghostryde").getBytes(UTF_8));
+    deposit = unmarshal(
+        XjcRdeDeposit.class, readXml("fop_2000-01-01_full_S1_R1.xml.ghostryde").getBytes(UTF_8));
     assertThat(deposit.getResend()).isEqualTo(1);
   }
 
@@ -555,8 +569,13 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     executeTasksUntilEmpty("mapreduce", clock);
     String firstDeposit = readXml("lol_1984-12-18_full_S1_R0.xml.ghostryde");
     assertThat(firstDeposit).doesNotContain("ns1.justine.lol");
-    assertThat(RegistryCursor.load(Registry.get("lol"), RDE_STAGING))
-        .hasValue(DateTime.parse("1984-12-19TZ"));
+    assertThat(
+            ofy()
+                .load()
+                .key(Cursor.createKey(RDE_STAGING, Registry.get("lol")))
+                .now()
+                .getCursorTime())
+        .isEqualTo(DateTime.parse("1984-12-19TZ"));
 
     // Second mapreduce should emit the old version of host.
     action.response = new FakeResponse();
@@ -566,8 +585,14 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     assertThat(secondDeposit).contains("ns1.justine.lol");
     assertThat(secondDeposit).contains("feed::a:bee");
     assertThat(secondDeposit).doesNotContain("dead:beef::cafe");
-    assertThat(RegistryCursor.load(Registry.get("lol"), RDE_STAGING))
-        .hasValue(DateTime.parse("1984-12-20TZ"));
+
+    assertThat(
+            ofy()
+                .load()
+                .key(Cursor.createKey(RDE_STAGING, Registry.get("lol")))
+                .now()
+                .getCursorTime())
+        .isEqualTo(DateTime.parse("1984-12-20TZ"));
 
     // Third mapreduce emits current version of host.
     action.response = new FakeResponse();
@@ -577,8 +602,13 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     assertThat(thirdDeposit).contains("ns1.justine.lol");
     assertThat(thirdDeposit).doesNotContain("feed::a:bee");
     assertThat(thirdDeposit).contains("dead:beef::cafe");
-    assertThat(RegistryCursor.load(Registry.get("lol"), RDE_STAGING))
-        .hasValue(DateTime.parse("1984-12-21TZ"));
+    assertThat(
+            ofy()
+                .load()
+                .key(Cursor.createKey(RDE_STAGING, Registry.get("lol")))
+                .now()
+                .getCursorTime())
+        .isEqualTo(DateTime.parse("1984-12-21TZ"));
   }
 
   private String readXml(String objectName) throws IOException, PGPException {
@@ -617,11 +647,11 @@ public class RdeStagingActionTest extends MapreduceTestCase<RdeStagingAction> {
     ofy().transact(new VoidWork() {
       @Override
       public void vrun() {
-        RegistryCursor.save(registry, cursorType, value);
+        ofy().save().entity(Cursor.create(cursorType, value, registry)).now();
       }});
   }
 
-  public static <T> T unmarshal(byte[] xml) throws XmlException {
-    return XjcXmlTransformer.unmarshal(new ByteArrayInputStream(xml));
+  public static <T> T unmarshal(Class<T> clazz, byte[] xml) throws XmlException {
+    return XjcXmlTransformer.unmarshal(clazz, new ByteArrayInputStream(xml));
   }
 }

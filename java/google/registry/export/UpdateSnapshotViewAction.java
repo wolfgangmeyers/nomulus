@@ -22,7 +22,6 @@ import com.google.api.services.bigquery.model.TableReference;
 import com.google.api.services.bigquery.model.ViewDefinition;
 import com.google.appengine.api.taskqueue.TaskOptions;
 import com.google.appengine.api.taskqueue.TaskOptions.Method;
-
 import google.registry.bigquery.BigqueryFactory;
 import google.registry.config.ConfigModule.Config;
 import google.registry.request.Action;
@@ -30,9 +29,7 @@ import google.registry.request.HttpException.InternalServerErrorException;
 import google.registry.request.Parameter;
 import google.registry.util.FormattingLogger;
 import google.registry.util.SqlTemplate;
-
 import java.io.IOException;
-
 import javax.inject.Inject;
 
 /** Update a well-known view to point at a certain datastore snapshot table in BigQuery. */
@@ -89,17 +86,16 @@ public class UpdateSnapshotViewAction implements Runnable {
             .setDatasetId(LATEST_SNAPSHOT_DATASET)
             .setTableId(kindName))
         .setView(new ViewDefinition().setQuery(
-            SqlTemplate.create("SELECT * FROM [%DATASET%.%TABLE%]")
+            SqlTemplate.create("SELECT * FROM [%PROJECT%:%DATASET%.%TABLE%]")
+                .put("PROJECT", projectId)
                 .put("DATASET", datasetId)
                 .put("TABLE", tableId)
                 .build())));
 
     logger.infofmt(
-        "Updated view %s:%s to point at snapshot table %s:%s.",
-        LATEST_SNAPSHOT_DATASET,
-        kindName,
-        datasetId,
-        tableId);
+        "Updated view %s to point at snapshot table %s.",
+        String.format("[%s:%s.%s]", projectId, LATEST_SNAPSHOT_DATASET, kindName),
+        String.format("[%s:%s.%s]", projectId, datasetId, tableId));
   }
 
   private static void updateTable(Bigquery bigquery, Table table) throws IOException {

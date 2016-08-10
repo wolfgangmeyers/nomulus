@@ -25,27 +25,20 @@ import com.google.common.collect.Sets;
 import com.google.common.reflect.ClassPath;
 import com.google.common.reflect.ClassPath.ClassInfo;
 import com.google.common.truth.Expect;
-
 import google.registry.tools.Command.GtechCommand;
-
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
-import org.junit.rules.ExpectedException;
-import org.junit.runner.RunWith;
-import org.junit.runners.JUnit4;
-
 import java.io.IOException;
 import java.lang.reflect.Modifier;
 import java.util.Map;
 import java.util.Set;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+import org.junit.runner.RunWith;
+import org.junit.runners.JUnit4;
 
 /** Unit tests for {@link GtechTool}. */
 @RunWith(JUnit4.class)
 public class GtechToolTest {
-
-  @Rule
-  public final ExpectedException thrown = ExpectedException.none();
 
   @Rule
   public final Expect expect = Expect.create();

@@ -16,6 +16,7 @@ package google.registry.flows.domain;
 
 import static google.registry.flows.domain.DomainFlowUtils.DISALLOWED_TLD_STATES_FOR_LAUNCH_FLOWS;
 import static google.registry.flows.domain.DomainFlowUtils.validateFeeChallenge;
+import static google.registry.model.domain.fee.Fee.FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
 import static google.registry.model.eppoutput.Result.Code.Success;
 import static google.registry.model.index.DomainApplicationIndex.loadActiveApplicationsByDomainName;
 import static google.registry.model.index.ForeignKeyIndex.loadAndGetReference;
@@ -24,7 +25,6 @@ import com.google.common.base.Function;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.CommandUseErrorException;
 import google.registry.flows.EppException.ObjectAlreadyExistsException;
@@ -33,9 +33,6 @@ import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainApplication.Builder;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.Period;
-import google.registry.model.domain.fee.Fee;
-import google.registry.model.domain.fee.FeeCreateExtension;
-import google.registry.model.domain.fee.FeeCreateResponseExtension;
 import google.registry.model.domain.launch.ApplicationStatus;
 import google.registry.model.domain.launch.LaunchCreateExtension;
 import google.registry.model.domain.launch.LaunchCreateResponseExtension;
@@ -43,13 +40,13 @@ import google.registry.model.domain.launch.LaunchPhase;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.eppoutput.CreateData.DomainCreateData;
 import google.registry.model.eppoutput.EppOutput;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.smd.AbstractSignedMark;
 import google.registry.model.smd.EncodedSignedMark;
-
 import java.util.List;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that creates a new application for a domain resource.
@@ -92,6 +89,7 @@ import java.util.List;
  * @error {@link DomainFlowUtils.LinkedResourcesDoNotExistException}
  * @error {@link DomainFlowUtils.MissingContactTypeException}
  * @error {@link DomainFlowUtils.NameserversNotAllowedException}
+ * @error {@link DomainFlowUtils.NameserversNotSpecifiedException}
  * @error {@link DomainFlowUtils.NoMarksFoundMatchingDomainException}
  * @error {@link DomainFlowUtils.PremiumNameBlockedException}
  * @error {@link DomainFlowUtils.RegistrantNotAllowedException}
@@ -114,9 +112,12 @@ import java.util.List;
  */
 public class DomainApplicationCreateFlow extends BaseDomainCreateFlow<DomainApplication, Builder> {
 
+  @Inject DomainApplicationCreateFlow() {}
+
   @Override
   protected void initDomainCreateFlow() {
-    registerExtensions(FeeCreateExtension.class, LaunchCreateExtension.class);
+    registerExtensions(LaunchCreateExtension.class);
+    registerExtensions(FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
   }
 
   @Override
@@ -139,8 +140,9 @@ public class DomainApplicationCreateFlow extends BaseDomainCreateFlow<DomainAppl
 
   @Override
   protected void verifyDomainCreateIsAllowed() throws EppException {
-    validateFeeChallenge(targetId, getTld(), now, getClientId(), feeCreate, createCost);
-    if (tldState == TldState.LANDRUSH && !superuser) {
+    validateFeeChallenge(
+        targetId, getTld(), now, feeCreate, commandOperations.getTotalCost());
+    if (tldState == TldState.LANDRUSH && !isSuperuser) {
       // Prohibit creating a landrush application in LANDRUSH (but not in SUNRUSH) if there is
       // exactly one sunrise application for the same name.
       List<DomainApplication> applications = FluentIterable
@@ -209,9 +211,9 @@ public class DomainApplicationCreateFlow extends BaseDomainCreateFlow<DomainAppl
         .setApplicationId(newResource.getForeignKey())
         .build());
     if (feeCreate != null) {
-      responseExtensionsBuilder.add(new FeeCreateResponseExtension.Builder()
-          .setCurrency(createCost.getCurrencyUnit())
-          .setFee(ImmutableList.of(Fee.create(createCost.getAmount(), "create")))
+      responseExtensionsBuilder.add(feeCreate.createResponseBuilder()
+          .setCurrency(commandOperations.getCurrency())
+          .setFees(commandOperations.getFees())
           .build());
     }
 

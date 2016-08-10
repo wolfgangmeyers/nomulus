@@ -17,15 +17,13 @@ package google.registry.flows;
 import static google.registry.model.eppoutput.Result.Code.Success;
 
 import com.google.common.collect.ImmutableList;
-
 import google.registry.config.RegistryEnvironment;
 import google.registry.flows.EppException.ParameterValuePolicyErrorException;
 import google.registry.model.EppResource;
 import google.registry.model.eppinput.ResourceCommand.ResourceCheck;
 import google.registry.model.eppoutput.CheckData;
 import google.registry.model.eppoutput.EppOutput;
-import google.registry.model.eppoutput.Response.ResponseExtension;
-
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import java.util.List;
 
 /**

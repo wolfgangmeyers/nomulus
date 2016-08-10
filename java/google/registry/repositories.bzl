@@ -1,12 +1,10 @@
-# -*- mode: python; -*-
-#
-# Copyright 2016 The Domain Registry Authors. All rights reserved.
+# Copyright 2016 The Domain Registry Authors. All Rights Reserved.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
 #
-#    http://www.apache.org/licenses/LICENSE-2.0
+#     http://www.apache.org/licenses/LICENSE-2.0
 #
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
@@ -211,6 +209,12 @@ def domain_registry_repositories():
   )
 
   native.maven_jar(
+      name = "google_api_services_monitoring",
+      artifact = "com.google.apis:google-api-services-monitoring:v3-rev6-1.21.0",
+      sha1 = "d8490745206ca5b1bfedad650dd64a69737a4b20",
+  )
+
+  native.maven_jar(
       name = "google_api_services_storage",
       artifact = "com.google.apis:google-api-services-storage:v1-rev15-1.19.0",
       sha1 = "91f40f13ab4c24ac33d505695433ba842690bf40",
@@ -254,8 +258,8 @@ def domain_registry_repositories():
 
   native.maven_jar(
       name = "gson",
-      artifact = "com.google.code.gson:gson:2.4",
-      sha1 = "0695b63d702f505b9b916e02272e3b6381bade7f",
+      artifact = "com.google.code.gson:gson:2.7",
+      sha1 = "751f548c85fa49f330cecbb1875893f971b33c4e",
   )
 
   native.maven_jar(
@@ -284,8 +288,8 @@ def domain_registry_repositories():
 
   native.maven_jar(
       name = "icu4j",
-      artifact = "com.ibm.icu:icu4j:56.1",
-      sha1 = "8dd6671f52165a0419e6de5e1016400875a90fa9",
+      artifact = "com.ibm.icu:icu4j:57.1",
+      sha1 = "198ea005f41219f038f4291f0b0e9f3259730e92",
   )
 
   native.maven_jar(
@@ -368,8 +372,8 @@ def domain_registry_repositories():
 
   native.maven_jar(
       name = "json",
-      artifact = "org.json:json:20090211",
-      sha1 = "c183aa3a2a6250293808bba12262c8920ce5a51c",
+      artifact = "org.json:json:20160212",
+      sha1 = "a742e3f85161835b95877478c5dd5b405cefaab9",
   )
 
   native.maven_jar(
@@ -416,8 +420,8 @@ def domain_registry_repositories():
 
   native.maven_jar(
       name = "protobuf_java",
-      artifact = "com.google.protobuf:protobuf-java:2.6.1",
-      sha1 = "d9521f2aecb909835746b7a5facf612af5e890e8",
+      artifact = "com.google.protobuf:protobuf-java:3.0.0-beta-3",
+      sha1 = "ed8c2f9a63cfa770292f8173fd0172bdaa014fe3",
   )
 
   native.maven_jar(
@@ -446,12 +450,18 @@ def domain_registry_repositories():
 
   native.maven_jar(
       name = "sshd_core",
-      artifact = "org.apache.sshd:sshd-core:0.7.0",
-      sha1 = "ef5d0cae23845dead3fc53ecd61bd990ed42f60f",
+      artifact = "org.apache.sshd:sshd-core:1.2.0",
+      sha1 = "4bc24a8228ba83dac832680366cf219da71dae8e",
   )
 
   native.maven_jar(
       name = "truth",
       artifact = "com.google.truth:truth:0.28",
       sha1 = "0a388c7877c845ff4b8e19689dda5ac9d34622c4",
+  )
+
+  native.maven_jar(
+      name = "stax2_api",
+      artifact = "org.codehaus.woodstox:stax2-api:3.1.4",
+      sha1 = "ac19014b1e6a7c08aad07fe114af792676b685b7",
   )

@@ -15,8 +15,10 @@
 package google.registry.module.tools;
 
 import dagger.Subcomponent;
-
 import google.registry.export.PublishDetailReportAction;
+import google.registry.flows.EppToolAction;
+import google.registry.flows.EppToolAction.EppToolModule;
+import google.registry.flows.FlowComponent;
 import google.registry.loadtest.LoadTestAction;
 import google.registry.loadtest.LoadTestModule;
 import google.registry.mapreduce.MapreduceModule;
@@ -46,6 +48,7 @@ import google.registry.tools.server.javascrap.CountRecurringBillingEventsAction;
 @RequestScope
 @Subcomponent(
     modules = {
+        EppToolModule.class,
         LoadTestModule.class,
         MapreduceModule.class,
         RequestModule.class,
@@ -58,6 +61,8 @@ interface ToolsRequestComponent {
   CreatePremiumListAction createPremiumListAction();
   DeleteEntityAction deleteEntityAction();
   DeleteProberDataAction deleteProberDataAction();
+  EppToolAction eppToolAction();
+  FlowComponent.Builder flowComponentBuilder();
   GenerateZoneFilesAction generateZoneFilesAction();
   KillAllCommitLogsAction killAllCommitLogsAction();
   KillAllEppResourcesAction killAllEppResourcesAction();

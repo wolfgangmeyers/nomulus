@@ -33,16 +33,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
-
-import google.registry.flows.FlowRunner.CommitMode;
-import google.registry.flows.FlowRunner.UserPrivileges;
-import google.registry.flows.SessionMetadata.SessionSource;
+import google.registry.flows.EppTestComponent.FakesAndMocksModule;
+import google.registry.flows.picker.FlowPicker;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.eppcommon.ProtocolDefinition;
-import google.registry.model.eppcommon.Trid;
-import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.ofy.Ofy;
 import google.registry.model.poll.PollMessage;
@@ -51,19 +47,19 @@ import google.registry.model.tmch.ClaimsListShard.ClaimsListSingleton;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.EppLoader;
 import google.registry.testing.FakeClock;
+import google.registry.testing.FakeHttpSession;
 import google.registry.testing.InjectRule;
-import google.registry.testing.TestSessionMetadata;
+import google.registry.testing.ShardableTestCase;
+import google.registry.testing.TestDataHelper;
 import google.registry.util.TypeUtils.TypeInstantiator;
 import google.registry.xml.ValidationMode;
-
+import java.util.List;
+import java.util.Map;
 import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
-
-import java.util.List;
-import java.util.Map;
 
 /**
  * Base class for resource flow unit tests.
@@ -71,7 +67,13 @@ import java.util.Map;
  * @param <F> the flow type
  */
 @RunWith(MockitoJUnitRunner.class)
-public abstract class FlowTestCase<F extends Flow> {
+public abstract class FlowTestCase<F extends Flow> extends ShardableTestCase {
+
+  /** Whether to actually write to the datastore or just simulate. */
+  public enum CommitMode { LIVE, DRY_RUN }
+
+  /** Whether to run in normal or superuser mode. */
+  public enum UserPrivileges { NORMAL, SUPERUSER }
 
   @Rule
   public final AppEngineRule appEngine = AppEngineRule.builder()
@@ -82,23 +84,19 @@ public abstract class FlowTestCase<F extends Flow> {
   @Rule
   public final InjectRule inject = new InjectRule();
 
-  private FlowRunner flowRunner;
-
   protected EppLoader eppLoader;
-  protected Class<? extends Flow> flowClass;
   protected SessionMetadata sessionMetadata;
   protected FakeClock clock = new FakeClock(DateTime.now(UTC));
+  protected TransportCredentials credentials = new PasswordOnlyTransportCredentials();
+  protected EppRequestSource eppRequestSource = EppRequestSource.UNIT_TEST;
 
   @Before
   public void init() throws Exception {
-    flowRunner = null;
-    sessionMetadata = new TestSessionMetadata();
+    sessionMetadata = new HttpSessionMetadata(new FakeHttpSession());
     sessionMetadata.setClientId("TheRegistrar");
     sessionMetadata.setServiceExtensionUris(ProtocolDefinition.getVisibleServiceExtensionUris());
-    sessionMetadata.setSessionSource(SessionSource.NONE);
     ofy().saveWithoutBackup().entity(new ClaimsListSingleton()).now();
     inject.setStaticField(Ofy.class, "clock", clock);  // For transactional flows.
-    inject.setStaticField(FlowRunner.class, "clock", clock);  // For non-transactional flows.
   }
 
   protected void removeServiceExtensionUri(String uri) {
@@ -118,31 +116,12 @@ public abstract class FlowTestCase<F extends Flow> {
     return readResourceUtf8(getClass(), "testdata/" + filename);
   }
 
-  /** Lazily load the flow, since it may fail to initialize if the environment isn't set up yet. */
-  public FlowRunner getFlowRunner() throws Exception {
-    if (flowRunner == null) {
-      flowRunner = createFlowRunner();
-    }
-    return flowRunner;
+  protected String readFile(String filename, Map<String, String> substitutions) {
+    return TestDataHelper.loadFileWithSubstitutions(getClass(), filename, substitutions);
   }
 
-  /** Load a flow from an epp object. */
-  private FlowRunner createFlowRunner() throws Exception {
-    EppInput eppInput = eppLoader.getEpp();
-    flowClass = firstNonNull(flowClass, FlowRegistry.getFlowClass(eppInput));
-    Class<?> expectedFlowClass = new TypeInstantiator<F>(getClass()){}.getExactType();
-    assertThat(flowClass).isEqualTo(expectedFlowClass);
-    return new FlowRunner(
-        flowClass,
-        eppInput,
-        getTrid(),
-        sessionMetadata,
-        "<xml></xml>".getBytes(),
-        null);
-  }
-
-  protected Trid getTrid() throws Exception {
-    return Trid.create(eppLoader.getEpp().getCommandWrapper().getClTrid(), "server-trid");
+  protected String getClientTrid() throws Exception {
+    return eppLoader.getEpp().getCommandWrapper().getClTrid();
   }
 
   /** Gets the client ID that the flow will run as. */
@@ -156,7 +135,15 @@ public abstract class FlowTestCase<F extends Flow> {
   }
 
   public void assertTransactionalFlow(boolean isTransactional) throws Exception {
-    assertThat(getFlowRunner().isTransactional()).isEqualTo(isTransactional);
+    Class<? extends Flow> flowClass = FlowPicker.getFlowClass(eppLoader.getEpp());
+    if (isTransactional) {
+      assertThat(flowClass).isAssignableTo(TransactionalFlow.class);
+    } else {
+      // There's no "isNotAssignableTo" in Truth.
+      assertThat(TransactionalFlow.class.isAssignableFrom(flowClass))
+          .named(flowClass.getSimpleName() + " implements TransactionalFlow")
+          .isFalse();
+    }
   }
 
   public void assertNoHistory() throws Exception {
@@ -272,34 +259,68 @@ public abstract class FlowTestCase<F extends Flow> {
         .containsExactlyElementsIn(FluentIterable.from(asList(expected)).transform(idStripper));
   }
 
-  /** Run a flow, and attempt to marshal the result to EPP or throw if it doesn't validate. */
+  private EppOutput runFlowInternal(CommitMode commitMode, UserPrivileges userPrivileges)
+      throws Exception {
+    // Assert that the xml triggers the flow we expect.
+    assertThat(FlowPicker.getFlowClass(eppLoader.getEpp()))
+        .isEqualTo(new TypeInstantiator<F>(getClass()){}.getExactType());
+    // Run the flow.
+    return DaggerEppTestComponent.builder()
+        .fakesAndMocksModule(new FakesAndMocksModule(clock))
+        .build()
+        .startRequest()
+        .flowComponentBuilder()
+            .flowModule(new FlowModule.Builder()
+                .setSessionMetadata(sessionMetadata)
+                .setCredentials(credentials)
+                .setEppRequestSource(eppRequestSource)
+                .setIsDryRun(commitMode.equals(CommitMode.DRY_RUN))
+                .setIsSuperuser(userPrivileges.equals(UserPrivileges.SUPERUSER))
+                .setInputXmlBytes(eppLoader.getEppXml().getBytes(UTF_8))
+                .setEppInput(eppLoader.getEpp())
+                .build())
+            .build()
+            .flowRunner()
+            .run();
+  }
+
+  /** Run a flow and marshal the result to EPP, or throw if it doesn't validate. */
   public EppOutput runFlow(CommitMode commitMode, UserPrivileges userPrivileges) throws Exception {
-    EppOutput output = getFlowRunner().run(commitMode, userPrivileges);
+    EppOutput output = runFlowInternal(commitMode, userPrivileges);
     marshal(output, ValidationMode.STRICT);
     return output;
   }
 
+  /** Shortcut to call {@link #runFlow(CommitMode, UserPrivileges)} as normal user and live run. */
   public EppOutput runFlow() throws Exception {
     return runFlow(CommitMode.LIVE, UserPrivileges.NORMAL);
   }
 
+  /** Run a flow, marshal the result to EPP, and assert that the output is as expected. */
   public void runFlowAssertResponse(
       CommitMode commitMode, UserPrivileges userPrivileges, String xml, String... ignoredPaths)
       throws Exception {
-    EppOutput eppOutput = getFlowRunner().run(commitMode, userPrivileges);
-    assertThat(eppOutput.isSuccess()).isTrue();
+    // Always ignore the server trid, since it's generated and meaningless to flow correctness.
+    // TODO(user): Remove asList()
+    String[] ignoredPathsPlusTrid = FluentIterable.from(asList(ignoredPaths))
+        .append("epp.response.trID.svTRID")
+        .toArray(String.class);
+    EppOutput output = runFlowInternal(commitMode, userPrivileges);
+    if (output.isResponse()) {
+      assertThat(output.isSuccess()).isTrue();
+    }
     try {
       assertXmlEquals(
-          xml, new String(marshal(eppOutput, ValidationMode.STRICT), UTF_8), ignoredPaths);
+          xml, new String(marshal(output, ValidationMode.STRICT), UTF_8), ignoredPathsPlusTrid);
     } catch (Throwable e) {
       assertXmlEquals(
-          xml, new String(marshal(eppOutput, ValidationMode.LENIENT), UTF_8), ignoredPaths);
+          xml, new String(marshal(output, ValidationMode.LENIENT), UTF_8), ignoredPathsPlusTrid);
       // If it was a marshaling error, augment the output.
       throw new Exception(
           String.format(
               "Invalid xml.\nExpected:\n%s\n\nActual:\n%s\n",
               xml,
-              marshal(eppOutput, ValidationMode.LENIENT)),
+              marshal(output, ValidationMode.LENIENT)),
           e);
     }
     // Clear the cache so that we don't see stale results in tests.

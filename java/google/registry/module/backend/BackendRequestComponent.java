@@ -15,12 +15,12 @@
 package google.registry.module.backend;
 
 import dagger.Subcomponent;
-
 import google.registry.backup.BackupModule;
 import google.registry.backup.CommitLogCheckpointAction;
 import google.registry.backup.DeleteOldCommitLogsAction;
 import google.registry.backup.ExportCommitLogDiffAction;
 import google.registry.backup.RestoreCommitLogsAction;
+import google.registry.billing.ExpandRecurringBillingEventsAction;
 import google.registry.cron.CommitLogFanoutAction;
 import google.registry.cron.CronModule;
 import google.registry.cron.TldFanoutAction;
@@ -28,7 +28,6 @@ import google.registry.dns.DnsModule;
 import google.registry.dns.PublishDnsUpdatesAction;
 import google.registry.dns.ReadDnsQueueAction;
 import google.registry.dns.RefreshDnsAction;
-import google.registry.dns.WriteDnsAction;
 import google.registry.export.BigqueryPollJobAction;
 import google.registry.export.ExportDomainListsAction;
 import google.registry.export.ExportRequestModule;
@@ -87,6 +86,7 @@ interface BackendRequestComponent {
   DeleteHostResourceAction deleteHostResourceAction();
   DeleteOldCommitLogsAction deleteOldCommitLogsAction();
   DnsRefreshForHostRenameAction dnsRefreshForHostRenameAction();
+  ExpandRecurringBillingEventsAction expandRecurringBillingEventsAction();
   ExportCommitLogDiffAction exportCommitLogDiffAction();
   ExportDomainListsAction exportDomainListsAction();
   ExportReservedTermsAction exportReservedTermsAction();
@@ -109,6 +109,5 @@ interface BackendRequestComponent {
   TmchDnlAction tmchDnlAction();
   TmchSmdrlAction tmchSmdrlAction();
   UpdateSnapshotViewAction updateSnapshotViewAction();
-  WriteDnsAction writeDnsAction();
   VerifyEntityIntegrityAction verifyEntityIntegrityAction();
 }

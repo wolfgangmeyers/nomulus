@@ -28,6 +28,7 @@ import google.registry.model.eppoutput.CreateData.ContactCreateData;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.ofy.ObjectifyService;
 import google.registry.model.reporting.HistoryEntry;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that creates a new contact resource.
@@ -37,6 +38,9 @@ import google.registry.model.reporting.HistoryEntry;
  * @error {@link ContactFlowUtils.DeclineContactDisclosureFieldDisallowedPolicyException}
  */
 public class ContactCreateFlow extends ResourceCreateFlow<ContactResource, Builder, Create> {
+
+  @Inject ContactCreateFlow() {}
+
   @Override
   protected EppOutput getOutput() {
     return createOutput(Success, ContactCreateData.create(newResource.getContactId(), now));

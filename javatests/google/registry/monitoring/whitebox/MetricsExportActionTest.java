@@ -30,14 +30,11 @@ import com.google.api.services.bigquery.model.TableDataInsertAllResponse;
 import com.google.api.services.bigquery.model.TableDataInsertAllResponse.InsertErrors;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableListMultimap;
-
 import google.registry.bigquery.BigqueryFactory;
 import google.registry.testing.AppEngineRule;
-
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.Matchers;
 import org.mockito.Mock;
@@ -46,9 +43,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 /** Unit tests for {@link MetricsExportAction}. */
 @RunWith(MockitoJUnitRunner.class)
 public class MetricsExportActionTest {
-
-  @Rule
-  public ExpectedException thrown = ExpectedException.none();
 
   @Rule
   public final AppEngineRule appEngine = AppEngineRule.builder()

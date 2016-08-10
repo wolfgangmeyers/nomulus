@@ -20,6 +20,7 @@ import static google.registry.model.EppResourceUtils.loadByUniqueId;
 import static google.registry.request.Actions.getPathForAction;
 import static google.registry.testing.DatastoreHelper.assertNoBillingEvents;
 import static google.registry.testing.DatastoreHelper.createTld;
+import static google.registry.testing.DatastoreHelper.getOnlyHistoryEntryOfType;
 import static google.registry.testing.DatastoreHelper.newDomainResource;
 import static google.registry.testing.DatastoreHelper.newHostResource;
 import static google.registry.testing.DatastoreHelper.persistActiveDomain;
@@ -28,6 +29,7 @@ import static google.registry.testing.DatastoreHelper.persistActiveSubordinateHo
 import static google.registry.testing.DatastoreHelper.persistDeletedHost;
 import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.testing.GenericEppResourceSubject.assertAboutEppResources;
+import static google.registry.testing.HistoryEntrySubject.assertAboutHistoryEntries;
 import static google.registry.testing.HostResourceSubject.assertAboutHosts;
 import static google.registry.testing.TaskQueueHelper.assertDnsTasksEnqueued;
 import static google.registry.testing.TaskQueueHelper.assertNoDnsTasksEnqueued;
@@ -36,12 +38,9 @@ import static google.registry.util.DateTimeUtils.END_OF_TIME;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Ref;
-
-import google.registry.flows.FlowRunner.CommitMode;
-import google.registry.flows.FlowRunner.UserPrivileges;
+import google.registry.flows.EppRequestSource;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
 import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
@@ -63,14 +62,11 @@ import google.registry.model.host.HostResource;
 import google.registry.model.index.ForeignKeyIndex;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.testing.TaskQueueHelper.TaskMatcher;
-
+import java.net.InetAddress;
+import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Test;
-
-import java.net.InetAddress;
-
-import javax.annotation.Nullable;
 
 /** Unit tests for {@link HostUpdateFlow}. */
 public class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, HostResource> {
@@ -832,7 +828,6 @@ public class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Hos
 
   @Test
   public void testSuccess_superuserUnauthorizedClient() throws Exception {
-    sessionMetadata.setSuperuser(true);
     sessionMetadata.setClientId("NewRegistrar");
     persistActiveHost(oldHostName());
 
@@ -888,5 +883,18 @@ public class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Hos
   public void testFailure_ccTldInBailiwick() throws Exception {
     createTld("co.uk");
     doFailingHostNameTest("foo.co.uk", HostNameTooShallowException.class);
+  }
+
+  @Test
+  public void testSuccess_metadata() throws Exception {
+    persistActiveHost("ns1.example.tld");
+    clock.advanceOneMilli();
+    setEppInput("host_update_metadata.xml");
+    eppRequestSource = EppRequestSource.TOOL;
+    runFlowAssertResponse(readFile("host_update_response.xml"));
+    assertAboutHistoryEntries()
+        .that(getOnlyHistoryEntryOfType(reloadResourceByUniqueId(), HistoryEntry.Type.HOST_UPDATE))
+        .hasMetadataReason("host-update-test").and()
+        .hasMetadataRequestedByRegistrar(false);
   }
 }

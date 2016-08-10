@@ -19,7 +19,6 @@ import static google.registry.flows.ResourceFlowUtils.verifyResourceOwnership;
 import static google.registry.flows.domain.DomainFlowUtils.verifyLaunchApplicationIdMatchesDomain;
 
 import com.google.common.collect.ImmutableList;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ParameterValuePolicyErrorException;
 import google.registry.flows.EppException.RequiredParameterMissingException;
@@ -27,10 +26,11 @@ import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainApplication.Builder;
 import google.registry.model.domain.launch.LaunchInfoExtension;
 import google.registry.model.domain.launch.LaunchInfoResponseExtension;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.mark.Mark;
 import google.registry.model.smd.EncodedSignedMark;
 import google.registry.model.smd.SignedMark;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that reads a domain application.
@@ -44,6 +44,8 @@ import google.registry.model.smd.SignedMark;
 public class DomainApplicationInfoFlow extends BaseDomainInfoFlow<DomainApplication, Builder> {
 
   private boolean includeMarks;
+
+  @Inject DomainApplicationInfoFlow() {}
 
   @Override
   protected final void initSingleResourceFlow() throws EppException {
@@ -87,7 +89,7 @@ public class DomainApplicationInfoFlow extends BaseDomainInfoFlow<DomainApplicat
     if (includeMarks) {
       for (EncodedSignedMark encodedMark : existingResource.getEncodedSignedMarks()) {
         try {
-          marksBuilder.add(((SignedMark) unmarshal(encodedMark.getBytes())).getMark());
+          marksBuilder.add(unmarshal(SignedMark.class, encodedMark.getBytes()).getMark());
         } catch (EppException e) {
           // This is a serious error; don't let the benign EppException propagate.
           throw new IllegalStateException("Could not decode a stored encoded signed mark");

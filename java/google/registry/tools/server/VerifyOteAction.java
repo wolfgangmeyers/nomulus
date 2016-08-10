@@ -17,12 +17,14 @@ package google.registry.tools.server;
 import static com.google.common.base.Predicates.not;
 import static com.google.common.collect.Maps.toMap;
 import static google.registry.flows.EppXmlTransformer.unmarshal;
-import static google.registry.flows.FlowRegistry.getFlowClass;
+import static google.registry.flows.picker.FlowPicker.getFlowClass;
+import static google.registry.model.domain.fee.Fee.FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.util.CollectionUtils.isNullOrEmpty;
 import static google.registry.util.DomainNameUtils.ACE_PREFIX;
 import static java.util.Arrays.asList;
 
+import com.google.common.base.Ascii;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
@@ -31,7 +33,6 @@ import com.google.common.collect.FluentIterable;
 import com.google.common.collect.HashMultiset;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Multiset;
-
 import google.registry.flows.EppException;
 import google.registry.flows.Flow;
 import google.registry.flows.contact.ContactCreateFlow;
@@ -57,7 +58,6 @@ import google.registry.flows.host.HostCreateFlow;
 import google.registry.flows.host.HostDeleteFlow;
 import google.registry.flows.host.HostUpdateFlow;
 import google.registry.model.domain.DomainCommand;
-import google.registry.model.domain.fee.FeeCreateExtension;
 import google.registry.model.domain.launch.LaunchCreateExtension;
 import google.registry.model.domain.secdns.SecDnsCreateExtension;
 import google.registry.model.domain.secdns.SecDnsUpdateExtension;
@@ -68,12 +68,10 @@ import google.registry.model.reporting.HistoryEntry;
 import google.registry.request.Action;
 import google.registry.request.JsonActionRunner;
 import google.registry.request.JsonActionRunner.JsonAction;
-
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
-
 import javax.annotation.Nonnull;
 import javax.inject.Inject;
 
@@ -145,7 +143,8 @@ public class VerifyOteAction implements Runnable, JsonAction {
   private static final Predicate<EppInput> HAS_FEE = new Predicate<EppInput>() {
       @Override
       public boolean apply(@Nonnull EppInput eppInput) {
-        return eppInput.getSingleExtension(FeeCreateExtension.class) != null;
+        return eppInput.getFirstExtensionOfClasses(
+            FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER) != null;
       }};
 
   private static final Predicate<EppInput> HAS_SEC_DNS = new Predicate<EppInput>() {
@@ -253,7 +252,7 @@ public class VerifyOteAction implements Runnable, JsonAction {
 
     /** Returns a more human-readable translation of the enum constant. */
     String description() {
-      return this.name().replace('_', ' ').toLowerCase();
+      return Ascii.toLowerCase(this.name().replace('_', ' '));
     }
 
     /** An {@link EppInput} might match multiple actions, so check if this action matches. */
@@ -297,7 +296,7 @@ public class VerifyOteAction implements Runnable, JsonAction {
       if (xmlBytes == null) {
         return;
       }
-      final EppInput eppInput = unmarshal(xmlBytes);
+      final EppInput eppInput = unmarshal(EppInput.class, xmlBytes);
       if (!statCounts.addAll(
           FluentIterable.from(EnumSet.allOf(StatType.class))
               .filter(

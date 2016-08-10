@@ -17,15 +17,13 @@ package google.registry.testing;
 import static google.registry.testing.DatastoreHelper.generateNewContactHostRoid;
 import static google.registry.testing.DatastoreHelper.generateNewDomainRoid;
 import static google.registry.testing.DatastoreHelper.persistResource;
-import static google.registry.util.DomainNameUtils.getTldFromSld;
+import static google.registry.util.DomainNameUtils.getTldFromDomainName;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InetAddresses;
-
 import com.googlecode.objectify.Ref;
-
 import google.registry.model.EppResource;
 import google.registry.model.contact.ContactAddress;
 import google.registry.model.contact.ContactPhoneNumber;
@@ -43,13 +41,10 @@ import google.registry.model.registrar.RegistrarAddress;
 import google.registry.model.registrar.RegistrarContact;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.util.Idn;
-
-import org.joda.time.DateTime;
-
 import java.net.InetAddress;
 import java.util.List;
-
 import javax.annotation.Nullable;
+import org.joda.time.DateTime;
 
 /** Test helper methods for the rdap and whois packages. */
 public final class FullFieldsTestEntityHelper {
@@ -221,7 +216,7 @@ public final class FullFieldsTestEntityHelper {
       Registrar registrar) {
     DomainResource.Builder builder = new DomainResource.Builder()
         .setFullyQualifiedDomainName(Idn.toASCII(domain))
-        .setRepoId(generateNewDomainRoid(getTldFromSld(Idn.toASCII(domain))))
+        .setRepoId(generateNewDomainRoid(getTldFromDomainName(Idn.toASCII(domain))))
         .setLastEppUpdateTime(DateTime.parse("2009-05-29T20:13:00Z"))
         .setCreationTimeForTest(DateTime.parse("2000-10-08T00:45:00Z"))
         .setRegistrationExpirationTime(DateTime.parse("2110-10-08T00:44:59Z"))

@@ -21,27 +21,24 @@ import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSetMultimap;
 import com.google.common.collect.Multimaps;
-
 import google.registry.config.ConfigModule.Config;
 import google.registry.mapreduce.MapreduceRunner;
 import google.registry.mapreduce.inputs.EppResourceInputs;
 import google.registry.mapreduce.inputs.NullInput;
 import google.registry.model.EppResource;
+import google.registry.model.common.Cursor;
+import google.registry.model.common.Cursor.CursorType;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.host.HostResource;
 import google.registry.model.index.EppResourceIndex;
 import google.registry.model.rde.RdeMode;
 import google.registry.model.registrar.Registrar;
-import google.registry.model.registry.RegistryCursor;
-import google.registry.model.registry.RegistryCursor.CursorType;
 import google.registry.request.Action;
 import google.registry.request.Response;
 import google.registry.util.Clock;
 import google.registry.util.FormattingLogger;
-
-import org.joda.time.Duration;
-
 import javax.inject.Inject;
+import org.joda.time.Duration;
 
 /**
  * MapReduce that idempotently stages escrow deposit XML files on GCS for RDE/BRDA for all TLDs.
@@ -89,8 +86,8 @@ import javax.inject.Inject;
  * key and shows you its representation in lenient XML.
  *
  * <p>Failed deposits will be retried indefinitely. This is because RDE and BRDA each have a
- * {@link RegistryCursor} for each TLD. Even if the cursor lags for days, it'll catch up gradually
- * on its own, once the data becomes valid.
+ * {@link Cursor} for each TLD. Even if the cursor lags for days, it'll catch up gradually on its
+ * own, once the data becomes valid.
  *
  * <p>The third-party escrow provider will validate each deposit we send them. They do both schema
  * validation and reference checking.

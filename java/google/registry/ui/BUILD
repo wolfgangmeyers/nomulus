@@ -2,55 +2,19 @@ package(default_visibility = ["//java/google/registry:registry_project"])
 
 licenses(["notice"])  # Apache 2.0
 
-load("//closure:defs.bzl", "closure_js_binary", "closure_js_deps")
+load("@io_bazel_rules_closure//closure:defs.bzl", "closure_js_binary", "closure_js_deps")
+load("//java/google/registry/builddefs:zip_file.bzl", "zip_file")
 
 exports_files(["globals.txt"])
 
 
-java_library(
-	name = "assets_recursive_jar",
-	resources = glob(["assets/**"]),
-)
-
-filegroup(
-    name = "js_files_recursive",
-    srcs = [
-        "//java/google/registry/ui/js:js_files",
-        "//java/google/registry/ui/js/registrar:js_files",
-        "//java/google/registry/ui/soy:js_files",
-        "//java/google/registry/ui/soy/api:js_files",
-        "//java/google/registry/ui/soy/registrar:js_files",
-    ],
-)
-
-filegroup(
-    name = "assets_recursive",
-    srcs = glob(["assets/**"]),
-)
-
-java_library(
-    name = "runfiles_jar",
-    resources = [
-        "brain_bin.js",
-        "brain_bin_map.js",
-        "registrar_bin.js",
-        "registrar_bin_map.js",
-        "//java/google/registry/ui/css:registrar_bin.css",
-        "//java/google/registry/ui/html:html_files",
-	],
-)
-
 filegroup(
     name = "runfiles",
-    srcs = [
+    srcs = glob(["assets/**"]) + [
         "brain_bin.js",
         "brain_bin_map.js",
         "registrar_bin.js",
         "registrar_bin_map.js",
-        ":assets_recursive",
-        "//javascript/closure:js_files_recursive",
-        "//javascript/template/soy:soy_usegoog_js_files",
-        "//java/google/registry/ui:deps.js",
         "//java/google/registry/ui/css:registrar_bin.css",
         "//java/google/registry/ui/html:html_files",
     ],
@@ -63,12 +27,43 @@ filegroup(
         "brain_bin.js.map",
         "deps.js",
         "registrar_bin.js.map",
-        ":js_files_recursive",
-        ":runfiles",
+        "registrar_dbg.js",
         "//javascript/closure:js_files_recursive",
         "//javascript/template/soy:soy_usegoog_js_files",
         "//java/google/registry/ui/css:css_files",
+        "//java/google/registry/ui/css:registrar_dbg.css",
+        "//java/google/registry/ui/js:js_files",
+        "//java/google/registry/ui/js/registrar:js_files",
+        "//java/google/registry/ui/soy:js_files",
+        "//java/google/registry/ui/soy/registrar:js_files",
     ],
+)
+
+zip_file(
+    name = "war",
+    srcs = [":runfiles"],
+    out = "ui.war",
+    mappings = {
+        "java/google/registry/ui/assets": "assets",
+        "java/google/registry/ui/css": "assets/css",
+        "java/google/registry/ui/html": "",
+        "java/google/registry/ui": "assets/js",
+    },
+)
+
+zip_file(
+    name = "war_debug",
+    srcs = [":runfiles_debug"],
+    out = "ui_debug.war",
+    mappings = {
+        "java/google/registry/ui/deps.js": "assets/sources/deps.js",
+        "java/google/registry/ui/brain_bin.js.map": "assets/js/brain_bin.js.map",
+        "java/google/registry/ui/registrar_bin.js.map": "assets/js/registrar_bin.js.map",
+        "java/google/registry/ui/registrar_dbg.js": "assets/js/registrar_dbg.js",
+        "java/google/registry/ui/css/registrar_dbg.css": "assets/css/registrar_dbg.css",
+        "": "assets/sources",
+    },
+    deps = [":war"],
 )
 
 java_library(

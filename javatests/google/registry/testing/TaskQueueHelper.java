@@ -30,6 +30,7 @@ import static java.util.Arrays.asList;
 import com.google.appengine.api.taskqueue.dev.QueueStateInfo;
 import com.google.appengine.api.taskqueue.dev.QueueStateInfo.HeaderWrapper;
 import com.google.appengine.api.taskqueue.dev.QueueStateInfo.TaskStateInfo;
+import com.google.common.base.Ascii;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Predicate;
@@ -42,11 +43,7 @@ import com.google.common.collect.Maps;
 import com.google.common.collect.Multimap;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
-
 import google.registry.dns.DnsConstants;
-
-import org.joda.time.Duration;
-
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
@@ -56,8 +53,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Objects;
-
 import javax.annotation.Nonnull;
+import org.joda.time.Duration;
 
 /** Static utility functions for testing task queues. */
 public class TaskQueueHelper {
@@ -98,7 +95,7 @@ public class TaskQueueHelper {
 
     public TaskMatcher header(String name, String value) {
       // Lowercase for case-insensitive comparison.
-      expected.headers.put(name.toLowerCase(), value);
+      expected.headers.put(Ascii.toLowerCase(name), value);
       return this;
     }
 
@@ -314,7 +311,7 @@ public class TaskQueueHelper {
       for (HeaderWrapper header : info.getHeaders()) {
         // Lowercase header name for comparison since HTTP
         // header names are case-insensitive.
-        headerBuilder.put(header.getKey().toLowerCase(), header.getValue());
+        headerBuilder.put(Ascii.toLowerCase(header.getKey()), header.getValue());
       }
       this.headers = headerBuilder.build();
       ImmutableMultimap.Builder<String, String> inputParams = new ImmutableMultimap.Builder<>();
@@ -323,7 +320,7 @@ public class TaskQueueHelper {
         inputParams.putAll(UriParameters.parse(query));
       }
       if (headers.containsEntry(
-          HttpHeaders.CONTENT_TYPE.toLowerCase(), MediaType.FORM_DATA.toString())) {
+          Ascii.toLowerCase(HttpHeaders.CONTENT_TYPE), MediaType.FORM_DATA.toString())) {
         inputParams.putAll(UriParameters.parse(info.getBody()));
       }
       this.params = inputParams.build();

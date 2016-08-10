@@ -18,9 +18,8 @@ import static com.google.common.base.Preconditions.checkState;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 
 import com.googlecode.objectify.Key;
-
 import google.registry.flows.EppException.AuthorizationErrorException;
-import google.registry.flows.SessionMetadata.SessionSource;
+import google.registry.flows.FlowModule.InputXml;
 import google.registry.model.EppResource;
 import google.registry.model.domain.Period;
 import google.registry.model.domain.metadata.MetadataExtension;
@@ -28,6 +27,7 @@ import google.registry.model.eppinput.ResourceCommand.SingleResourceCommand;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.util.TypeUtils.TypeInstantiator;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that creates or mutates a single stored resource.
@@ -41,6 +41,9 @@ public abstract class ResourceCreateOrMutateFlow
     <R extends EppResource, C extends SingleResourceCommand> extends SingleResourceFlow<R, C>
     implements TransactionalFlow {
 
+  @Inject EppRequestSource eppRequestSource;
+  @Inject @InputXml byte[] inputXmlBytes;
+
   String repoId;
   protected R newResource;
   protected HistoryEntry historyEntry;
@@ -48,6 +51,7 @@ public abstract class ResourceCreateOrMutateFlow
 
   @Override
   protected final void initSingleResourceFlow() throws EppException {
+    registerExtensions(MetadataExtension.class);
     metadataExtension = eppInput.getSingleExtension(MetadataExtension.class);
     initRepoId();
     initHistoryEntry();
@@ -77,7 +81,7 @@ public abstract class ResourceCreateOrMutateFlow
         .setTrid(trid)
         .setModificationTime(now)
         .setXmlBytes(storeXmlInHistoryEntry() ? inputXmlBytes : null)
-        .setBySuperuser(superuser)
+        .setBySuperuser(isSuperuser)
         .setReason(getHistoryEntryReason())
         .setRequestedByRegistrar(getHistoryEntryRequestedByRegistrar())
         .setParent(getResourceKey())
@@ -123,8 +127,7 @@ public abstract class ResourceCreateOrMutateFlow
 
   /** Ensure that, if a metadata command exists, it is being passed from a tool-created session. */
   void validateMetadataExtension() throws EppException {
-    if (!(metadataExtension == null
-        || sessionMetadata.getSessionSource().equals(SessionSource.TOOL))) {
+    if (!(metadataExtension == null || eppRequestSource.equals(EppRequestSource.TOOL))) {
       throw new OnlyToolCanPassMetadataException();
     }
   }

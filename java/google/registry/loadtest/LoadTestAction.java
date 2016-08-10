@@ -16,33 +16,34 @@ package google.registry.loadtest;
 
 import static com.google.appengine.api.taskqueue.QueueConstants.maxTasksPerAdd;
 import static com.google.appengine.api.taskqueue.QueueFactory.getQueue;
-import static com.google.appengine.api.taskqueue.TaskOptions.Builder.withPayload;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Lists.partition;
 import static com.google.common.collect.Lists.transform;
 import static google.registry.util.ResourceUtils.readResourceUtf8;
+import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 import static org.joda.time.DateTimeZone.UTC;
 
 import com.google.appengine.api.taskqueue.TaskOptions;
 import com.google.common.base.Function;
+import com.google.common.base.Joiner;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Iterators;
-
+import com.google.common.net.MediaType;
 import google.registry.config.RegistryEnvironment;
 import google.registry.request.Action;
 import google.registry.request.Parameter;
 import google.registry.util.TaskEnqueuer;
-
-import org.joda.time.DateTime;
-
+import java.io.UnsupportedEncodingException;
+import java.net.URLEncoder;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Random;
-
 import javax.inject.Inject;
+import org.joda.time.DateTime;
 
 /** Simple load test action that can generate configurable QPSes of various EPP actions. */
 @Action(
@@ -278,10 +279,26 @@ public class LoadTestAction implements Runnable {
     for (int i = 0; i < xmls.size(); i++) {
       // Space tasks evenly within across a second.
       int offsetMillis = (int) (1000.0 / xmls.size() * i);
-      tasks.add(withPayload(new LoadTask(clientId, xmls.get(i)))
-          .etaMillis(start.plusMillis(offsetMillis).getMillis()));
+      tasks.add(TaskOptions.Builder.withUrl("/_dr/epptool")
+          .etaMillis(start.getMillis() + offsetMillis)
+          .payload(
+              Joiner.on('&').withKeyValueSeparator("=").join(
+                  ImmutableMap.of(
+                      "clientIdentifier", clientId,
+                      "superuser", false,
+                      "dryRun", false,
+                      "xml", urlEncode(xmls.get(i)))),
+              MediaType.FORM_DATA.toString()));
     }
     return tasks.build();
+  }
+
+  private String urlEncode(String xml) {
+    try {
+      return URLEncoder.encode(xml, UTF_8.toString());
+    } catch (UnsupportedEncodingException e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private void enqueue(List<TaskOptions> tasks) {

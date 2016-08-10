@@ -14,7 +14,6 @@
 
 package google.registry.flows.session;
 
-import static com.google.common.truth.Truth.assertThat;
 import static google.registry.testing.DatastoreHelper.deleteResource;
 import static google.registry.testing.DatastoreHelper.persistResource;
 
@@ -22,9 +21,9 @@ import google.registry.flows.EppException.UnimplementedExtensionException;
 import google.registry.flows.EppException.UnimplementedObjectServiceException;
 import google.registry.flows.EppException.UnimplementedProtocolVersionException;
 import google.registry.flows.FlowTestCase;
+import google.registry.flows.TransportCredentials.BadRegistrarPasswordException;
 import google.registry.flows.session.LoginFlow.AlreadyLoggedInException;
 import google.registry.flows.session.LoginFlow.BadRegistrarClientIdException;
-import google.registry.flows.session.LoginFlow.BadRegistrarPasswordException;
 import google.registry.flows.session.LoginFlow.PasswordChangesNotSupportedException;
 import google.registry.flows.session.LoginFlow.RegistrarAccountNotActiveException;
 import google.registry.flows.session.LoginFlow.TooManyFailedLoginsException;
@@ -32,7 +31,6 @@ import google.registry.flows.session.LoginFlow.UnsupportedLanguageException;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.Registrar.State;
 import google.registry.testing.ExceptionRule;
-
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -76,21 +74,6 @@ public abstract class LoginFlowTestCase extends FlowTestCase<LoginFlow> {
   @Test
   public void testSuccess() throws Exception {
     doSuccessfulTest("login_valid.xml");
-    assertThat(sessionMetadata.isSuperuser()).isFalse();
-  }
-
-  @Test
-  public void testSuccess_superuser() throws Exception {
-    persistResource(getRegistrarBuilder().setIanaIdentifier(9999L).build());
-    doSuccessfulTest("login_valid.xml");
-    assertThat(sessionMetadata.isSuperuser()).isTrue();
-  }
-
-  @Test
-  public void testSuccess_notSuperuser() throws Exception {
-    persistResource(getRegistrarBuilder().setIanaIdentifier(15L).build());
-    doSuccessfulTest("login_valid.xml");
-    assertThat(sessionMetadata.isSuperuser()).isFalse();
   }
 
   @Test

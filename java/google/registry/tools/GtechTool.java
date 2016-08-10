@@ -16,7 +16,6 @@ package google.registry.tools;
 
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
-
 import google.registry.tools.Command.GtechCommand;
 
 /** Command line interface with a subset of commands that are safe for tech support to run. */
@@ -53,6 +52,7 @@ public final class GtechTool {
           .put("get_applied_labels", GetAppliedLabelsCommand.class)
           .put("get_contact", GetContactCommand.class)
           .put("get_domain", GetDomainCommand.class)
+          .put("get_lrp_token", GetLrpTokenCommand.class)
           .put("get_history_entries", GetHistoryEntriesCommand.class)
           .put("get_host", GetHostCommand.class)
           .put("get_registrar", GetRegistrarCommand.class)

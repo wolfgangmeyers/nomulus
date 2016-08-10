@@ -17,11 +17,12 @@ java_library(
     ),
     resources = [
         "logging.properties",
-        "//java/google/registry/env/common/default:WEB-INF/datastore-indexes.xml",
-        "//java/google/registry/env/common/default:WEB-INF/queue.xml",
+        "//java/google/registry:env/common/default/WEB-INF/datastore-indexes.xml",
+        "//java/google/registry:env/common/default/WEB-INF/queue.xml",
     ] + glob(["*.csv"]),
     visibility = ["//visibility:public"],
     deps = [
+        "//java/com/google/common/annotations",
         "//java/com/google/common/base",
         "//java/com/google/common/cache",
         "//java/com/google/common/collect",

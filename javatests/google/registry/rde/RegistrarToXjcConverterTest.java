@@ -20,27 +20,25 @@ import static google.registry.xjc.XjcXmlTransformer.marshalStrict;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import com.google.common.collect.ImmutableList;
-
 import google.registry.model.ofy.Ofy;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarAddress;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.FakeClock;
 import google.registry.testing.InjectRule;
+import google.registry.testing.ShardableTestCase;
 import google.registry.xjc.rderegistrar.XjcRdeRegistrar;
 import google.registry.xjc.rderegistrar.XjcRdeRegistrarAddrType;
 import google.registry.xjc.rderegistrar.XjcRdeRegistrarPostalInfoEnumType;
 import google.registry.xjc.rderegistrar.XjcRdeRegistrarPostalInfoType;
 import google.registry.xjc.rderegistrar.XjcRdeRegistrarStatusType;
-
+import java.io.ByteArrayOutputStream;
 import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.io.ByteArrayOutputStream;
 
 /**
  * Unit tests for {@link RegistrarToXjcConverter}.
@@ -49,7 +47,7 @@ import java.io.ByteArrayOutputStream;
  * some exceptional conditions.
  */
 @RunWith(JUnit4.class)
-public class RegistrarToXjcConverterTest {
+public class RegistrarToXjcConverterTest extends ShardableTestCase {
 
   @Rule
   public final AppEngineRule appEngine = AppEngineRule.builder()
@@ -147,6 +145,4 @@ public class RegistrarToXjcConverterTest {
   public void testMarshal() throws Exception {
     marshalStrict(RegistrarToXjcConverter.convert(registrar), new ByteArrayOutputStream(), UTF_8);
   }
-
-  @Test public void makeShardingWork1() {}
 }

@@ -23,9 +23,9 @@ import static org.joda.time.Duration.standardSeconds;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import google.registry.model.common.Cursor;
+import google.registry.model.common.Cursor.CursorType;
 import google.registry.model.registry.Registry;
-import google.registry.model.registry.RegistryCursor;
-import google.registry.model.registry.RegistryCursor.CursorType;
 import google.registry.model.server.Lock;
 import google.registry.rde.EscrowTaskRunner.EscrowTask;
 import google.registry.request.HttpException.NoContentException;
@@ -33,7 +33,7 @@ import google.registry.request.HttpException.ServiceUnavailableException;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.ExceptionRule;
 import google.registry.testing.FakeClock;
-
+import java.util.concurrent.Callable;
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.junit.Before;
@@ -41,8 +41,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import java.util.concurrent.Callable;
 
 /** Unit tests for {@link EscrowTaskRunner}. */
 @RunWith(JUnit4.class)
@@ -77,13 +75,13 @@ public class EscrowTaskRunnerTest {
   public void testRun_cursorIsToday_advancesCursorToTomorrow() throws Exception {
     clock.setTo(DateTime.parse("2006-06-06T00:30:00Z"));
     persistResource(
-        RegistryCursor.create(registry, CursorType.RDE_STAGING, DateTime.parse("2006-06-06TZ")));
+        Cursor.create(CursorType.RDE_STAGING, DateTime.parse("2006-06-06TZ"), registry));
     runner.lockRunAndRollForward(
         task, registry, standardSeconds(30), CursorType.RDE_STAGING, standardDays(1));
     verify(task).runWithLock(DateTime.parse("2006-06-06TZ"));
     ofy().clearSessionCache();
-    assertThat(RegistryCursor.load(registry, CursorType.RDE_STAGING))
-        .hasValue(DateTime.parse("2006-06-07TZ"));
+    Cursor cursor = ofy().load().key(Cursor.createKey(CursorType.RDE_STAGING, registry)).now();
+    assertThat(cursor.getCursorTime()).isEqualTo(DateTime.parse("2006-06-07TZ"));
   }
 
   @Test
@@ -92,15 +90,16 @@ public class EscrowTaskRunnerTest {
     runner.lockRunAndRollForward(
         task, registry, standardSeconds(30), CursorType.RDE_STAGING, standardDays(1));
     verify(task).runWithLock(DateTime.parse("2006-06-06TZ"));
-    assertThat(RegistryCursor.load(Registry.get("lol"), CursorType.RDE_STAGING))
-        .hasValue(DateTime.parse("2006-06-07TZ"));
+    Cursor cursor =
+        ofy().load().key(Cursor.createKey(CursorType.RDE_STAGING, Registry.get("lol"))).now();
+    assertThat(cursor.getCursorTime()).isEqualTo(DateTime.parse("2006-06-07TZ"));
   }
 
   @Test
   public void testRun_cursorInTheFuture_doesNothing() throws Exception {
     clock.setTo(DateTime.parse("2006-06-06T00:30:00Z"));
     persistResource(
-        RegistryCursor.create(registry, CursorType.RDE_STAGING, DateTime.parse("2006-06-07TZ")));
+        Cursor.create(CursorType.RDE_STAGING, DateTime.parse("2006-06-07TZ"), registry));
     thrown.expect(NoContentException.class, "Already completed");
     runner.lockRunAndRollForward(
         task, registry, standardSeconds(30), CursorType.RDE_STAGING, standardDays(1));
@@ -112,7 +111,7 @@ public class EscrowTaskRunnerTest {
     thrown.expect(ServiceUnavailableException.class, "Lock in use: " + lockName);
     clock.setTo(DateTime.parse("2006-06-06T00:30:00Z"));
     persistResource(
-        RegistryCursor.create(registry, CursorType.RDE_STAGING, DateTime.parse("2006-06-06TZ")));
+        Cursor.create(CursorType.RDE_STAGING, DateTime.parse("2006-06-06TZ"), registry));
     Lock.executeWithLocks(
         new Callable<Void>() {
           @Override

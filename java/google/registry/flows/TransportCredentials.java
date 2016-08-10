@@ -17,23 +17,21 @@ package google.registry.flows;
 import google.registry.flows.EppException.AuthenticationErrorException;
 import google.registry.model.registrar.Registrar;
 
-/**
- * A marker interface for objects containing registrar credentials provided via an EPP transport.
- */
+/** Interface for objects containing registrar credentials provided via an EPP transport. */
 public interface TransportCredentials {
-
   /**
-   * Indicates whether the transport takes the place of EPP login checks, in which case LoginFlow
-   * will not check the password. Alternatively, if the password should be checked, it MUST match
-   * the user's and GAE's isUserAdmin should not be used to bypass this check as internal
-   * connections over RPC will have this property for all registrars.
+   * Check that these credentials are valid for the registrar and optionally check the password.
+   *
+   * Called by {@link google.registry.flows.session.LoginFlow LoginFlow} to check the transport
+   * credentials against the stored registrar's credentials. If they do not match, throw an
+   * {@link AuthenticationErrorException}.
    */
-  boolean performsLoginCheck();
+  void validate(Registrar registrar, String password) throws AuthenticationErrorException;
 
-  /**
-   * Called by {@link google.registry.flows.session.LoginFlow LoginFlow}
-   * to check the transport credentials against the stored registrar's credentials.
-   * If they do not match, throw an AuthenticationErrorException.
-   */
-  void validate(Registrar r) throws AuthenticationErrorException;
+  /** Registrar password is incorrect. */
+  static class BadRegistrarPasswordException extends AuthenticationErrorException {
+    public BadRegistrarPasswordException() {
+      super("Registrar password is incorrect");
+    }
+  }
 }

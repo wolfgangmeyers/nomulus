@@ -15,7 +15,6 @@
 package google.registry.module.backend;
 
 import dagger.Component;
-
 import google.registry.bigquery.BigqueryModule;
 import google.registry.config.ConfigModule;
 import google.registry.dns.writer.dnsupdate.DnsUpdateConfigModule;
@@ -28,6 +27,7 @@ import google.registry.groups.GroupsModule;
 import google.registry.groups.GroupssettingsModule;
 import google.registry.keyring.api.KeyModule;
 import google.registry.keyring.api.VoidKeyringModule;
+import google.registry.monitoring.whitebox.StackdriverModule;
 import google.registry.rde.JSchModule;
 import google.registry.request.Modules.AppIdentityCredentialModule;
 import google.registry.request.Modules.DatastoreServiceModule;
@@ -40,7 +40,6 @@ import google.registry.request.Modules.UseAppIdentityCredentialForGoogleApisModu
 import google.registry.request.RequestModule;
 import google.registry.util.SystemClock.SystemClockModule;
 import google.registry.util.SystemSleeper.SystemSleeperModule;
-
 import javax.inject.Singleton;
 
 /** Dagger component with instance lifetime for "backend" App Engine module. */
@@ -64,6 +63,7 @@ import javax.inject.Singleton;
         KeyModule.class,
         ModulesServiceModule.class,
         SpreadsheetServiceModule.class,
+        StackdriverModule.class,
         SystemClockModule.class,
         SystemSleeperModule.class,
         URLFetchServiceModule.class,

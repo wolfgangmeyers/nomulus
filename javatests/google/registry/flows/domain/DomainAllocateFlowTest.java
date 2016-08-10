@@ -39,16 +39,10 @@ import static org.joda.money.CurrencyUnit.USD;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Ref;
-
-import google.registry.flows.EppException.UnimplementedExtensionException;
-import google.registry.flows.FlowRunner.CommitMode;
-import google.registry.flows.FlowRunner.UserPrivileges;
 import google.registry.flows.ResourceCreateFlow.ResourceAlreadyExistsException;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.domain.DomainAllocateFlow.HasFinalStatusException;
-import google.registry.flows.domain.DomainAllocateFlow.MissingAllocateCreateExtensionException;
 import google.registry.flows.domain.DomainAllocateFlow.MissingApplicationException;
 import google.registry.flows.domain.DomainAllocateFlow.OnlySuperuserCanAllocateException;
 import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
@@ -76,7 +70,6 @@ import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.smd.EncodedSignedMark;
 import google.registry.testing.DatastoreHelper;
 import google.registry.testing.TaskQueueHelper.TaskMatcher;
-
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -103,8 +96,6 @@ public class DomainAllocateFlowTest
   public void initAllocateTest() throws Exception {
     setEppInput("domain_allocate.xml", ImmutableMap.of("APPLICATIONID", "2-TLD"));
     clock.setTo(APPLICATION_TIME);
-    // We must manually set the flow class since this flow is not registered in the flow registry.
-    flowClass = DomainAllocateFlow.class;
   }
 
   private void setupDomainApplication(String tld, TldState tldState) throws Exception {
@@ -487,26 +478,10 @@ public class DomainAllocateFlowTest
   }
 
   @Test
-  public void testFailure_launchExtension() throws Exception {
-    setupDomainApplication("tld", TldState.QUIET_PERIOD);
-    setEppInput("domain_create_claim_notice.xml");
-    thrown.expect(UnimplementedExtensionException.class);
-    runFlowAsSuperuser();
-  }
-
-  @Test
   public void testFailure_applicationDoesNotExist() throws Exception {
     setupDomainApplication("tld", TldState.QUIET_PERIOD);
     setEppInput("domain_allocate_bad_application_roid.xml");
     thrown.expect(MissingApplicationException.class);
-    runFlowAsSuperuser();
-  }
-
-  @Test
-  public void testFailure_missingAllocateCreateExtension() throws Exception {
-    setupDomainApplication("tld", TldState.QUIET_PERIOD);
-    setEppInput("domain_create.xml");
-    thrown.expect(MissingAllocateCreateExtensionException.class);
     runFlowAsSuperuser();
   }
 

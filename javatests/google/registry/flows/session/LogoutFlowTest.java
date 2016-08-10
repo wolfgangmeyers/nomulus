@@ -19,7 +19,6 @@ import static google.registry.testing.DatastoreHelper.createTld;
 import google.registry.flows.FlowTestCase;
 import google.registry.flows.LoggedInFlow.NotLoggedInException;
 import google.registry.testing.ExceptionRule;
-
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -52,8 +51,4 @@ public class LogoutFlowTest extends FlowTestCase<LogoutFlow> {
     sessionMetadata.setClientId(null);  // Turn off the implicit login
     runFlow();
   }
-
-  // Extra methods so the test runner doesn't produce empty shards.
-  @Test public void testNothing1() {}
-  @Test public void testNothing2() {}
 }

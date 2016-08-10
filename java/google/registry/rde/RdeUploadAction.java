@@ -18,28 +18,26 @@ import static com.google.appengine.api.taskqueue.TaskOptions.Builder.withUrl;
 import static com.google.common.base.Verify.verify;
 import static com.google.common.net.MediaType.PLAIN_TEXT_UTF_8;
 import static com.jcraft.jsch.ChannelSftp.OVERWRITE;
+import static google.registry.model.common.Cursor.getCursorTimeOrStartOfTime;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.rde.RdeMode.FULL;
 import static google.registry.request.Action.Method.POST;
-import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 
 import com.google.appengine.api.taskqueue.Queue;
 import com.google.appengine.tools.cloudstorage.GcsFilename;
 import com.google.common.io.ByteStreams;
-
 import com.googlecode.objectify.VoidWork;
 import com.jcraft.jsch.JSch;
-
 import google.registry.config.ConfigModule.Config;
 import google.registry.gcs.GcsUtils;
 import google.registry.keyring.api.KeyModule.Key;
+import google.registry.model.common.Cursor;
+import google.registry.model.common.Cursor.CursorType;
 import google.registry.model.rde.RdeNamingUtils;
 import google.registry.model.rde.RdeRevision;
 import google.registry.model.registry.Registry;
-import google.registry.model.registry.RegistryCursor;
-import google.registry.model.registry.RegistryCursor.CursorType;
 import google.registry.rde.EscrowTaskRunner.EscrowTask;
 import google.registry.rde.JSchSshSession.JSchSshSessionFactory;
 import google.registry.request.Action;
@@ -51,21 +49,18 @@ import google.registry.util.Clock;
 import google.registry.util.FormattingLogger;
 import google.registry.util.TaskEnqueuer;
 import google.registry.util.TeeOutputStream;
-
-import org.bouncycastle.openpgp.PGPKeyPair;
-import org.bouncycastle.openpgp.PGPPrivateKey;
-import org.bouncycastle.openpgp.PGPPublicKey;
-import org.joda.time.DateTime;
-import org.joda.time.Duration;
-
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.URI;
-
 import javax.inject.Inject;
 import javax.inject.Named;
+import org.bouncycastle.openpgp.PGPKeyPair;
+import org.bouncycastle.openpgp.PGPPrivateKey;
+import org.bouncycastle.openpgp.PGPPublicKey;
+import org.joda.time.DateTime;
+import org.joda.time.Duration;
 
 /**
  * Action that securely uploads an RDE XML file from Cloud Storage to a trusted third party (such as
@@ -119,17 +114,17 @@ public final class RdeUploadAction implements Runnable, EscrowTask {
 
   @Override
   public void runWithLock(DateTime watermark) throws Exception {
-    DateTime stagingCursor =
-        RegistryCursor.load(Registry.get(tld), CursorType.RDE_STAGING).or(START_OF_TIME);
-    if (!stagingCursor.isAfter(watermark)) {
-      logger.infofmt("tld=%s uploadCursor=%s stagingCursor=%s", tld, watermark, stagingCursor);
+    DateTime stagingCursorTime = getCursorTimeOrStartOfTime(
+        ofy().load().key(Cursor.createKey(CursorType.RDE_STAGING, Registry.get(tld))).now());
+    if (!stagingCursorTime.isAfter(watermark)) {
+      logger.infofmt("tld=%s uploadCursor=%s stagingCursor=%s", tld, watermark, stagingCursorTime);
       throw new ServiceUnavailableException("Waiting for RdeStagingAction to complete");
     }
-    DateTime sftpCursor =
-        RegistryCursor.load(Registry.get(tld), CursorType.RDE_UPLOAD_SFTP).or(START_OF_TIME);
-    if (sftpCursor.plus(sftpCooldown).isAfter(clock.nowUtc())) {
+    DateTime sftpCursorTime = getCursorTimeOrStartOfTime(
+        ofy().load().key(Cursor.createKey(CursorType.RDE_UPLOAD_SFTP, Registry.get(tld))).now());
+    if (sftpCursorTime.plus(sftpCooldown).isAfter(clock.nowUtc())) {
       // Fail the task good and hard so it retries until the cooldown passes.
-      logger.infofmt("tld=%s cursor=%s sftpCursor=%s", tld, watermark, sftpCursor);
+      logger.infofmt("tld=%s cursor=%s sftpCursor=%s", tld, watermark, sftpCursorTime);
       throw new ServiceUnavailableException("SFTP cooldown has not yet passed");
     }
     int revision = RdeRevision.getNextRevision(tld, watermark, FULL) - 1;
@@ -145,8 +140,10 @@ public final class RdeUploadAction implements Runnable, EscrowTask {
     ofy().transact(new VoidWork() {
       @Override
       public void vrun() {
-        RegistryCursor.save(
-            Registry.get(tld), CursorType.RDE_UPLOAD_SFTP, ofy().getTransactionTime());
+        Cursor cursor =
+            Cursor.create(
+                CursorType.RDE_UPLOAD_SFTP, ofy().getTransactionTime(), Registry.get(tld));
+        ofy().save().entity(cursor).now();
       }
     });
     response.setContentType(PLAIN_TEXT_UTF_8);

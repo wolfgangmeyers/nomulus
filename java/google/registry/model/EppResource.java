@@ -14,6 +14,7 @@
 
 package google.registry.model;
 
+import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Sets.difference;
 import static com.google.common.collect.Sets.union;
 import static google.registry.util.CollectionUtils.difference;
@@ -24,22 +25,17 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
-
 import com.googlecode.objectify.Ref;
 import com.googlecode.objectify.annotation.Id;
 import com.googlecode.objectify.annotation.Index;
-
 import google.registry.model.eppcommon.StatusValue;
-import google.registry.model.eppoutput.Response.ResponseData;
+import google.registry.model.eppoutput.EppResponse.ResponseData;
 import google.registry.model.ofy.CommitLogManifest;
 import google.registry.model.transfer.TransferData;
-
-import org.joda.time.DateTime;
-
 import java.util.Set;
-
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlTransient;
+import org.joda.time.DateTime;
 
 /** An Epp entity object such as a contact or a host. */
 @XmlTransient
@@ -209,6 +205,19 @@ public abstract class EppResource extends BackupGroupRoot implements Buildable, 
     /** Create a {@link Builder} wrapping the given instance. */
     protected Builder(T instance) {
       super(instance);
+    }
+
+    /**
+     * Set the time this resource was created.
+     *
+     * <p>Note: This can only be used if the creation time hasn't already been set, which it is in
+     * normal EPP flows.
+     */
+    public B setCreationTime(DateTime creationTime) {
+      checkState(getInstance().creationTime.timestamp == null,
+          "creationTime can only be set once for EppResource.");
+      getInstance().creationTime = CreateAutoTimestamp.create(creationTime);
+      return thisCastToDerived();
     }
 
     /** Set the time this resource was created. Should only be used in tests. */

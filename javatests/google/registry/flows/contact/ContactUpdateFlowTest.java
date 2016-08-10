@@ -23,9 +23,6 @@ import static google.registry.testing.DatastoreHelper.persistResource;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-
-import google.registry.flows.FlowRunner.CommitMode;
-import google.registry.flows.FlowRunner.UserPrivileges;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
 import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
@@ -39,7 +36,6 @@ import google.registry.model.contact.ContactResource;
 import google.registry.model.contact.PostalInfo;
 import google.registry.model.contact.PostalInfo.Type;
 import google.registry.model.eppcommon.StatusValue;
-
 import org.junit.Test;
 
 /** Unit tests for {@link ContactUpdateFlow}. */
@@ -197,7 +193,6 @@ public class ContactUpdateFlowTest
 
   @Test
   public void testSuccess_superuserUnauthorizedClient() throws Exception {
-    sessionMetadata.setSuperuser(true);
     sessionMetadata.setClientId("NewRegistrar");
     persistActiveContact(getUniqueIdFromCommand());
     clock.advanceOneMilli();

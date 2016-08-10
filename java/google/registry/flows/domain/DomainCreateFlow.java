@@ -14,14 +14,13 @@
 
 package google.registry.flows.domain;
 
-import static com.google.common.base.Preconditions.checkNotNull;
 import static google.registry.flows.domain.DomainFlowUtils.validateFeeChallenge;
+import static google.registry.model.domain.fee.Fee.FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
 import static google.registry.model.index.DomainApplicationIndex.loadActiveApplicationsByDomainName;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.CommandUseErrorException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
@@ -30,15 +29,14 @@ import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainResource.Builder;
 import google.registry.model.domain.GracePeriod;
-import google.registry.model.domain.fee.FeeCreateExtension;
 import google.registry.model.domain.launch.LaunchCreateExtension;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.tmch.LordnTask;
-
 import java.util.Set;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that creates a new domain resource.
@@ -82,6 +80,7 @@ import java.util.Set;
  * @error {@link DomainFlowUtils.MissingRegistrantException}
  * @error {@link DomainFlowUtils.MissingTechnicalContactException}
  * @error {@link DomainFlowUtils.NameserversNotAllowedException}
+ * @error {@link DomainFlowUtils.NameserversNotSpecifiedException}
  * @error {@link DomainFlowUtils.PremiumNameBlockedException}
  * @error {@link DomainFlowUtils.RegistrantNotAllowedException}
  * @error {@link DomainFlowUtils.TldDoesNotExistException}
@@ -98,6 +97,8 @@ public class DomainCreateFlow extends DomainCreateOrAllocateFlow {
   private static final Set<TldState> QLP_SMD_ALLOWED_STATES =
       Sets.immutableEnumSet(TldState.SUNRISE, TldState.SUNRUSH);
 
+  @Inject DomainCreateFlow() {}
+
   private boolean isAnchorTenant() {
     return isAnchorTenantViaReservation || isAnchorTenantViaExtension;
   }
@@ -105,8 +106,8 @@ public class DomainCreateFlow extends DomainCreateOrAllocateFlow {
   @Override
   protected final void verifyDomainCreateIsAllowed() throws EppException {
     String tld = getTld();
-    validateFeeChallenge(targetId, tld, now, getClientId(), feeCreate, createCost);
-    if (!superuser) {
+    validateFeeChallenge(targetId, tld, now, feeCreate, commandOperations.getTotalCost());
+    if (!isSuperuser) {
       // Prohibit creating a domain if there is an open application for the same name.
       for (DomainApplication application : loadActiveApplicationsByDomainName(targetId, now)) {
         if (!application.getApplicationStatus().isFinalStatus()) {
@@ -123,7 +124,8 @@ public class DomainCreateFlow extends DomainCreateOrAllocateFlow {
 
   @Override
   protected final void initDomainCreateOrAllocateFlow() {
-    registerExtensions(FeeCreateExtension.class, LaunchCreateExtension.class);
+    registerExtensions(LaunchCreateExtension.class);
+    registerExtensions(FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
   }
 
   @Override
@@ -142,13 +144,15 @@ public class DomainCreateFlow extends DomainCreateOrAllocateFlow {
   @Override
   protected final void setDomainCreateOrAllocateProperties(Builder builder) throws EppException {
     Registry registry = Registry.get(getTld());
+
     // Bill for the create.
     BillingEvent.OneTime createEvent = new BillingEvent.OneTime.Builder()
         .setReason(Reason.CREATE)
         .setTargetId(targetId)
         .setClientId(getClientId())
         .setPeriodYears(command.getPeriod().getValue())
-        .setCost(checkNotNull(createCost))
+        // TODO(b/29089413): the EAP fee needs to be a separate billing event.
+        .setCost(commandOperations.getTotalCost())
         .setEventTime(now)
         .setBillingTime(now.plus(isAnchorTenant()
             ? registry.getAnchorTenantAddGracePeriodLength()

@@ -19,7 +19,7 @@ import google.registry.flows.ResourceTransferRequestFlow;
 import google.registry.model.contact.ContactCommand.Transfer;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.reporting.HistoryEntry;
-
+import javax.inject.Inject;
 import org.joda.time.Duration;
 
 /**
@@ -33,6 +33,8 @@ import org.joda.time.Duration;
  */
 public class ContactTransferRequestFlow
     extends ResourceTransferRequestFlow<ContactResource, Transfer> {
+
+  @Inject ContactTransferRequestFlow() {}
 
   @Override
   protected final HistoryEntry.Type getHistoryEntryType() {

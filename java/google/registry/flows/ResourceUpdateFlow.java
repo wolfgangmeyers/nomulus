@@ -18,7 +18,6 @@ import static google.registry.model.eppoutput.Result.Code.Success;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-
 import google.registry.flows.EppException.ParameterValuePolicyErrorException;
 import google.registry.flows.EppException.ParameterValueRangeErrorException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
@@ -28,7 +27,6 @@ import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.eppinput.ResourceCommand.AddRemoveSameValueException;
 import google.registry.model.eppinput.ResourceCommand.ResourceUpdate;
 import google.registry.model.eppoutput.EppOutput;
-
 import java.util.Set;
 
 /**
@@ -61,7 +59,7 @@ public abstract class ResourceUpdateFlow
     for (StatusValue statusValue : Sets.union(
         command.getInnerAdd().getStatusValues(),
         command.getInnerRemove().getStatusValues())) {
-      if (!superuser && !statusValue.isClientSettable()) {  // The superuser can set any status.
+      if (!isSuperuser && !statusValue.isClientSettable()) {  // The superuser can set any status.
         throw new StatusNotClientSettableException(statusValue.getXmlName());
       }
     }
@@ -85,7 +83,7 @@ public abstract class ResourceUpdateFlow
   protected final void verifyNewStateIsAllowed() throws EppException {
     // If the resource is marked with clientUpdateProhibited, and this update did not clear that
     // status, then the update must be disallowed (unless a superuser is requesting the change).
-    if (!superuser
+    if (!isSuperuser
         && existingResource.getStatusValues().contains(StatusValue.CLIENT_UPDATE_PROHIBITED)
         && newResource.getStatusValues().contains(StatusValue.CLIENT_UPDATE_PROHIBITED)) {
       throw new ResourceHasClientUpdateProhibitedException();

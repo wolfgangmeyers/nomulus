@@ -17,29 +17,39 @@ package google.registry.flows.domain;
 import static google.registry.flows.domain.DomainFlowUtils.getReservationType;
 import static google.registry.flows.domain.DomainFlowUtils.handleFeeRequest;
 import static google.registry.model.EppResourceUtils.checkResourcesExist;
+import static google.registry.model.domain.fee.Fee.FEE_CHECK_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
+import static google.registry.model.domain.fee.Fee.FEE_EXTENSION_URIS;
+import static google.registry.model.index.DomainApplicationIndex.loadActiveApplicationsByDomainName;
 import static google.registry.model.registry.label.ReservationType.UNRESERVED;
-import static google.registry.pricing.PricingEngineProxy.isPremiumName;
+import static google.registry.pricing.PricingEngineProxy.getPricesForDomainName;
 import static google.registry.util.CollectionUtils.nullToEmpty;
-import static google.registry.util.DomainNameUtils.getTldFromSld;
+import static google.registry.util.DomainNameUtils.getTldFromDomainName;
 
+import com.google.common.base.Predicate;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.google.common.net.InternetDomainName;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ParameterValuePolicyErrorException;
-import google.registry.model.domain.fee.FeeCheckExtension;
+import google.registry.model.domain.DomainApplication;
+import google.registry.model.domain.fee.FeeCheckCommandExtension;
+import google.registry.model.domain.fee.FeeCheckCommandExtensionItem;
 import google.registry.model.domain.fee.FeeCheckResponseExtension;
-import google.registry.model.domain.fee.FeeCheckResponseExtension.FeeCheck;
+import google.registry.model.domain.fee.FeeCheckResponseExtensionItem;
 import google.registry.model.domain.launch.LaunchCheckExtension;
-import google.registry.model.eppcommon.ProtocolDefinition.ServiceExtension;
 import google.registry.model.eppoutput.CheckData;
 import google.registry.model.eppoutput.CheckData.DomainCheck;
 import google.registry.model.eppoutput.CheckData.DomainCheckData;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.registry.Registry;
+import google.registry.model.registry.Registry.TldState;
 import google.registry.model.registry.label.ReservationType;
-
+import java.util.Collections;
 import java.util.Set;
+import javax.inject.Inject;
+import org.joda.money.CurrencyUnit;
 
 /**
  * An EPP flow that checks whether a domain can be provisioned.
@@ -65,9 +75,19 @@ import java.util.Set;
  */
 public class DomainCheckFlow extends BaseDomainCheckFlow {
 
+  /**
+   * The TLD states during which we want to report a domain with pending applications as
+   * unavailable.
+   */
+  private static final Set<TldState> PENDING_ALLOCATION_TLD_STATES =
+      Sets.immutableEnumSet(TldState.GENERAL_AVAILABILITY, TldState.QUIET_PERIOD);
+
+  @Inject DomainCheckFlow() {}
+
   @Override
   protected void initDomainCheckFlow() throws EppException {
-    registerExtensions(LaunchCheckExtension.class, FeeCheckExtension.class);
+    registerExtensions(LaunchCheckExtension.class);
+    registerExtensions(FEE_CHECK_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
   }
 
   private String getMessageForCheck(String targetId, Set<String> existingIds) {
@@ -75,13 +95,23 @@ public class DomainCheckFlow extends BaseDomainCheckFlow {
       return "In use";
     }
     InternetDomainName domainName = domainNames.get(targetId);
-    ReservationType reservationType = getReservationType(domainName);
     Registry registry = Registry.get(domainName.parent().toString());
+    if (PENDING_ALLOCATION_TLD_STATES.contains(registry.getTldState(now))
+        && FluentIterable.from(loadActiveApplicationsByDomainName(domainName.toString(), now))
+            .anyMatch(new Predicate<DomainApplication>() {
+              @Override
+              public boolean apply(DomainApplication input) {
+                return !input.getApplicationStatus().isFinalStatus();
+              }})) {
+      return "Pending allocation";
+    }
+    ReservationType reservationType = getReservationType(domainName);
     if (reservationType == UNRESERVED
-        && isPremiumName(domainName, now, getClientId())
+        && getPricesForDomainName(domainName.toString(), now).isPremium()
         && registry.getPremiumPriceAckRequired()
-        && !nullToEmpty(sessionMetadata.getServiceExtensionUris()).contains(
-            ServiceExtension.FEE_0_6.getUri())) {
+        && Collections.disjoint(
+            nullToEmpty(sessionMetadata.getServiceExtensionUris()),
+            FEE_EXTENSION_URIS)) {
       return "Premium names require EPP ext.";
     }
     return reservationType.getMessageForCheck();
@@ -98,30 +128,59 @@ public class DomainCheckFlow extends BaseDomainCheckFlow {
     return DomainCheckData.create(checks.build());
   }
 
-  /** Handle the fee check extension. */
-  @Override
-  protected ImmutableList<? extends ResponseExtension> getResponseExtensions() throws EppException {
-    FeeCheckExtension feeCheck = eppInput.getSingleExtension(FeeCheckExtension.class);
-    if (feeCheck == null) {
-      return null;  // No fee checks were requested.
-    }
-    ImmutableList.Builder<FeeCheck> feeChecksBuilder = new ImmutableList.Builder<>();
-    for (FeeCheckExtension.DomainCheck domainCheck : feeCheck.getDomains()) {
-      String domainName = domainCheck.getName();
-      if (!domainNames.containsKey(domainName)) {
+  /**
+   * Return the domains to be checked for a particular fee check item. Some versions of the fee
+   * extension specify the domain name in the extension item, while others use the list of domain
+   * names from the regular check domain availability list.
+   */
+  private Set<String> getDomainNamesToCheck(FeeCheckCommandExtensionItem feeCheckItem)
+      throws OnlyCheckedNamesCanBeFeeCheckedException {
+    if (feeCheckItem.isDomainNameSupported()) {
+      String domainNameInExtension = feeCheckItem.getDomainName();
+      if (!domainNames.containsKey(domainNameInExtension)) {
         // Although the fee extension explicitly says it's ok to fee check a domain name that you
         // aren't also availability checking, we forbid it. This makes the experience simpler and
         // also means we can assume any domain names in the fee checks have been validated.
         throw new OnlyCheckedNamesCanBeFeeCheckedException();
       }
-      FeeCheck.Builder builder = new FeeCheck.Builder();
-      handleFeeRequest(
-          domainCheck, builder, domainName, getTldFromSld(domainName), getClientId(), now);
-      feeChecksBuilder.add(builder.setName(domainName).build());
+      return ImmutableSet.of(domainNameInExtension);
+    } else {
+      // If this version of the fee extension is nameless, use the full list of domains.
+      return domainNames.keySet();
     }
-    return ImmutableList.of(FeeCheckResponseExtension.create(feeChecksBuilder.build()));
-  }
+  }   
 
+  /** Handle the fee check extension. */
+  @Override
+  protected ImmutableList<ResponseExtension> getResponseExtensions() throws EppException {
+    FeeCheckCommandExtension<
+            ? extends FeeCheckCommandExtensionItem, ? extends FeeCheckResponseExtension<?>>
+        feeCheck = eppInput.getFirstExtensionOfClasses(
+            FEE_CHECK_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
+    if (feeCheck == null) {
+      return null;  // No fee checks were requested.
+    }
+    CurrencyUnit topLevelCurrency = feeCheck.isCurrencySupported() ? feeCheck.getCurrency() : null;
+    ImmutableList.Builder<FeeCheckResponseExtensionItem> feeCheckResponseItemsBuilder =
+        new ImmutableList.Builder<>();
+    for (FeeCheckCommandExtensionItem feeCheckItem : feeCheck.getItems()) {
+      for (String domainName : getDomainNamesToCheck(feeCheckItem)) {
+        FeeCheckResponseExtensionItem.Builder builder = feeCheckItem.createResponseBuilder();
+        handleFeeRequest(
+            feeCheckItem,
+            builder,
+            domainName,
+            getTldFromDomainName(domainName),
+            topLevelCurrency,
+            now);
+        feeCheckResponseItemsBuilder
+            .add(builder.setDomainNameIfSupported(domainName).build());
+      }
+    }
+    return ImmutableList.<ResponseExtension>of(
+        feeCheck.createResponse(feeCheckResponseItemsBuilder.build()));
+  }
+  
   /** By server policy, fee check names must be listed in the availability check. */
   static class OnlyCheckedNamesCanBeFeeCheckedException extends ParameterValuePolicyErrorException {
     OnlyCheckedNamesCanBeFeeCheckedException() {

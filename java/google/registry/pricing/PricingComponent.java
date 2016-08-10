@@ -15,11 +15,8 @@
 package google.registry.pricing;
 
 import dagger.Component;
-
-import google.registry.model.pricing.PricingEngine;
-
+import google.registry.model.pricing.PremiumPricingEngine;
 import java.util.Map;
-
 import javax.inject.Singleton;
 
 /**
@@ -32,5 +29,5 @@ import javax.inject.Singleton;
 @Singleton
 @Component(modules = {PricingModule.class})
 interface PricingComponent {
-  Map<Class<? extends PricingEngine>, PricingEngine> pricingEngines();
+  Map<String, PremiumPricingEngine> premiumPricingEngines();
 }

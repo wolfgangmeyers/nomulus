@@ -24,21 +24,19 @@ import static google.registry.flows.EppXmlTransformer.unmarshal;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.tools.CommandUtilities.addHeader;
 
+import com.beust.jcommander.Parameter;
+import com.beust.jcommander.Parameters;
+import com.google.common.base.Ascii;
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.template.soy.data.SoyMapData;
-
-import com.beust.jcommander.Parameter;
-import com.beust.jcommander.Parameters;
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.VoidWork;
 import com.googlecode.objectify.Work;
-
 import google.registry.flows.EppException;
-import google.registry.flows.EppXmlTransformer;
 import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainCommand;
@@ -51,7 +49,6 @@ import google.registry.model.eppinput.EppInput.ResourceCommandWrapper;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.smd.SignedMark;
 import google.registry.tools.soy.DomainAllocateSoyInfo;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -89,7 +86,7 @@ final class AllocateDomainCommand extends MutatingEppToolCommand {
 
   /** Extract the registration period from the XML used to create the domain application. */
   private static Period extractPeriodFromXml(byte[] xmlBytes) throws EppException {
-    EppInput eppInput = unmarshal(xmlBytes);
+    EppInput eppInput = unmarshal(EppInput.class, xmlBytes);
     return ((DomainCommand.Create)
         ((ResourceCommandWrapper) eppInput.getCommandWrapper().getCommand())
             .getResourceCommand()).getPeriod();
@@ -138,7 +135,7 @@ final class AllocateDomainCommand extends MutatingEppToolCommand {
             ImmutableMap.Builder<String, String> contactsMapBuilder = new ImmutableMap.Builder<>();
             for (DesignatedContact contact : application.getContacts()) {
               contactsMapBuilder.put(
-                  contact.getType().toString().toLowerCase(),
+                  Ascii.toLowerCase(contact.getType().toString()),
                   contact.getContactRef().get().getForeignKey());
             }
             LaunchNotice launchNotice = application.getLaunchNotice();
@@ -150,8 +147,10 @@ final class AllocateDomainCommand extends MutatingEppToolCommand {
                 "contacts", contactsMapBuilder.build(),
                 "authInfo", application.getAuthInfo().getPw().getValue(),
                 "smdId", application.getEncodedSignedMarks().isEmpty()
-                    ? null : EppXmlTransformer.<SignedMark>unmarshal(
-                         application.getEncodedSignedMarks().get(0).getBytes()).getId(),
+                    ? null
+                    : unmarshal(
+                        SignedMark.class,
+                        application.getEncodedSignedMarks().get(0).getBytes()).getId(),
                 "applicationRoid", application.getRepoId(),
                 "applicationTime", application.getCreationTime().toString(),
                 "launchNotice", launchNotice == null ? null : ImmutableMap.of(

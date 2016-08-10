@@ -38,7 +38,6 @@ import com.google.common.cache.LoadingCache;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.UncheckedExecutionException;
-
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.VoidWork;
 import com.googlecode.objectify.Work;
@@ -49,22 +48,18 @@ import com.googlecode.objectify.annotation.Ignore;
 import com.googlecode.objectify.annotation.OnLoad;
 import com.googlecode.objectify.annotation.Parent;
 import com.googlecode.objectify.cmd.Query;
-
 import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.ImmutableObject;
 import google.registry.model.annotations.VirtualEntity;
 import google.registry.model.registry.Registry;
-
-import org.joda.money.Money;
-import org.joda.time.DateTime;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
-
 import javax.annotation.Nullable;
+import org.joda.money.Money;
+import org.joda.time.DateTime;
 
 /**
  * A premium list entity, persisted to Datastore, that is used to check domain label prices.
@@ -266,14 +261,21 @@ public final class PremiumList extends BaseDomainLabelList<Money, PremiumList.Pr
    */
   public PremiumList saveAndUpdateEntries() {
     final Optional<PremiumList> oldPremiumList = get(name);
-    // Save the new child entities in a series of transactions.
-    for (final List<PremiumListEntry> batch
-        : partition(premiumListMap.values(), TRANSACTION_BATCH_SIZE)) {
-      ofy().transactNew(new VoidWork() {
-        @Override
-        public void vrun() {
-          ofy().save().entities(batch);
-        }});
+    // Only update entries if there's actually a new revision of the list to save (which there will
+    // be if the list content changes, vs just the description/metadata).
+    boolean entriesToUpdate =
+        !oldPremiumList.isPresent()
+            || !Objects.equals(oldPremiumList.get().revisionKey, this.revisionKey);
+    // If needed, save the new child entities in a series of transactions.
+    if (entriesToUpdate) {
+      for (final List<PremiumListEntry> batch
+          : partition(premiumListMap.values(), TRANSACTION_BATCH_SIZE)) {
+        ofy().transactNew(new VoidWork() {
+          @Override
+          public void vrun() {
+            ofy().save().entities(batch);
+          }});
+      }
     }
     // Save the new PremiumList itself.
     PremiumList updated = ofy().transactNew(new Work<PremiumList>() {
@@ -296,8 +298,8 @@ public final class PremiumList extends BaseDomainLabelList<Money, PremiumList.Pr
         }});
     // Update the cache.
     PremiumList.cache.put(name, updated);
-    // Delete the entities under the old PremiumList, if any.
-    if (oldPremiumList.isPresent()) {
+    // If needed and there are any, delete the entities under the old PremiumList.
+    if (entriesToUpdate && oldPremiumList.isPresent()) {
       oldPremiumList.get().deleteEntries();
     }
     return updated;

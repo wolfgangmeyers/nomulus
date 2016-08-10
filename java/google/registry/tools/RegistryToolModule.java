@@ -14,9 +14,9 @@
 
 package google.registry.tools;
 
+import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
-
 import java.security.NoSuchAlgorithmException;
 import java.security.ProviderException;
 import java.security.SecureRandom;
@@ -24,17 +24,15 @@ import java.util.Random;
 
 /** Dagger module for Registry Tool. */
 @Module
-final class RegistryToolModule {
+abstract class RegistryToolModule {
 
   @Provides
   static RegistryToolEnvironment provideRegistryToolEnvironment() {
     return RegistryToolEnvironment.get();
   }
 
-  @Provides
-  static PasswordGenerator providePasswordGenerator(RandomPasswordGenerator passwordGenerator) {
-    return passwordGenerator;
-  }
+  @Binds
+  abstract PasswordGenerator providePasswordGenerator(RandomPasswordGenerator passwordGenerator);
 
   @Provides
   static Random provideRandom() {

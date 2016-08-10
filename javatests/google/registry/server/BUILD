@@ -47,17 +47,18 @@ java_library(
 java_library(
     name = "RegistryTestServer",
     srcs = ["RegistryTestServer.java"],
-    data = ["//java/google/registry/ui:runfiles_debug"],
+    data = [
+        "//java/google/registry/ui:runfiles",
+        "//java/google/registry/ui:runfiles_debug",
+    ],
     deps = [
         ":TestServer",
         "//java/com/google/common/collect",
         "//java/com/google/common/net",
         "//third_party/java/jsr305_annotations",
         "//third_party/java/servlet/servlet_api",
-        "//java/google/registry/flows",
         "//java/google/registry/module/backend",
         "//java/google/registry/module/frontend",
-        "//java/google/registry/ui/server/api",
         "//java/google/registry/ui/server/registrar",
     ],
 )

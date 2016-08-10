@@ -17,19 +17,12 @@ package google.registry.model.domain;
 import com.googlecode.objectify.Ref;
 import com.googlecode.objectify.annotation.Embed;
 import com.googlecode.objectify.annotation.Index;
-
 import google.registry.model.EppResource;
 import google.registry.model.ImmutableObject;
-import google.registry.model.contact.ContactResource;
-import google.registry.model.host.HostResource;
-
-import javax.xml.bind.annotation.adapters.XmlAdapter;
 
 /**
  * Legacy shell of a "union" type to represent referenced objects as either a foreign key or as a
  * link to another object in the datastore. In its current form it merely wraps a {@link Ref}.
- *
- * <p>This type always marshals as the "foreign key". We no longer use this type for unmarshalling.
  *
  * @param <T> the type being referenced
  */
@@ -42,27 +35,6 @@ public class ReferenceUnion<T extends EppResource> extends ImmutableObject {
   public Ref<T> getLinked() {
     return linked;
   }
-
-  /** An adapter that marshals the linked {@link Ref} as its loaded foreign key. */
-  public static class Adapter<T extends EppResource>
-      extends XmlAdapter<String, ReferenceUnion<T>> {
-
-    @Override
-    public ReferenceUnion<T> unmarshal(String foreignKey) throws Exception {
-      throw new UnsupportedOperationException();
-    }
-
-    @Override
-    public String marshal(ReferenceUnion<T> reference) throws Exception {
-      return reference.getLinked().get().getForeignKey();
-    }
-  }
-
-  /** An adapter for references to contacts. */
-  static class ContactReferenceUnionAdapter extends Adapter<ContactResource>{}
-
-  /** An adapter for references to hosts. */
-  static class HostReferenceUnionAdapter extends Adapter<HostResource>{}
 
   public static <T extends EppResource> ReferenceUnion<T> create(Ref<T> linked) {
     ReferenceUnion<T> instance = new ReferenceUnion<>();

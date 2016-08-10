@@ -23,9 +23,7 @@ import static google.registry.util.CollectionUtils.union;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Key;
-
 import google.registry.flows.EppException.AuthorizationErrorException;
 import google.registry.flows.EppException.CommandUseErrorException;
 import google.registry.flows.EppException.ObjectPendingTransferException;
@@ -33,17 +31,15 @@ import google.registry.model.EppResource;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.eppinput.ResourceCommand.SingleResourceCommand;
 import google.registry.model.eppoutput.EppOutput;
-import google.registry.model.eppoutput.Response.ResponseData;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse.ResponseData;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.transfer.TransferData;
 import google.registry.model.transfer.TransferData.TransferServerApproveEntity;
 import google.registry.model.transfer.TransferStatus;
-
+import java.util.Set;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
-
-import java.util.Set;
 
 /**
  * An EPP flow that requests a transfer on a resource.
@@ -62,7 +58,7 @@ import java.util.Set;
   private DateTime transferExpirationTime;
 
   /** Helper class to identify the two clients. */
-  protected abstract class Client {
+  protected abstract static class Client {
     public abstract String getId();
   }
 

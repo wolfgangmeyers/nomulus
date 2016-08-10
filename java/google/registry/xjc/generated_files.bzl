@@ -1,4 +1,18 @@
-# converted from extension //java/google/registry/xjc:generated_files
+# Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 #
 #      .'``'.      ...
 #     :o  o `....'`  ;
@@ -15,7 +29,7 @@
 # (bindings.xjb), you must regenerate this file with the following commands:
 #
 #   bazel run java/google/registry/xjc:list_generated_files | tee /tmp/lol
-#   mv /tmp/lol java/google/registry/xjc/generated_files
+#   mv /tmp/lol java/google/registry/xjc/generated_files.bzl
 #
 
 pkginfo_generated_files = [
@@ -24,6 +38,9 @@ pkginfo_generated_files = [
     "dsig/package-info.java",
     "epp/package-info.java",
     "eppcom/package-info.java",
+    "fee06/package-info.java",
+    "fee11/package-info.java",
+    "fee12/package-info.java",
     "host/package-info.java",
     "iirdea/package-info.java",
     "launch/package-info.java",
@@ -168,6 +185,64 @@ xjc_generated_files = [
     "eppcom/XjcEppcomPwAuthInfoType.java",
     "eppcom/XjcEppcomReasonType.java",
     "eppcom/XjcEppcomTrStatusType.java",
+    "fee06/ObjectFactory.java",
+    "fee06/XjcFee06Check.java",
+    "fee06/XjcFee06ChkData.java",
+    "fee06/XjcFee06CommandType.java",
+    "fee06/XjcFee06CreData.java",
+    "fee06/XjcFee06Create.java",
+    "fee06/XjcFee06CreditType.java",
+    "fee06/XjcFee06DelData.java",
+    "fee06/XjcFee06DomainCDType.java",
+    "fee06/XjcFee06DomainCheckType.java",
+    "fee06/XjcFee06FeeType.java",
+    "fee06/XjcFee06InfData.java",
+    "fee06/XjcFee06Info.java",
+    "fee06/XjcFee06RenData.java",
+    "fee06/XjcFee06Renew.java",
+    "fee06/XjcFee06Transfer.java",
+    "fee06/XjcFee06TransformCommandType.java",
+    "fee06/XjcFee06TransformResultType.java",
+    "fee06/XjcFee06TrnData.java",
+    "fee06/XjcFee06UpdData.java",
+    "fee06/XjcFee06Update.java",
+    "fee11/ObjectFactory.java",
+    "fee11/XjcFee11Check.java",
+    "fee11/XjcFee11ChkData.java",
+    "fee11/XjcFee11CommandType.java",
+    "fee11/XjcFee11CreData.java",
+    "fee11/XjcFee11Create.java",
+    "fee11/XjcFee11CreditType.java",
+    "fee11/XjcFee11DelData.java",
+    "fee11/XjcFee11FeeType.java",
+    "fee11/XjcFee11ObjectCDType.java",
+    "fee11/XjcFee11RenData.java",
+    "fee11/XjcFee11Renew.java",
+    "fee11/XjcFee11Transfer.java",
+    "fee11/XjcFee11TransformCommandType.java",
+    "fee11/XjcFee11TransformResultType.java",
+    "fee11/XjcFee11TrnData.java",
+    "fee11/XjcFee11UpdData.java",
+    "fee11/XjcFee11Update.java",
+    "fee12/ObjectFactory.java",
+    "fee12/XjcFee12Check.java",
+    "fee12/XjcFee12ChkData.java",
+    "fee12/XjcFee12CommandCDType.java",
+    "fee12/XjcFee12CommandCheckType.java",
+    "fee12/XjcFee12CreData.java",
+    "fee12/XjcFee12Create.java",
+    "fee12/XjcFee12CreditType.java",
+    "fee12/XjcFee12DelData.java",
+    "fee12/XjcFee12FeeType.java",
+    "fee12/XjcFee12ObjectCDType.java",
+    "fee12/XjcFee12RenData.java",
+    "fee12/XjcFee12Renew.java",
+    "fee12/XjcFee12Transfer.java",
+    "fee12/XjcFee12TransformCommandType.java",
+    "fee12/XjcFee12TransformResultType.java",
+    "fee12/XjcFee12TrnData.java",
+    "fee12/XjcFee12UpdData.java",
+    "fee12/XjcFee12Update.java",
     "host/ObjectFactory.java",
     "host/XjcHostAddRemType.java",
     "host/XjcHostAddrType.java",

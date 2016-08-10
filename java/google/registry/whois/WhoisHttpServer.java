@@ -27,24 +27,20 @@ import static javax.servlet.http.HttpServletResponse.SC_OK;
 
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
-
 import google.registry.config.ConfigModule.Config;
 import google.registry.request.Action;
 import google.registry.request.RequestPath;
 import google.registry.request.Response;
 import google.registry.util.Clock;
 import google.registry.util.FormattingLogger;
-
-import org.joda.time.DateTime;
-import org.joda.time.Duration;
-
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-
 import javax.inject.Inject;
+import org.joda.time.DateTime;
+import org.joda.time.Duration;
 
 /**
  * Human-Friendly HTTP WHOIS API
@@ -134,6 +130,7 @@ public final class WhoisHttpServer implements Runnable {
 
   @Inject Clock clock;
   @Inject Response response;
+  @Inject @Config("whoisDisclaimer") String disclaimer;
   @Inject @Config("whoisHttpExpires") Duration expires;
   @Inject @RequestPath String requestPath;
   @Inject WhoisHttpServer() {}
@@ -163,7 +160,7 @@ public final class WhoisHttpServer implements Runnable {
     response.setHeader(ACCESS_CONTROL_ALLOW_ORIGIN, CORS_ALLOW_ORIGIN);
     response.setHeader(X_CONTENT_TYPE_OPTIONS, X_CONTENT_NO_SNIFF);
     response.setContentType(PLAIN_TEXT_UTF_8);
-    response.setPayload(whoisResponse.getPlainTextOutput(true));
+    response.setPayload(whoisResponse.getPlainTextOutput(true, disclaimer));
   }
 
   /** Removes {@code %xx} escape codes from request path components. */

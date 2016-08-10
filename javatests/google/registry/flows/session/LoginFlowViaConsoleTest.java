@@ -15,23 +15,20 @@
 package google.registry.flows.session;
 
 
+import static com.google.appengine.api.users.UserServiceFactory.getUserService;
 import static google.registry.testing.DatastoreHelper.persistResource;
 
-import com.google.appengine.api.users.UserServiceFactory;
 import com.google.apphosting.api.ApiProxy;
 import com.google.apphosting.api.ApiProxy.Environment;
 import com.google.common.collect.ImmutableSet;
-
-import google.registry.flows.EppConsoleServlet.GaeUserCredentials;
-import google.registry.flows.EppConsoleServlet.GaeUserCredentials.BadGaeUserIdException;
-import google.registry.flows.EppConsoleServlet.GaeUserCredentials.UserNotLoggedInException;
+import google.registry.flows.GaeUserCredentials;
+import google.registry.flows.GaeUserCredentials.BadGaeUserIdException;
+import google.registry.flows.GaeUserCredentials.UserNotLoggedInException;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarContact;
-
-import org.junit.Test;
-
 import java.util.HashMap;
 import java.util.Map;
+import org.junit.Test;
 
 /**
  * Unit tests for {@link LoginFlow} when accessed via a web frontend
@@ -150,15 +147,13 @@ public class LoginFlowViaConsoleTest extends LoginFlowTestCase {
         return envAttr;
       }
     });
-    sessionMetadata.setTransportCredentials(new GaeUserCredentials(
-        UserServiceFactory.getUserService().getCurrentUser()));
+    credentials = new GaeUserCredentials(getUserService().getCurrentUser());
     return oldEnv;
   }
 
   void noLogin() {
     oldEnv = ApiProxy.getCurrentEnvironment();
-    sessionMetadata.setTransportCredentials(new GaeUserCredentials(
-        UserServiceFactory.getUserService().getCurrentUser()));
+    credentials = new GaeUserCredentials(getUserService().getCurrentUser());
   }
 
   void persistLinkedAccount(String email, String gaeUserId) {

@@ -9,15 +9,16 @@ java_library(
     name = "backend",
     srcs = glob(["*.java"]),
     deps = [
+        "//java/com/google/common/annotations",
         "//java/com/google/common/base",
         "//java/com/google/common/collect",
         "//java/com/google/common/net",
         "//java/google/registry/backup",
         "//java/google/registry/bigquery",
+        "//java/google/registry/billing",
         "//java/google/registry/config",
         "//java/google/registry/cron",
         "//java/google/registry/dns",
-        "//java/google/registry/dns/writer/api",
         "//java/google/registry/dns/writer/dnsupdate",
         "//java/google/registry/export",
         "//java/google/registry/export/sheet",
@@ -35,6 +36,7 @@ java_library(
         "//java/google/registry/util",
         "//third_party/java/bouncycastle",
         "//third_party/java/dagger",
+        "//third_party/java/joda_time",
         "//third_party/java/jsr305_annotations",
         "//third_party/java/jsr330_inject",
         "//third_party/java/servlet/servlet_api",
@@ -50,6 +52,7 @@ java_binary(
     create_executable = 0,
     runtime_deps = [
         ":backend",
+        "//java/domains/donuts/config",  # DonutsRegistryConfig
         "//java/google/registry/monitoring/whitebox",  # MetricsTaskServlet
     ],
 )

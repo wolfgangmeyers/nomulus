@@ -14,21 +14,18 @@
 
 package google.registry.dns.writer.dnsupdate;
 
+import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
-
-import google.registry.dns.writer.api.DnsWriter;
-
+import google.registry.model.dns.DnsWriter;
 import javax.net.SocketFactory;
 
 /** Dagger module that provides a DnsUpdateWriter. */
 @Module
-public final class DnsUpdateWriterModule {
+public abstract class DnsUpdateWriterModule {
 
-  @Provides
-  static DnsWriter provideDnsWriter(DnsUpdateWriter dnsWriter) {
-    return dnsWriter;
-  }
+  @Binds
+  abstract DnsWriter provideDnsWriter(DnsUpdateWriter dnsWriter);
 
   @Provides
   static SocketFactory provideSocketFactory() {

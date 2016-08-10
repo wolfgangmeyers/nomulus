@@ -15,7 +15,12 @@
 package google.registry.module.frontend;
 
 import dagger.Subcomponent;
-
+import domains.donuts.config.DonutsTlsCredentialsModule;
+import google.registry.flows.CheckApiAction;
+import google.registry.flows.CheckApiAction.CheckApiModule;
+import google.registry.flows.EppConsoleAction;
+import google.registry.flows.EppTlsAction;
+import google.registry.flows.FlowComponent;
 import google.registry.rdap.RdapAutnumAction;
 import google.registry.rdap.RdapDomainAction;
 import google.registry.rdap.RdapDomainSearchAction;
@@ -40,13 +45,19 @@ import google.registry.whois.WhoisServer;
 @RequestScope
 @Subcomponent(
     modules = {
+        CheckApiModule.class,
+        DonutsTlsCredentialsModule.class,
         RdapModule.class,
         RegistrarUserModule.class,
         RequestModule.class,
         WhoisModule.class,
     })
 interface FrontendRequestComponent {
+  CheckApiAction checkApiAction();
   ConsoleUiAction consoleUiAction();
+  EppConsoleAction eppConsoleAction();
+  EppTlsAction eppTlsAction();
+  FlowComponent.Builder flowComponentBuilder();
   RdapAutnumAction rdapAutnumAction();
   RegistrarPaymentAction registrarPaymentAction();
   RegistrarPaymentSetupAction registrarPaymentSetupAction();

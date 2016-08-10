@@ -17,23 +17,21 @@ package google.registry.flows.poll;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 
 import com.google.common.collect.ImmutableList;
-
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Work;
 import com.googlecode.objectify.cmd.Query;
-
 import google.registry.flows.EppException;
 import google.registry.flows.LoggedInFlow;
 import google.registry.model.eppinput.EppInput.Poll;
 import google.registry.model.eppoutput.EppOutput;
-import google.registry.model.eppoutput.Response;
-import google.registry.model.eppoutput.Response.ResponseData;
-import google.registry.model.eppoutput.Response.ResponseExtension;
+import google.registry.model.eppoutput.EppResponse;
+import google.registry.model.eppoutput.EppResponse.ResponseData;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.eppoutput.Result;
 import google.registry.model.poll.MessageQueueInfo;
 import google.registry.model.poll.PollMessage;
-
 import java.util.List;
+import javax.annotation.Nullable;
 
 /** Base class of EPP Poll command flows. Mostly provides datastore helper methods. */
 public abstract class PollFlow extends LoggedInFlow {
@@ -77,9 +75,9 @@ public abstract class PollFlow extends LoggedInFlow {
   protected EppOutput createOutput(
       Result.Code code,
       MessageQueueInfo messageQueueInfo,
-      ImmutableList<ResponseData> responseData,
-      ImmutableList<ResponseExtension> responseExtensions) {
-    return EppOutput.create(new Response.Builder()
+      @Nullable ImmutableList<ResponseData> responseData,
+      @Nullable ImmutableList<ResponseExtension> responseExtensions) {
+    return EppOutput.create(new EppResponse.Builder()
         .setTrid(trid)
         .setResult(Result.create(code))
         .setMessageQueueInfo(messageQueueInfo)

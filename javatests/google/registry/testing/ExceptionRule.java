@@ -22,16 +22,14 @@ import static google.registry.flows.EppXmlTransformer.marshal;
 import google.registry.flows.EppException;
 import google.registry.model.eppcommon.Trid;
 import google.registry.model.eppoutput.EppOutput;
-import google.registry.model.eppoutput.Response;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.util.Clock;
 import google.registry.util.SystemClock;
 import google.registry.xml.ValidationMode;
-
+import javax.annotation.Nullable;
 import org.junit.rules.TestRule;
 import org.junit.runner.Description;
 import org.junit.runners.model.Statement;
-
-import javax.annotation.Nullable;
 
 /**
  * A test rule similar to JUnit's {@code ExpectedException} rule that does extra checking to ensure
@@ -72,7 +70,7 @@ public class ExceptionRule implements TestRule {
           if (e instanceof EppException) {
             // Attempt to marshall the exception to EPP. If it doesn't work, this will throw.
             marshal(
-                EppOutput.create(new Response.Builder()
+                EppOutput.create(new EppResponse.Builder()
                     .setTrid(Trid.create(null))
                     .setResult(((EppException) e).getResult())
                     .setExecutionTime(CLOCK.nowUtc())

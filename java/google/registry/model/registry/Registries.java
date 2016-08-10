@@ -22,15 +22,14 @@ import static com.google.common.collect.Maps.filterValues;
 import static google.registry.model.common.EntityGroupRoot.getCrossTldKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.util.CacheUtils.memoizeWithShortExpiration;
+import static google.registry.util.PreconditionsUtils.checkArgumentNotNull;
 
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InternetDomainName;
-
 import com.googlecode.objectify.Work;
-
 import google.registry.model.registry.Registry.TldType;
 
 /** Utilities for finding and listing {@link Registry} entities. */
@@ -92,7 +91,7 @@ public final class Registries {
    *
    * <p><b>Note:</b> This routine will only work on names under TLDs for which this registry is
    * authoritative. To extract TLDs from domains (not hosts) that other registries control, use
-   * {@link google.registry.util.DomainNameUtils#getTldFromSld(String)
+   * {@link google.registry.util.DomainNameUtils#getTldFromDomainName(String)
    * DomainNameUtils#getTldFromDomainName}.
    *
    * @param domainName domain name or host name (but not TLD) under an authoritative TLD
@@ -114,7 +113,7 @@ public final class Registries {
    * match exists.
    */
   public static InternetDomainName findTldForNameOrThrow(InternetDomainName domainName) {
-    return checkNotNull(
+    return checkArgumentNotNull(
         findTldForName(domainName).orNull(),
         "Domain name is not under a recognized TLD: %s", domainName.toString());
   }

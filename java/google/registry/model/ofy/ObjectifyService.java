@@ -20,10 +20,11 @@ import static com.google.common.base.Predicates.not;
 import static com.googlecode.objectify.ObjectifyService.factory;
 import static google.registry.util.TypeUtils.hasAnnotation;
 
+import com.google.appengine.api.datastore.AsyncDatastoreService;
+import com.google.appengine.api.datastore.DatastoreServiceConfig;
 import com.google.appengine.api.datastore.DatastoreServiceFactory;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.Iterables;
-
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Objectify;
 import com.googlecode.objectify.ObjectifyFactory;
@@ -31,7 +32,6 @@ import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.EntitySubclass;
 import com.googlecode.objectify.impl.translate.TranslatorFactory;
 import com.googlecode.objectify.impl.translate.opt.joda.MoneyStringTranslatorFactory;
-
 import google.registry.config.RegistryEnvironment;
 import google.registry.model.EntityClasses;
 import google.registry.model.ImmutableObject;
@@ -43,7 +43,6 @@ import google.registry.model.translators.DurationTranslatorFactory;
 import google.registry.model.translators.InetAddressTranslatorFactory;
 import google.registry.model.translators.ReadableInstantUtcTranslatorFactory;
 import google.registry.model.translators.UpdateAutoTimestampTranslatorFactory;
-
 import java.util.Arrays;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.logging.Level;
@@ -99,6 +98,16 @@ public class ObjectifyService {
       @Override
       public Objectify begin() {
         return new SessionKeyExposingObjectify(this);
+      }
+
+      @Override
+      protected AsyncDatastoreService createRawAsyncDatastoreService(DatastoreServiceConfig cfg) {
+        // In the unit test environment, wrap the datastore service in a proxy that can be used to
+        // examine the number of requests sent to datastore.
+        AsyncDatastoreService service = super.createRawAsyncDatastoreService(cfg);
+        return RegistryEnvironment.get().equals(RegistryEnvironment.UNITTEST)
+            ? new RequestCapturingAsyncDatastoreService(service)
+            : service;
       }});
 
     // Translators must be registered before any entities can be registered.

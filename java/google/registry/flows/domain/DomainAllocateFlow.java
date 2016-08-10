@@ -23,13 +23,10 @@ import static google.registry.util.CollectionUtils.isNullOrEmpty;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Ref;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.AuthorizationErrorException;
 import google.registry.flows.EppException.ObjectDoesNotExistException;
-import google.registry.flows.EppException.RequiredParameterMissingException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Flag;
@@ -48,15 +45,14 @@ import google.registry.model.registry.Registry;
 import google.registry.model.registry.label.ReservationType;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.tmch.LordnTask;
+import javax.inject.Inject;
 
 /**
  * An EPP flow that allocates a new domain resource from a domain application.
  *
- * @error {@link google.registry.flows.EppException.UnimplementedExtensionException}
  * @error {@link google.registry.flows.ResourceCreateFlow.ResourceAlreadyExistsException}
  * @error {@link google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException}
  * @error {@link DomainAllocateFlow.HasFinalStatusException}
- * @error {@link DomainAllocateFlow.MissingAllocateCreateExtensionException}
  * @error {@link DomainAllocateFlow.MissingApplicationException}
  * @error {@link DomainAllocateFlow.OnlySuperuserCanAllocateException}
  */
@@ -64,6 +60,8 @@ public class DomainAllocateFlow extends DomainCreateOrAllocateFlow {
 
   protected AllocateCreateExtension allocateCreate;
   protected DomainApplication application;
+
+  @Inject DomainAllocateFlow() {}
 
   @Override
   protected final void initDomainCreateOrAllocateFlow() {
@@ -73,11 +71,8 @@ public class DomainAllocateFlow extends DomainCreateOrAllocateFlow {
 
   @Override
   protected final void verifyDomainCreateIsAllowed() throws EppException {
-    if (!superuser) {
+    if (!isSuperuser) {
       throw new OnlySuperuserCanAllocateException();
-    }
-    if (allocateCreate == null) {
-      throw new MissingAllocateCreateExtensionException();
     }
     String applicationRoid = allocateCreate.getApplicationRoid();
     application = loadByUniqueId(DomainApplication.class, applicationRoid, now);
@@ -106,8 +101,7 @@ public class DomainAllocateFlow extends DomainCreateOrAllocateFlow {
         .setClientId(getClientId())
         // Note that the cost is calculated as of now, i.e. the event time, not the billing time,
         // which may be some additional days into the future.
-        .setCost(
-            getDomainCreateCost(targetId, now, getClientId(), command.getPeriod().getValue()))
+        .setCost(getDomainCreateCost(targetId, now, command.getPeriod().getValue()))
         .setPeriodYears(command.getPeriod().getValue())
         .setEventTime(now)
         // If there are no nameservers on the domain, then they get the benefit of the sunrush
@@ -198,13 +192,6 @@ public class DomainAllocateFlow extends DomainCreateOrAllocateFlow {
   @Override
   protected final HistoryEntry.Type getHistoryEntryType() {
     return HistoryEntry.Type.DOMAIN_ALLOCATE;
-  }
-
-  /** The allocate create extension is required to allocate a domain. */
-  static class MissingAllocateCreateExtensionException extends RequiredParameterMissingException {
-    public MissingAllocateCreateExtensionException() {
-      super("The allocate create extension is required to allocate a domain");
-    }
   }
 
   /** Domain application with specific ROID does not exist. */

@@ -14,23 +14,19 @@
 
 package google.registry.util;
 
-import static com.google.appengine.api.search.checkers.Preconditions.checkArgument;
+import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Iterables.any;
 import static com.google.common.math.IntMath.pow;
 import static google.registry.util.PredicateUtils.supertypeOf;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.ImmutableSet;
-
 import google.registry.config.ConfigModule.Config;
-
-import org.joda.time.Duration;
-
 import java.io.Serializable;
 import java.util.Set;
 import java.util.concurrent.Callable;
-
 import javax.inject.Inject;
+import org.joda.time.Duration;
 
 /** Wrapper that does retry with exponential backoff. */
 public class Retrier implements Serializable {

@@ -30,14 +30,11 @@ import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static org.joda.money.CurrencyUnit.EUR;
 import static org.joda.money.CurrencyUnit.USD;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
-
 import com.googlecode.objectify.Key;
-
 import google.registry.flows.EppException.UnimplementedExtensionException;
-import google.registry.flows.FlowRunner.CommitMode;
-import google.registry.flows.FlowRunner.UserPrivileges;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
 import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
@@ -62,7 +59,7 @@ import google.registry.model.poll.PollMessage;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
 import google.registry.model.reporting.HistoryEntry;
-
+import java.util.Map;
 import org.joda.money.Money;
 import org.junit.Before;
 import org.junit.Test;
@@ -70,6 +67,13 @@ import org.junit.Test;
 /** Unit tests for {@link DomainRestoreRequestFlow}. */
 public class DomainRestoreRequestFlowTest extends
     ResourceFlowTestCase<DomainRestoreRequestFlow, DomainResource> {
+
+  private static final ImmutableMap<String, String> FEE_06_MAP =
+      ImmutableMap.of("FEE_VERSION", "0.6", "FEE_NS", "fee");
+  private static final ImmutableMap<String, String> FEE_11_MAP =
+      ImmutableMap.of("FEE_VERSION", "0.11", "FEE_NS", "fee11");
+  private static final ImmutableMap<String, String> FEE_12_MAP =
+      ImmutableMap.of("FEE_VERSION", "0.12", "FEE_NS", "fee12");
 
   public DomainRestoreRequestFlowTest() {
     setEppInput("domain_update_restore_request.xml");
@@ -180,39 +184,114 @@ public class DomainRestoreRequestFlowTest extends
   }
 
   @Test
-  public void testSuccess_fee() throws Exception {
-    setEppInput("domain_update_restore_request_fee.xml");
+  public void testSuccess_fee_v06() throws Exception {
+    setEppInput("domain_update_restore_request_fee.xml", FEE_06_MAP);
     persistPendingDeleteDomain();
-    runFlowAssertResponse(readFile("domain_update_restore_request_response_fee.xml"));
+    runFlowAssertResponse(readFile("domain_update_restore_request_response_fee.xml", FEE_06_MAP));
   }
 
   @Test
-  public void testSuccess_fee_withDefaultAttributes() throws Exception {
-    setEppInput("domain_update_restore_request_fee_defaults.xml");
+  public void testSuccess_fee_v11() throws Exception {
+    setEppInput("domain_update_restore_request_fee.xml", FEE_11_MAP);
     persistPendingDeleteDomain();
-    runFlowAssertResponse(readFile("domain_update_restore_request_response_fee.xml"));
+    runFlowAssertResponse(readFile("domain_update_restore_request_response_fee.xml", FEE_11_MAP));
   }
 
   @Test
-  public void testFailure_refundableFee() throws Exception {
+  public void testSuccess_fee_v12() throws Exception {
+    setEppInput("domain_update_restore_request_fee.xml", FEE_12_MAP);
+    persistPendingDeleteDomain();
+    runFlowAssertResponse(readFile("domain_update_restore_request_response_fee.xml", FEE_12_MAP));
+  }
+  @Test
+  public void testSuccess_fee_withDefaultAttributes_v06() throws Exception {
+    setEppInput("domain_update_restore_request_fee_defaults.xml", FEE_06_MAP);
+    persistPendingDeleteDomain();
+    runFlowAssertResponse(readFile("domain_update_restore_request_response_fee.xml", FEE_06_MAP));
+  }
+
+  @Test
+  public void testSuccess_fee_withDefaultAttributes_v11() throws Exception {
+    setEppInput("domain_update_restore_request_fee_defaults.xml", FEE_11_MAP);
+    persistPendingDeleteDomain();
+    runFlowAssertResponse(readFile("domain_update_restore_request_response_fee.xml", FEE_11_MAP));
+  }
+
+  @Test
+  public void testSuccess_fee_withDefaultAttributes_v12() throws Exception {
+    setEppInput("domain_update_restore_request_fee_defaults.xml", FEE_12_MAP);
+    persistPendingDeleteDomain();
+    runFlowAssertResponse(readFile("domain_update_restore_request_response_fee.xml", FEE_12_MAP));
+  }
+
+  @Test
+  public void testFailure_refundableFee_v06() throws Exception {
     thrown.expect(UnsupportedFeeAttributeException.class);
-    setEppInput("domain_update_restore_request_fee_refundable.xml");
+    setEppInput("domain_update_restore_request_fee_refundable.xml", FEE_06_MAP);
     persistPendingDeleteDomain();
     runFlow();
   }
 
   @Test
-  public void testFailure_gracePeriodFee() throws Exception {
+  public void testFailure_refundableFee_v11() throws Exception {
     thrown.expect(UnsupportedFeeAttributeException.class);
-    setEppInput("domain_update_restore_request_fee_grace_period.xml");
+    setEppInput("domain_update_restore_request_fee_refundable.xml", FEE_11_MAP);
     persistPendingDeleteDomain();
     runFlow();
   }
 
   @Test
-  public void testFailure_appliedFee() throws Exception {
+  public void testFailure_refundableFee_v12() throws Exception {
     thrown.expect(UnsupportedFeeAttributeException.class);
-    setEppInput("domain_update_restore_request_fee_applied.xml");
+    setEppInput("domain_update_restore_request_fee_refundable.xml", FEE_12_MAP);
+    persistPendingDeleteDomain();
+    runFlow();
+  }
+
+  @Test
+  public void testFailure_gracePeriodFee_v06() throws Exception {
+    thrown.expect(UnsupportedFeeAttributeException.class);
+    setEppInput("domain_update_restore_request_fee_grace_period.xml", FEE_06_MAP);
+    persistPendingDeleteDomain();
+    runFlow();
+  }
+
+  @Test
+  public void testFailure_gracePeriodFee_v11() throws Exception {
+    thrown.expect(UnsupportedFeeAttributeException.class);
+    setEppInput("domain_update_restore_request_fee_grace_period.xml", FEE_11_MAP);
+    persistPendingDeleteDomain();
+    runFlow();
+  }
+
+  @Test
+  public void testFailure_gracePeriodFee_v12() throws Exception {
+    thrown.expect(UnsupportedFeeAttributeException.class);
+    setEppInput("domain_update_restore_request_fee_grace_period.xml", FEE_12_MAP);
+    persistPendingDeleteDomain();
+    runFlow();
+  }
+
+  @Test
+  public void testFailure_appliedFee_v06() throws Exception {
+    thrown.expect(UnsupportedFeeAttributeException.class);
+    setEppInput("domain_update_restore_request_fee_applied.xml", FEE_06_MAP);
+    persistPendingDeleteDomain();
+    runFlow();
+  }
+
+  @Test
+  public void testFailure_appliedFee_v11() throws Exception {
+    thrown.expect(UnsupportedFeeAttributeException.class);
+    setEppInput("domain_update_restore_request_fee_applied.xml", FEE_11_MAP);
+    persistPendingDeleteDomain();
+    runFlow();
+  }
+
+  @Test
+  public void testFailure_appliedFee_v12() throws Exception {
+    thrown.expect(UnsupportedFeeAttributeException.class);
+    setEppInput("domain_update_restore_request_fee_applied.xml", FEE_12_MAP);
     persistPendingDeleteDomain();
     runFlow();
   }
@@ -264,9 +343,9 @@ public class DomainRestoreRequestFlowTest extends
   }
 
   @Test
-  public void testFailure_wrongFeeAmount() throws Exception {
+  public void testFailure_wrongFeeAmount_v06() throws Exception {
     thrown.expect(FeesMismatchException.class);
-    setEppInput("domain_update_restore_request_fee.xml");
+    setEppInput("domain_update_restore_request_fee.xml", FEE_06_MAP);
     persistPendingDeleteDomain();
     persistResource(
         Registry.get("tld").asBuilder().setRestoreBillingCost(Money.of(USD, 100)).build());
@@ -274,9 +353,28 @@ public class DomainRestoreRequestFlowTest extends
   }
 
   @Test
-  public void testFailure_wrongCurrency() throws Exception {
+  public void testFailure_wrongFeeAmount_v11() throws Exception {
+    thrown.expect(FeesMismatchException.class);
+    setEppInput("domain_update_restore_request_fee.xml", FEE_11_MAP);
+    persistPendingDeleteDomain();
+    persistResource(
+        Registry.get("tld").asBuilder().setRestoreBillingCost(Money.of(USD, 100)).build());
+    runFlow();
+  }
+
+  @Test
+  public void testFailure_wrongFeeAmount_v12() throws Exception {
+    thrown.expect(FeesMismatchException.class);
+    setEppInput("domain_update_restore_request_fee.xml", FEE_12_MAP);
+    persistPendingDeleteDomain();
+    persistResource(
+        Registry.get("tld").asBuilder().setRestoreBillingCost(Money.of(USD, 100)).build());
+    runFlow();
+  }
+
+  private void runWrongCurrencyTest(Map<String, String> substitutions) throws Exception {
     thrown.expect(CurrencyUnitMismatchException.class);
-    setEppInput("domain_update_restore_request_fee.xml");
+    setEppInput("domain_update_restore_request_fee.xml", substitutions);
     persistPendingDeleteDomain();
     persistResource(
         Registry.get("tld")
@@ -285,15 +383,47 @@ public class DomainRestoreRequestFlowTest extends
             .setCreateBillingCost(Money.of(EUR, 13))
             .setRestoreBillingCost(Money.of(EUR, 11))
             .setRenewBillingCostTransitions(ImmutableSortedMap.of(START_OF_TIME, Money.of(EUR, 7)))
+            .setEapFeeSchedule(ImmutableSortedMap.of(START_OF_TIME, Money.zero(EUR)))
             .setServerStatusChangeBillingCost(Money.of(EUR, 19))
             .build());
+    runFlow();    
+  }
+
+  @Test
+  public void testFailure_wrongCurrency_v06() throws Exception {
+    runWrongCurrencyTest(FEE_06_MAP);
+  }
+
+  @Test
+  public void testFailure_wrongCurrency_v11() throws Exception {
+    runWrongCurrencyTest(FEE_11_MAP);
+  }
+
+  @Test
+  public void testFailure_wrongCurrency_v12() throws Exception {
+    runWrongCurrencyTest(FEE_12_MAP);
+  }
+
+  @Test
+  public void testFailure_feeGivenInWrongScale_v06() throws Exception {
+    thrown.expect(CurrencyValueScaleException.class);
+    setEppInput("domain_update_restore_request_fee_bad_scale.xml", FEE_06_MAP);
+    persistPendingDeleteDomain();
     runFlow();
   }
 
   @Test
-  public void testFailure_feeGivenInWrongScale() throws Exception {
+  public void testFailure_feeGivenInWrongScale_v11() throws Exception {
     thrown.expect(CurrencyValueScaleException.class);
-    setEppInput("domain_update_restore_request_fee_bad_scale.xml");
+    setEppInput("domain_update_restore_request_fee_bad_scale.xml", FEE_11_MAP);
+    persistPendingDeleteDomain();
+    runFlow();
+  }
+
+  @Test
+  public void testFailure_feeGivenInWrongScale_v12() throws Exception {
+    thrown.expect(CurrencyValueScaleException.class);
+    setEppInput("domain_update_restore_request_fee_bad_scale.xml", FEE_12_MAP);
     persistPendingDeleteDomain();
     runFlow();
   }
@@ -370,7 +500,6 @@ public class DomainRestoreRequestFlowTest extends
   @Test
   public void testSuccess_superuserUnauthorizedClient() throws Exception {
     thrown.expect(ResourceNotOwnedException.class);
-    sessionMetadata.setSuperuser(true);
     sessionMetadata.setClientId("NewRegistrar");
     persistPendingDeleteDomain();
     runFlowAssertResponse(readFile("domain_update_response.xml"));

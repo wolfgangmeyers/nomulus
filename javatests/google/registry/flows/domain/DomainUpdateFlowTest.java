@@ -34,6 +34,7 @@ import static google.registry.testing.HistoryEntrySubject.assertAboutHistoryEntr
 import static google.registry.testing.TaskQueueHelper.assertDnsTasksEnqueued;
 import static org.joda.money.CurrencyUnit.USD;
 
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 
@@ -41,8 +42,7 @@ import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Ref;
 
 import google.registry.flows.EppException.UnimplementedExtensionException;
-import google.registry.flows.FlowRunner.CommitMode;
-import google.registry.flows.FlowRunner.UserPrivileges;
+import google.registry.flows.EppRequestSource;
 import google.registry.flows.ResourceCreateOrMutateFlow.OnlyToolCanPassMetadataException;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
@@ -50,7 +50,6 @@ import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistExce
 import google.registry.flows.ResourceUpdateFlow.AddRemoveSameValueEppException;
 import google.registry.flows.ResourceUpdateFlow.ResourceHasClientUpdateProhibitedException;
 import google.registry.flows.ResourceUpdateFlow.StatusNotClientSettableException;
-import google.registry.flows.SessionMetadata.SessionSource;
 import google.registry.flows.SingleResourceFlow.ResourceStatusProhibitsOperationException;
 import google.registry.flows.domain.BaseDomainUpdateFlow.EmptySecDnsUpdateException;
 import google.registry.flows.domain.BaseDomainUpdateFlow.MaxSigLifeChangeNotSupportedException;
@@ -63,6 +62,7 @@ import google.registry.flows.domain.DomainFlowUtils.MissingAdminContactException
 import google.registry.flows.domain.DomainFlowUtils.MissingContactTypeException;
 import google.registry.flows.domain.DomainFlowUtils.MissingTechnicalContactException;
 import google.registry.flows.domain.DomainFlowUtils.NameserversNotAllowedException;
+import google.registry.flows.domain.DomainFlowUtils.NameserversNotSpecifiedException;
 import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
 import google.registry.flows.domain.DomainFlowUtils.RegistrantNotAllowedException;
 import google.registry.flows.domain.DomainFlowUtils.TooManyDsRecordsException;
@@ -380,20 +380,19 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
         nameservers.add(Ref.create(host));
       }
     }
-    ImmutableSet.Builder<DesignatedContact> contacts = new ImmutableSet.Builder<>();
+    ImmutableList.Builder<DesignatedContact> contactsBuilder = new ImmutableList.Builder<>();
     for (int i = 0; i < 8; i++) {
-      ContactResource contact = persistActiveContact(String.format("max_test_%d", i));
-      if (i < 4) {
-        contacts.add(
-            DesignatedContact.create(
-                DesignatedContact.Type.values()[i],
-                Ref.create(contact)));
-      }
+      contactsBuilder.add(
+          DesignatedContact.create(
+              DesignatedContact.Type.values()[i % 4],
+              Ref.create(persistActiveContact(String.format("max_test_%d", i)))));
     }
+    ImmutableList<DesignatedContact> contacts = contactsBuilder.build();
     persistResource(
         reloadResourceByUniqueId().asBuilder()
             .setNameservers(nameservers.build())
-            .setContacts(contacts.build())
+            .setContacts(ImmutableSet.copyOf(contacts.subList(0, 3)))
+            .setRegistrant(contacts.get(3).getContactRef())
             .build());
     clock.advanceOneMilli();
     assertTransactionalFlow(true);
@@ -413,7 +412,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
 
   @Test
   public void testSuccess_metadata() throws Exception {
-    sessionMetadata.setSessionSource(SessionSource.TOOL);
+    eppRequestSource = EppRequestSource.TOOL;
     setEppInput("domain_update_metadata.xml");
     persistReferencedEntities();
     persistDomain();
@@ -666,7 +665,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
 
   @Test
   public void testSuccess_addServerStatusBillingEvent() throws Exception {
-    sessionMetadata.setSessionSource(SessionSource.TOOL);
+    eppRequestSource = EppRequestSource.TOOL;
     persistReferencedEntities();
     persistDomain();
     doServerStatusBillingTest("domain_update_add_server_status.xml", true);
@@ -674,7 +673,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
 
   @Test
   public void testSuccess_noBillingOnPreExistingServerStatus() throws Exception {
-    sessionMetadata.setSessionSource(SessionSource.TOOL);
+    eppRequestSource = EppRequestSource.TOOL;
     DomainResource addStatusDomain = persistActiveDomain(getUniqueIdFromCommand());
     persistResource(
         addStatusDomain.asBuilder()
@@ -685,7 +684,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
 
   @Test
   public void testSuccess_removeServerStatusBillingEvent() throws Exception {
-    sessionMetadata.setSessionSource(SessionSource.TOOL);
+    eppRequestSource = EppRequestSource.TOOL;
     persistReferencedEntities();
     DomainResource removeStatusDomain = persistDomain();
     persistResource(
@@ -697,7 +696,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
 
   @Test
   public void testSuccess_changeServerStatusBillingEvent() throws Exception {
-    sessionMetadata.setSessionSource(SessionSource.TOOL);
+    eppRequestSource = EppRequestSource.TOOL;
     persistReferencedEntities();
     DomainResource changeStatusDomain = persistDomain();
     persistResource(
@@ -721,7 +720,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
 
   @Test
   public void testSuccess_noBillingEventOnServerStatusChangeNotFromRegistrar() throws Exception {
-    sessionMetadata.setSessionSource(SessionSource.TOOL);
+    eppRequestSource = EppRequestSource.TOOL;
     persistActiveDomain(getUniqueIdFromCommand());
     doServerStatusBillingTest("domain_update_add_server_status_non_registrar.xml", false);
   }
@@ -971,7 +970,6 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
 
   @Test
   public void testSuccess_superuserUnauthorizedClient() throws Exception {
-    sessionMetadata.setSuperuser(true);
     sessionMetadata.setClientId("NewRegistrar");
     persistReferencedEntities();
     persistDomain();
@@ -1098,6 +1096,40 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
   }
 
   @Test
+  public void testSuccess_newNameserverWhitelisted() throws Exception {
+    setEppInput("domain_update_add_nameserver.xml");
+    persistReferencedEntities();
+    persistDomain();
+    // No registrant is given but both nameserver and registrant whitelist exist.
+    persistResource(
+        Registry.get("tld").asBuilder()
+            .setAllowedRegistrantContactIds(ImmutableSet.of("sh8013"))
+            .setAllowedFullyQualifiedHostNames(
+                ImmutableSet.of("ns1.example.foo", "ns2.example.foo"))
+            .build());
+    assertThat(reloadResourceByUniqueId().getNameservers()).doesNotContain(
+        Ref.create(loadByUniqueId(HostResource.class, "ns2.example.foo", clock.nowUtc())));
+    runFlow();
+    assertThat(reloadResourceByUniqueId().getNameservers()).contains(
+        Ref.create(loadByUniqueId(HostResource.class, "ns2.example.foo", clock.nowUtc())));
+  }
+
+  @Test
+  public void testSuccess_changeRegistrantWhitelisted() throws Exception {
+    setEppInput("domain_update_registrant.xml");
+    persistReferencedEntities();
+    persistDomain();
+    // Only changes registrant, with both nameserver and registrant whitelist on the TLD.
+    persistResource(
+        Registry.get("tld").asBuilder()
+            .setAllowedRegistrantContactIds(ImmutableSet.of("sh8013"))
+            .setAllowedFullyQualifiedHostNames(ImmutableSet.of("ns1.example.foo"))
+            .build());
+    runFlow();
+    assertThat(reloadResourceByUniqueId().getRegistrant().get().getContactId()).isEqualTo("sh8013");
+  }
+
+  @Test
   public void testSuccess_nameserverAndRegistrantWhitelisted() throws Exception {
     persistReferencedEntities();
     persistDomain();
@@ -1107,5 +1139,41 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
             .setAllowedFullyQualifiedHostNames(ImmutableSet.of("ns2.example.foo"))
             .build());
     doSuccessfulTest();
+  }
+
+  @Test
+  public void testSuccess_removeNameserverWhitelisted() throws Exception {
+    setEppInput("domain_update_remove_nameserver.xml");
+    persistReferencedEntities();
+    persistDomain();
+    persistResource(
+        reloadResourceByUniqueId().asBuilder()
+            .addNameservers(ImmutableSet.of(Ref.create(
+                loadByUniqueId(HostResource.class, "ns2.example.foo", clock.nowUtc()))))
+            .build());
+    persistResource(
+        Registry.get("tld").asBuilder()
+            .setAllowedFullyQualifiedHostNames(
+                ImmutableSet.of("ns1.example.foo", "ns2.example.foo"))
+            .build());
+    assertThat(reloadResourceByUniqueId().getNameservers()).contains(
+        Ref.create(loadByUniqueId(HostResource.class, "ns1.example.foo", clock.nowUtc())));
+    clock.advanceOneMilli();
+    runFlow();
+    assertThat(reloadResourceByUniqueId().getNameservers()).doesNotContain(
+        Ref.create(loadByUniqueId(HostResource.class, "ns1.example.foo", clock.nowUtc())));
+  }
+
+  @Test
+  public void testFailure_removeLastNameserverWhitelisted() throws Exception {
+    persistReferencedEntities();
+    persistDomain();
+    setEppInput("domain_update_remove_nameserver.xml");
+    persistResource(
+        Registry.get("tld").asBuilder()
+            .setAllowedFullyQualifiedHostNames(ImmutableSet.of("ns1.example.foo"))
+            .build());
+    thrown.expect(NameserversNotSpecifiedException.class);
+    runFlow();
   }
 }

@@ -20,22 +20,19 @@ import static com.google.common.io.BaseEncoding.base16;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+import com.google.common.base.Ascii;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Optional;
 import com.google.common.primitives.Ints;
-
 import com.googlecode.objectify.annotation.Embed;
 import com.googlecode.objectify.annotation.IgnoreSave;
 import com.googlecode.objectify.condition.IfNull;
-
 import google.registry.model.ImmutableObject;
-
-import org.joda.time.DateTime;
-
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.XmlValue;
+import org.joda.time.DateTime;
 
 /** The claims notice id from the claims phase. */
 @Embed
@@ -105,7 +102,7 @@ public class LaunchNotice extends ImmutableObject {
     String tcnId = getNoticeId().getTcnId();
     checkArgument(tcnId.length() == 27);
 
-    int checksum = Ints.fromByteArray(base16().decode(tcnId.substring(0, 8).toUpperCase()));
+    int checksum = Ints.fromByteArray(base16().decode(Ascii.toUpperCase(tcnId.substring(0, 8))));
     String noticeId = tcnId.substring(8);
     checkArgument(CharMatcher.inRange('0', '9').matchesAllOf(noticeId));
 

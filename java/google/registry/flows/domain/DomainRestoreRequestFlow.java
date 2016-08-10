@@ -20,6 +20,7 @@ import static google.registry.flows.domain.DomainFlowUtils.newAutorenewPollMessa
 import static google.registry.flows.domain.DomainFlowUtils.validateFeeChallenge;
 import static google.registry.flows.domain.DomainFlowUtils.verifyNotReserved;
 import static google.registry.flows.domain.DomainFlowUtils.verifyPremiumNameIsNotBlocked;
+import static google.registry.model.domain.fee.Fee.FEE_UPDATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
 import static google.registry.model.eppoutput.Result.Code.Success;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.pricing.PricingEngineProxy.getDomainRenewCost;
@@ -27,9 +28,7 @@ import static google.registry.util.DateTimeUtils.END_OF_TIME;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.InternetDomainName;
-
 import com.googlecode.objectify.Ref;
-
 import google.registry.dns.DnsQueue;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.CommandUseErrorException;
@@ -40,8 +39,7 @@ import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainCommand.Update;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.fee.Fee;
-import google.registry.model.domain.fee.FeeUpdateExtension;
-import google.registry.model.domain.fee.FeeUpdateResponseExtension;
+import google.registry.model.domain.fee.FeeTransformCommandExtension;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.domain.rgp.RgpUpdateExtension;
 import google.registry.model.eppcommon.StatusValue;
@@ -50,7 +48,7 @@ import google.registry.model.index.ForeignKeyIndex;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.registry.Registry;
 import google.registry.model.reporting.HistoryEntry;
-
+import javax.inject.Inject;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 
@@ -73,13 +71,16 @@ import org.joda.time.DateTime;
  */
 public class DomainRestoreRequestFlow extends OwnedResourceMutateFlow<DomainResource, Update>  {
 
-  protected FeeUpdateExtension feeUpdate;
+  protected FeeTransformCommandExtension feeUpdate;
   protected Money restoreCost;
   protected Money renewCost;
 
+  @Inject DomainRestoreRequestFlow() {}
+
   @Override
   protected final void initResourceCreateOrMutateFlow() throws EppException {
-    registerExtensions(FeeUpdateExtension.class, RgpUpdateExtension.class);
+    registerExtensions(RgpUpdateExtension.class);
+    registerExtensions(FEE_UPDATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
   }
 
   @Override
@@ -97,14 +98,15 @@ public class DomainRestoreRequestFlow extends OwnedResourceMutateFlow<DomainReso
 
     String tld = existingResource.getTld();
     checkAllowedAccessToTld(getAllowedTlds(), tld);
-    if (!superuser) {
+    if (!isSuperuser) {
       verifyNotReserved(InternetDomainName.from(targetId), false);
       verifyPremiumNameIsNotBlocked(targetId, now, getClientId());
     }
-    feeUpdate = eppInput.getSingleExtension(FeeUpdateExtension.class);
+    feeUpdate = eppInput.getFirstExtensionOfClasses(
+        FEE_UPDATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
     restoreCost = Registry.get(tld).getStandardRestoreCost();
-    renewCost = getDomainRenewCost(targetId, now, getClientId(), 1);
-    validateFeeChallenge(targetId, tld, now, getClientId(), feeUpdate, restoreCost, renewCost);
+    renewCost = getDomainRenewCost(targetId, now, 1);
+    validateFeeChallenge(targetId, tld, now, feeUpdate, restoreCost, renewCost);
   }
 
   @Override
@@ -186,9 +188,9 @@ public class DomainRestoreRequestFlow extends OwnedResourceMutateFlow<DomainReso
         Success,
         null,
         (feeUpdate == null) ? null : ImmutableList.of(
-            new FeeUpdateResponseExtension.Builder()
+            feeUpdate.createResponseBuilder()
               .setCurrency(restoreCost.getCurrencyUnit())
-              .setFee(ImmutableList.of(
+              .setFees(ImmutableList.of(
                   Fee.create(restoreCost.getAmount(), "restore"),
                   Fee.create(renewCost.getAmount(), "renew")))
               .build()));

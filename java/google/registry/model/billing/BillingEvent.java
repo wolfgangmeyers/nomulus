@@ -26,7 +26,6 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
-
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Ref;
 import com.googlecode.objectify.annotation.Entity;
@@ -36,7 +35,6 @@ import com.googlecode.objectify.annotation.Index;
 import com.googlecode.objectify.annotation.OnLoad;
 import com.googlecode.objectify.annotation.Parent;
 import com.googlecode.objectify.condition.IfNull;
-
 import google.registry.model.Buildable;
 import google.registry.model.ImmutableObject;
 import google.registry.model.common.TimeOfYear;
@@ -44,12 +42,10 @@ import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.transfer.TransferData.TransferServerApproveEntity;
-
-import org.joda.money.Money;
-import org.joda.time.DateTime;
-
 import java.util.Objects;
 import java.util.Set;
+import org.joda.money.Money;
+import org.joda.time.DateTime;
 
 /** A billable event in a domain's lifecycle. */
 public abstract class BillingEvent extends ImmutableObject
@@ -226,11 +222,11 @@ public abstract class BillingEvent extends ImmutableObject
     DateTime syntheticCreationTime;
 
     /**
-     * For {@link Flag#SYNTHETIC} events, the {@link BillingEvent} from which this OneTime was
-     * created. This is needed in order to properly match billing events against
+     * For {@link Flag#SYNTHETIC} events, a {@link Key} to the {@link BillingEvent} from which this
+     * OneTime was created. This is needed in order to properly match billing events against
      * {@link Cancellation}s.
      */
-    Long cancellationTargetId;
+    Key<? extends BillingEvent> cancellationMatchingBillingEvent;
 
     public Money getCost() {
       return cost;
@@ -248,8 +244,8 @@ public abstract class BillingEvent extends ImmutableObject
       return syntheticCreationTime;
     }
 
-    public Long getCancellationTargetId() {
-      return cancellationTargetId;
+    public Key<? extends BillingEvent> getCancellationMatchingBillingEvent() {
+      return cancellationMatchingBillingEvent;
     }
 
     @Override
@@ -288,8 +284,9 @@ public abstract class BillingEvent extends ImmutableObject
         return this;
       }
 
-      public Builder setCancellationTargetId(Long cancellationTargetId) {
-        getInstance().cancellationTargetId = cancellationTargetId;
+      public Builder setCancellationMatchingBillingEvent(
+          Key<? extends BillingEvent> cancellationMatchingBillingEvent) {
+        getInstance().cancellationMatchingBillingEvent = cancellationMatchingBillingEvent;
         return this;
       }
 
@@ -310,8 +307,9 @@ public abstract class BillingEvent extends ImmutableObject
             "Synthetic creation time must be set if and only if the SYNTHETIC flag is set.");
         checkState(
             instance.getFlags().contains(Flag.SYNTHETIC)
-                == (instance.cancellationTargetId != null),
-            "Cancellation target ID must be set if and only if the SYNTHETIC flag is set.");
+                == (instance.cancellationMatchingBillingEvent != null),
+            "Cancellation matching billing event must be set if and only if the SYNTHETIC flag "
+                + "is set.");
         return super.build();
       }
     }

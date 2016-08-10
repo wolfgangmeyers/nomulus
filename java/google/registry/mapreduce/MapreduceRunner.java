@@ -34,17 +34,13 @@ import com.google.appengine.tools.pipeline.Job0;
 import com.google.appengine.tools.pipeline.JobSetting;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Optional;
-
 import google.registry.mapreduce.inputs.ConcatenatingInput;
 import google.registry.request.Parameter;
 import google.registry.util.FormattingLogger;
 import google.registry.util.PipelineUtils;
-
-import org.joda.time.Duration;
-
 import java.io.Serializable;
-
 import javax.inject.Inject;
+import org.joda.time.Duration;
 
 /**
  * Runner for map-only or full map and reduce mapreduces.
@@ -71,7 +67,8 @@ public class MapreduceRunner {
   private String jobName;
   private String moduleName;
 
-  // If no reduce shards are set via http params, use this many shards.
+  // Defaults for number of mappers/reducers if not specified in HTTP params.
+  private int defaultMapShards = Integer.MAX_VALUE;
   private int defaultReduceShards = 1;
 
   /**
@@ -105,9 +102,15 @@ public class MapreduceRunner {
     return this;
   }
 
+  /** Set the default number of mappers, if not overriden by the http param. */
+  public MapreduceRunner setDefaultMapShards(int defaultMapShards) {
+    this.defaultMapShards = defaultMapShards;
+    return this;
+  }
+
   /** Set the default number of reducers, if not overriden by the http param. */
   public MapreduceRunner setDefaultReduceShards(int defaultReduceShards) {
-    this.defaultReduceShards = checkNotNull(defaultReduceShards, "defaultReduceShards");
+    this.defaultReduceShards = defaultReduceShards;
     return this;
   }
 
@@ -130,7 +133,7 @@ public class MapreduceRunner {
     return new MapJob<>(
         new MapSpecification.Builder<I, O, R>()
             .setJobName(jobName)
-            .setInput(new ConcatenatingInput<>(inputs, httpParamMapShards.or(Integer.MAX_VALUE)))
+            .setInput(new ConcatenatingInput<>(inputs, httpParamMapShards.or(defaultMapShards)))
             .setMapper(mapper)
             .setOutput(output)
             .build(),
@@ -179,14 +182,14 @@ public class MapreduceRunner {
       createMapreduceJob(
           Mapper<I, K, V> mapper,
           Reducer<K, V, O> reducer,
-          Output<O, R> output,
-          Iterable<? extends Input<? extends I>> inputs) {
+          Iterable<? extends Input<? extends I>> inputs,
+          Output<O, R> output) {
     checkCommonRequiredFields(inputs, mapper);
     checkArgumentNotNull(reducer, "reducer");
     return new MapReduceJob<>(
         new MapReduceSpecification.Builder<I, K, V, O, R>()
             .setJobName(jobName)
-            .setInput(new ConcatenatingInput<>(inputs, httpParamMapShards.or(Integer.MAX_VALUE)))
+            .setInput(new ConcatenatingInput<>(inputs, httpParamMapShards.or(defaultMapShards)))
             .setMapper(mapper)
             .setReducer(reducer)
             .setOutput(output)
@@ -222,8 +225,30 @@ public class MapreduceRunner {
       Mapper<I, K, V> mapper,
       Reducer<K, V, Void> reducer,
       Iterable<? extends Input<? extends I>> inputs) {
-    return runAsPipeline(
-        createMapreduceJob(mapper, reducer, new NoOutput<Void, Void>(), inputs));
+    return runMapreduce(mapper, reducer, inputs, new NoOutput<Void, Void>());
+  }
+
+  /**
+   * Kick off a mapreduce job with specified Output handler.
+   *
+   * @see #createMapreduceJob for creating and running a mapreduce as part of a pipeline
+   *
+   * @param mapper instance of a mapper class
+   * @param reducer instance of a reducer class
+   * @param inputs input sources for the mapper
+   * @param <I> mapper input type
+   * @param <K> emitted key type
+   * @param <V> emitted value type
+   * @param <O> emitted output type
+   * @param <R> return value of output
+   * @return the job id
+   */
+  public final <I, K extends Serializable, V extends Serializable, O, R> String runMapreduce(
+      Mapper<I, K, V> mapper,
+      Reducer<K, V, O> reducer,
+      Iterable<? extends Input<? extends I>> inputs,
+      Output<O, R> output) {
+    return runAsPipeline(createMapreduceJob(mapper, reducer, inputs, output));
   }
 
   private void checkCommonRequiredFields(Iterable<?> inputs, Mapper<?, ?, ?> mapper) {

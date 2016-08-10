@@ -14,19 +14,14 @@
 
 package google.registry.model.eppoutput;
 
-import static org.joda.time.DateTimeZone.UTC;
-
 import google.registry.model.ImmutableObject;
 import google.registry.model.eppcommon.PresenceMarker;
 import google.registry.model.eppcommon.ProtocolDefinition;
 import google.registry.model.eppoutput.EppOutput.ResponseOrGreeting;
-
-import org.joda.time.DateTime;
-
 import java.util.Set;
-
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementWrapper;
+import org.joda.time.DateTime;
 
 /**
  * A greeting, defined in {@link "http://tools.ietf.org/html/rfc5730"}.
@@ -37,7 +32,7 @@ import javax.xml.bind.annotation.XmlElementWrapper;
 public class Greeting extends ImmutableObject implements ResponseOrGreeting {
 
   String svID = "Charleston Road Registry";
-  DateTime svDate = DateTime.now(UTC);
+  DateTime svDate;
 
   /** This is never changed, so it might as well be static for efficiency. */
   @XmlElement
@@ -46,6 +41,12 @@ public class Greeting extends ImmutableObject implements ResponseOrGreeting {
   /** This is never changed, so it might as well be static for efficiency. */
   @XmlElement
   static Dcp dcp = new Dcp();
+
+  public static Greeting create(DateTime svDate) {
+    Greeting instance = new Greeting();
+    instance.svDate = svDate;
+    return instance;
+  }
 
   static class SvcMenu extends ImmutableObject {
     String version = ProtocolDefinition.VERSION;

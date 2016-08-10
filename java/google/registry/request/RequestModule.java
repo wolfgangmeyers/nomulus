@@ -22,21 +22,17 @@ import com.google.common.collect.ImmutableListMultimap;
 import com.google.common.io.ByteStreams;
 import com.google.common.io.CharStreams;
 import com.google.common.net.MediaType;
-
 import dagger.Module;
 import dagger.Provides;
-
 import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.HttpException.UnsupportedMediaTypeException;
-
-import org.json.simple.JSONValue;
-import org.json.simple.parser.ParseException;
-
 import java.io.IOException;
 import java.util.Map;
-
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
+import javax.servlet.http.HttpSession;
+import org.json.simple.JSONValue;
+import org.json.simple.parser.ParseException;
 
 /** Dagger module for servlets. */
 @Module
@@ -53,6 +49,11 @@ public final class RequestModule {
   @Provides
   static Response provideResponse(ResponseImpl response) {
     return response;
+  }
+
+  @Provides
+  HttpSession provideHttpSession() {
+    return req.getSession();
   }
 
   @Provides

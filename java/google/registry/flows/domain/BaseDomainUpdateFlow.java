@@ -21,7 +21,7 @@ import static google.registry.flows.domain.DomainFlowUtils.cloneAndLinkReference
 import static google.registry.flows.domain.DomainFlowUtils.validateContactsHaveTypes;
 import static google.registry.flows.domain.DomainFlowUtils.validateDsData;
 import static google.registry.flows.domain.DomainFlowUtils.validateNameserversAllowedOnTld;
-import static google.registry.flows.domain.DomainFlowUtils.validateNameserversCount;
+import static google.registry.flows.domain.DomainFlowUtils.validateNameserversCountForTld;
 import static google.registry.flows.domain.DomainFlowUtils.validateNoDuplicateContacts;
 import static google.registry.flows.domain.DomainFlowUtils.validateRegistrantAllowedOnTld;
 import static google.registry.flows.domain.DomainFlowUtils.validateRequiredContactsPresent;
@@ -128,7 +128,7 @@ public abstract class BaseDomainUpdateFlow<R extends DomainBase, B extends Build
     validateNoDuplicateContacts(newResource.getContacts());
     validateRequiredContactsPresent(newResource.getRegistrant(), newResource.getContacts());
     validateDsData(newResource.getDsData());
-    validateNameserversCount(newResource.getNameservers().size());
+    validateNameserversCountForTld(newResource.getTld(), newResource.getNameservers().size());
   }
 
   /** The secDNS:all element must have value 'true' if present. */

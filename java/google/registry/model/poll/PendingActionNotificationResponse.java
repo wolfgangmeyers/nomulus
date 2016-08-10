@@ -16,21 +16,17 @@ package google.registry.model.poll;
 
 
 import com.google.common.annotations.VisibleForTesting;
-
 import com.googlecode.objectify.annotation.Embed;
-
 import google.registry.model.ImmutableObject;
 import google.registry.model.eppcommon.Trid;
-import google.registry.model.eppoutput.Response.ResponseData;
-
-import org.joda.time.DateTime;
-
+import google.registry.model.eppoutput.EppResponse.ResponseData;
 import javax.xml.bind.annotation.XmlAttribute;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.bind.annotation.XmlType;
 import javax.xml.bind.annotation.XmlValue;
+import org.joda.time.DateTime;
 
 /** The {@link ResponseData} returned when completing a pending action on a domain. */
 @XmlTransient
@@ -70,15 +66,14 @@ public abstract class PendingActionNotificationResponse
     return nameOrId.actionResult;
   }
 
-  @SuppressWarnings("unchecked")
-  protected <T extends PendingActionNotificationResponse> T init(
-      String nameOrId, boolean actionResult, Trid trid, DateTime processedDate) {
-    this.nameOrId = new NameOrId();
-    this.nameOrId.value = nameOrId;
-    this.nameOrId.actionResult = actionResult;
-    this.trid = trid;
-    this.processedDate = processedDate;
-    return (T) this;
+  protected static <T extends PendingActionNotificationResponse> T init(
+      T response, String nameOrId, boolean actionResult, Trid trid, DateTime processedDate) {
+    response.nameOrId = new NameOrId();
+    response.nameOrId.value = nameOrId;
+    response.nameOrId.actionResult = actionResult;
+    response.trid = trid;
+    response.processedDate = processedDate;
+    return response;
   }
 
   /** An adapter to output the XML in response to resolving a pending command on a domain. */
@@ -97,8 +92,12 @@ public abstract class PendingActionNotificationResponse
 
     public static DomainPendingActionNotificationResponse create(
         String fullyQualifiedDomainName, boolean actionResult, Trid trid, DateTime processedDate) {
-      return new DomainPendingActionNotificationResponse().init(
-          fullyQualifiedDomainName, actionResult, trid, processedDate);
+      return init(
+          new DomainPendingActionNotificationResponse(),
+          fullyQualifiedDomainName,
+          actionResult,
+          trid,
+          processedDate);
     }
   }
 
@@ -118,8 +117,12 @@ public abstract class PendingActionNotificationResponse
 
     public static ContactPendingActionNotificationResponse create(
         String contactId, boolean actionResult, Trid trid, DateTime processedDate) {
-      return new ContactPendingActionNotificationResponse().init(
-          contactId, actionResult, trid, processedDate);
+      return init(
+          new ContactPendingActionNotificationResponse(),
+          contactId,
+          actionResult,
+          trid,
+          processedDate);
     }
   }
 }
