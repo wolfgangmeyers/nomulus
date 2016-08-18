@@ -15,9 +15,9 @@
 package google.registry.tools;
 
 import dagger.Component;
+import domains.donuts.keyring.DonutsKeyringModule;
 import google.registry.config.ConfigModule;
 import google.registry.keyring.api.KeyModule;
-import google.registry.keyring.api.VoidKeyringModule;
 import google.registry.request.Modules.DatastoreServiceModule;
 import google.registry.request.Modules.Jackson2Module;
 import google.registry.request.Modules.URLFetchServiceModule;
@@ -38,7 +38,7 @@ import google.registry.util.SystemClock.SystemClockModule;
         RegistryToolModule.class,
         SystemClockModule.class,
         URLFetchServiceModule.class,
-        VoidKeyringModule.class,
+        DonutsKeyringModule.class,
     })
 interface RegistryToolComponent {
   void inject(CreateAnchorTenantCommand command);

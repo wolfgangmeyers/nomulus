@@ -15,10 +15,10 @@
 package google.registry.module.frontend;
 
 import dagger.Component;
+import domains.donuts.keyring.DonutsKeyringModule;
 import google.registry.braintree.BraintreeModule;
 import google.registry.config.ConfigModule;
 import google.registry.keyring.api.KeyModule;
-import google.registry.keyring.api.VoidKeyringModule;
 import google.registry.request.Modules.UserServiceModule;
 import google.registry.request.RequestModule;
 import google.registry.ui.ConsoleConfigModule;
@@ -32,10 +32,10 @@ import javax.inject.Singleton;
         BraintreeModule.class,
         ConfigModule.class,
         ConsoleConfigModule.class,
+        DonutsKeyringModule.class,
         KeyModule.class,
         SystemClockModule.class,
         UserServiceModule.class,
-        VoidKeyringModule.class,
     })
 interface FrontendComponent {
   FrontendRequestComponent startRequest(RequestModule requestModule);

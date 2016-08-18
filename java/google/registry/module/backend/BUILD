@@ -13,6 +13,7 @@ java_library(
         "//java/com/google/common/base",
         "//java/com/google/common/collect",
         "//java/com/google/common/net",
+        "//java/domains/donuts/keyring",
         "//java/google/registry/backup",
         "//java/google/registry/bigquery",
         "//java/google/registry/billing",

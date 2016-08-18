@@ -17,6 +17,7 @@ java_library(
         "//third_party/java/jsr330_inject",
         "//third_party/java/servlet/servlet_api",
         "//java/domains/donuts/config",
+        "//java/domains/donuts/keyring",
         "//java/google/registry/braintree",
         "//java/google/registry/config",
         "//java/google/registry/flows",

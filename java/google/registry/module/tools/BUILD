@@ -16,6 +16,7 @@ java_library(
         "//third_party/java/jsr305_annotations",
         "//third_party/java/jsr330_inject",
         "//third_party/java/servlet/servlet_api",
+        "//java/domains/donuts/keyring",
         "//java/google/registry/config",
         "//java/google/registry/export",
         "//java/google/registry/flows",
