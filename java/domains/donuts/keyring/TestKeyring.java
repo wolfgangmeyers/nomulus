@@ -49,21 +49,21 @@ public final class TestKeyring implements Keyring {
   private static final String TEST_KEY_ID = "mercury-donuts-test@example.test";
 
   private static final ByteSource PGP_PUBLIC_KEYRING =
-      Resources.asByteSource(Resources.getResource("test-public-keyring.asc"));
+      Resources.asByteSource(Resources.getResource(TestKeyring.class, "test-public-keyring.asc"));
 
   private static final ByteSource PGP_PRIVATE_KEYRING =
-      Resources.asByteSource(Resources.getResource("test-private-keyring.asc"));
+      Resources.asByteSource(Resources.getResource(TestKeyring.class, "test-private-keyring.asc"));
 
   private static final ByteSource SSH_RDE_PUBLIC_KEY =
-      Resources.asByteSource(Resources.getResource("test-ssh_rsa.asc"));
+      Resources.asByteSource(Resources.getResource(TestKeyring.class, "test-ssh_rsa.pub.asc"));
 
   private static final ByteSource SSH_RDE_PRIVATE_KEY =
-      Resources.asByteSource(Resources.getResource("test-ssh_rsa.pub.asc"));
+      Resources.asByteSource(Resources.getResource(TestKeyring.class, "test-ssh_rsa.asc"));
 
-  private static final PGPPublicKeyRingCollection publics;
-  private static final PGPSecretKeyRingCollection privates;
+  private final PGPPublicKeyRingCollection publics;
+  private final PGPSecretKeyRingCollection privates;
 
-  static {
+  public TestKeyring() {
     try (InputStream publicInput = PGP_PUBLIC_KEYRING.openStream();
         InputStream privateInput = PGP_PRIVATE_KEYRING.openStream()) {
       publics = new BcPGPPublicKeyRingCollection(PGPUtil.getDecoderStream(publicInput));
