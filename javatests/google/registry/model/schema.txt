@@ -605,19 +605,11 @@ class google.registry.model.poll.PollMessage$OneTime {
   java.util.List<google.registry.model.transfer.TransferResponse$DomainTransferResponse> domainTransferResponses;
   org.joda.time.DateTime eventTime;
 }
-class google.registry.model.pricing.DomainPrices {
-  org.joda.money.Money createPrice;
-  org.joda.money.Money renewPrice;
-}
 class google.registry.model.pricing.PricingCategory {
-  @Id java.lang.String pricingCategoryName;
+  @Id java.lang.String name;
   @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
-  google.registry.model.common.TimedTransitionProperty<google.registry.model.pricing.DomainPrices, google.registry.model.pricing.PricingCategory$DomainPricesTransition> priceTransitions;
-  java.lang.String comments;
-}
-class google.registry.model.pricing.PricingCategory$DomainPricesTransition {
-  google.registry.model.pricing.DomainPrices prices;
-  org.joda.time.DateTime transitionTime;
+  java.lang.String comment;
+  org.joda.money.Money price;
 }
 class google.registry.model.rde.RdeRevision {
   @Id java.lang.String id;
