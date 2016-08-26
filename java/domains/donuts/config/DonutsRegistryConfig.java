@@ -60,9 +60,9 @@ public final class DonutsRegistryConfig implements RegistryConfig {
 
   @Override
   public int getCommitLogBucketCount() {
-    // TODO: Increase to 100 after merging Google fix to CommitLogCheckpoint.
+    // TODO: May cause NPE (for one request) in ExportCommitLogDiffAction until merging Google fix to CommitLogCheckpoint.
     //       See: https://github.com/DonutsInc/domain-registry/pull/21#issuecomment-238730780
-    return 1;  // if you decrease this number, the world ends
+    return 100;  // if you decrease this number, the world ends
   }
 
   /**
