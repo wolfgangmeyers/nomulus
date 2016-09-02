@@ -85,6 +85,13 @@ public class RdapEntitySearchActionTest {
         ImmutableList.of("123 Blinky St", "Blinkyland"),
         clock.nowUtc());
 
+    makeAndPersistContactResource(
+        "blindly",
+        "Blindly",
+        "blindly@b.tld",
+        ImmutableList.of("123 Blindly St", "Blindlyland"),
+        clock.nowUtc());
+
     // deleted
     persistResource(
         makeContactResource("clyde", "Clyde (愚図た)", "clyde@c.tld")
@@ -92,12 +99,12 @@ public class RdapEntitySearchActionTest {
 
     registrar =
         persistResource(
-            makeRegistrar("2-Registrar", "Yes Virginia <script>", Registrar.State.ACTIVE));
+            makeRegistrar("2-Registrar", "Yes Virginia <script>", Registrar.State.ACTIVE, 20L));
     persistSimpleResources(makeRegistrarContacts(registrar));
 
     // inactive
     registrarInactive =
-        persistResource(makeRegistrar("2-RegistrarInact", "No Way", Registrar.State.PENDING));
+        persistResource(makeRegistrar("2-RegistrarInact", "No Way", Registrar.State.PENDING, 21L));
     persistSimpleResources(makeRegistrarContacts(registrarInactive));
 
     // test
@@ -115,7 +122,7 @@ public class RdapEntitySearchActionTest {
     action.response = response;
     action.rdapResultSetMaxSize = 100;
     action.rdapLinkBase = "https://example.com/rdap/";
-    action.rdapWhoisServer = "whois.example.tld";
+    action.rdapWhoisServer = null;
     action.fnParam = Optional.absent();
     action.handleParam = Optional.absent();
   }
@@ -188,7 +195,15 @@ public class RdapEntitySearchActionTest {
   }
 
   @Test
-  public void testSuffix_rejected() throws Exception {
+  public void testNameMatch_suffixRejected() throws Exception {
+    assertThat(generateActualJsonWithFullName("exam*ple"))
+        .isEqualTo(
+            generateExpectedJson("Suffix not allowed after wildcard", "rdap_error_422.json"));
+    assertThat(response.getStatus()).isEqualTo(422);
+  }
+
+  @Test
+  public void testHandleMatch_suffixRejected() throws Exception {
     assertThat(generateActualJsonWithHandle("exam*ple"))
         .isEqualTo(
             generateExpectedJson("Suffix not allowed after wildcard", "rdap_error_422.json"));
@@ -212,11 +227,51 @@ public class RdapEntitySearchActionTest {
   }
 
   @Test
-  public void testNameMatch_notImplemented() throws Exception {
-    assertThat(generateActualJsonWithFullName("hello"))
+  public void testNameMatch_contactFound() throws Exception {
+    assertThat(generateActualJsonWithFullName("Blinky (赤ベイ)"))
         .isEqualTo(
-            generateExpectedJson("Entity name search not implemented", "rdap_error_501.json"));
-    assertThat(response.getStatus()).isEqualTo(501);
+            generateExpectedJsonForEntity(
+                "2-ROID",
+                "Blinky (赤ベイ)",
+                "blinky@b.tld",
+                "\"123 Blinky St\", \"Blinkyland\"",
+                "rdap_contact.json"));
+    assertThat(response.getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  public void testNameMatch_contactWildcardFound() throws Exception {
+    assertThat(generateActualJsonWithFullName("Blinky*"))
+        .isEqualTo(
+            generateExpectedJsonForEntity(
+                "2-ROID",
+                "Blinky (赤ベイ)",
+                "blinky@b.tld",
+                "\"123 Blinky St\", \"Blinkyland\"",
+                "rdap_contact.json"));
+    assertThat(response.getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  public void testNameMatch_contactWildcardFoundBoth() throws Exception {
+    assertThat(generateActualJsonWithFullName("Blin*"))
+        .isEqualTo(generateExpectedJson("rdap_multiple_contacts2.json"));
+    assertThat(response.getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  public void testNameMatch_deletedContactNotFound() throws Exception {
+    generateActualJsonWithFullName("Cl*");
+    assertThat(response.getStatus()).isEqualTo(404);
+  }
+
+  @Test
+  public void testNameMatch_registrarFound() throws Exception {
+    assertThat(generateActualJsonWithFullName("Yes Virginia <script>"))
+        .isEqualTo(
+            generateExpectedJsonForEntity(
+                "20", "Yes Virginia <script>", null, null, "rdap_registrar.json"));
+    assertThat(response.getStatus()).isEqualTo(200);
   }
 
   @Test
@@ -233,11 +288,11 @@ public class RdapEntitySearchActionTest {
   }
 
   @Test
-  public void testHandleMatch_registrar_found() throws Exception {
-    assertThat(generateActualJsonWithHandle("2-Registrar"))
+  public void testHandleMatch_20_found() throws Exception {
+    assertThat(generateActualJsonWithHandle("20"))
         .isEqualTo(
             generateExpectedJsonForEntity(
-                "2-Registrar", "Yes Virginia <script>", null, null, "rdap_registrar.json"));
+                "20", "Yes Virginia <script>", null, null, "rdap_registrar.json"));
     assertThat(response.getStatus()).isEqualTo(200);
   }
 
@@ -254,10 +309,9 @@ public class RdapEntitySearchActionTest {
   }
 
   @Test
-  public void testHandleMatch_2rstar_found() throws Exception {
-    assertThat(generateActualJsonWithHandle("2-R*"))
-        .isEqualTo(generateExpectedJson("rdap_multiple_contacts.json"));
-    assertThat(response.getStatus()).isEqualTo(200);
+  public void testNameMatch_testAndInactiveRegistrars_notFound() throws Exception {
+    generateActualJsonWithHandle("No Way");
+    assertThat(response.getStatus()).isEqualTo(404);
   }
 
   @Test
@@ -288,12 +342,9 @@ public class RdapEntitySearchActionTest {
   }
 
   @Test
-  public void testHandleMatch_2registstar_found() throws Exception {
-    assertThat(generateActualJsonWithHandle("2-Regist*"))
-        .isEqualTo(
-            generateExpectedJsonForEntity(
-                "2-Registrar", "Yes Virginia <script>", null, null, "rdap_registrar.json"));
-    assertThat(response.getStatus()).isEqualTo(200);
+  public void testHandleMatch_20star_notFound() throws Exception {
+    generateActualJsonWithHandle("20*");
+    assertThat(response.getStatus()).isEqualTo(404);
   }
 
   @Test

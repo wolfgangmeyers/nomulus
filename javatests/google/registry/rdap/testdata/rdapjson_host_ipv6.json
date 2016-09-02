@@ -19,10 +19,13 @@
       "eventActor": "foo",
       "eventDate": "1998-01-01T00:00:00.000Z"
     },
+    {
+      "eventAction": "last update of RDAP database",
+      "eventDate": "2000-01-01T00:00:00.000Z"
+    }
   ],
   "ipAddresses" :
   {
     "v6" : ["bad:f00d:cafe::15:beef"]
-  },
-  "port43": "whois.google.com"
+  }
 }

@@ -18,6 +18,10 @@
       "eventActor": "foo",
       "eventDate": "1999-01-01T00:00:00.000Z"
     },
+    {
+      "eventAction": "last update of RDAP database",
+      "eventDate": "2000-01-01T00:00:00.000Z"
+    }
   ],
   "vcardArray" :
   [
@@ -30,6 +34,5 @@
       ["tel", {"type" : ["fax"]}, "uri", "tel:+1.2126660420"],
       ["email", {}, "text", "lol@cat.みんな"]
     ]
-  ],
-  "port43": "whois.google.com"
+  ]
 }

@@ -33,12 +33,15 @@ import google.registry.model.registry.Registry.TldState;
 import google.registry.model.registry.Registry.TldType;
 import google.registry.model.registry.label.PremiumList;
 import google.registry.tools.params.OptionalStringParameter;
+import google.registry.tools.params.TldStateParameter;
 import google.registry.tools.params.TransitionListParameter.BillingCostTransitions;
 import google.registry.tools.params.TransitionListParameter.TldStateTransitions;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import javax.annotation.Nullable;
+import javax.inject.Inject;
+import javax.inject.Named;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
@@ -46,9 +49,11 @@ import org.joda.time.Duration;
 /** Shared base class for commands to create or update a TLD. */
 abstract class CreateOrUpdateTldCommand extends MutatingCommand {
 
-  @Parameter(
-      description = "Names of the TLDs",
-      required = true)
+  @Inject
+  @Named("dnsWriterNames")
+  Set<String> dnsWriterNames;
+
+  @Parameter(description = "Names of the TLDs", required = true)
   List<String> mainParameters;
 
   @Parameter(
@@ -205,6 +210,21 @@ abstract class CreateOrUpdateTldCommand extends MutatingCommand {
       description = "The end of the claims period")
   DateTime claimsPeriodEnd;
 
+  @Nullable
+  @Parameter(
+    names = "--dns_writer",
+    description = "The name of the DnsWriter implementation to use",
+    converter = OptionalStringParameter.class,
+    validateWith = OptionalStringParameter.class)
+  Optional<String> dnsWriter;
+
+  @Nullable
+  @Parameter(
+      names = "--lrp_tld_states",
+      converter = TldStateParameter.class,
+      description = "A comma-separated list of TLD states for which LRP is available")
+  List<TldState> lrpTldStates;
+
   /** Returns the existing registry (for update) or null (for creates). */
   @Nullable
   abstract Registry getOldRegistry(String tld);
@@ -359,6 +379,20 @@ abstract class CreateOrUpdateTldCommand extends MutatingCommand {
         } else {
           builder.setPremiumList(null);
         }
+      }
+
+      if (dnsWriter != null) {
+        if (dnsWriter.isPresent()) {
+          checkArgument(
+              dnsWriterNames.contains(dnsWriter.get()),
+              "The DNS writer '%s' doesn't exist",
+              dnsWriter.get());
+          builder.setDnsWriter(dnsWriter.get());
+        }
+      }
+
+      if (lrpTldStates != null) {
+        builder.setLrpTldStates(ImmutableSet.copyOf(lrpTldStates));
       }
 
       ImmutableSet<String> newReservedListNames = getReservedLists(oldRegistry);

@@ -46,6 +46,9 @@ java_library(
         "//java/domains/donuts/keyring",
         "//java/google/registry/bigquery",
         "//java/google/registry/config",
+        "//java/google/registry/dns/writer",
+        "//java/google/registry/dns/writer/clouddns",
+        "//java/google/registry/dns/writer/dnsupdate",
         "//java/google/registry/export",
         "//java/google/registry/flows",
         "//java/google/registry/keyring/api",
@@ -94,3 +97,13 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "gtech_tool",
+    create_executable = 1,
+    main_class = "google.registry.tools.GtechTool",
+    runtime_deps = [
+        ":tools",
+        "//third_party/java/appengine:appengine-api-link",
+        "//third_party/java/appengine:appengine-remote-api-link",
+    ],
+)

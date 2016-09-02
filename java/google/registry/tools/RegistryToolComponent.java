@@ -17,6 +17,7 @@ package google.registry.tools;
 import dagger.Component;
 import domains.donuts.keyring.DonutsKeyringModule;
 import google.registry.config.ConfigModule;
+import google.registry.dns.writer.dnsupdate.DnsUpdateWriterModule;
 import google.registry.keyring.api.KeyModule;
 import google.registry.request.Modules.DatastoreServiceModule;
 import google.registry.request.Modules.Jackson2Module;
@@ -30,19 +31,23 @@ import google.registry.util.SystemClock.SystemClockModule;
  * Otherwise {@link RegistryCli} will not be able to populate those fields after its instantiation.
  */
 @Component(
-    modules = {
-        ConfigModule.class,
-        DatastoreServiceModule.class,
-        Jackson2Module.class,
-        KeyModule.class,
-        RegistryToolModule.class,
-        SystemClockModule.class,
-        URLFetchServiceModule.class,
-        DonutsKeyringModule.class,
-    })
+  modules = {
+    ConfigModule.class,
+    DatastoreServiceModule.class,
+    DnsUpdateWriterModule.class,
+    DonutsKeyringModule.class,
+    Jackson2Module.class,
+    KeyModule.class,
+    RegistryToolModule.class,
+    SystemClockModule.class,
+    URLFetchServiceModule.class,
+  }
+)
 interface RegistryToolComponent {
   void inject(CreateAnchorTenantCommand command);
   void inject(CreateContactCommand command);
+  void inject(CreateDomainCommand command);
+  void inject(CreateTldCommand command);
   void inject(EncryptEscrowDepositCommand command);
   void inject(GenerateApplicationsReportCommand command);
   void inject(GenerateDnsReportCommand command);
@@ -53,6 +58,7 @@ interface RegistryToolComponent {
   void inject(SendEscrowReportToIcannCommand command);
   void inject(SetupOteCommand command);
   void inject(UpdateCursorsCommand command);
+  void inject(UpdateTldCommand command);
   void inject(ValidateEscrowDepositCommand command);
   void inject(WhoisQueryCommand command);
 }

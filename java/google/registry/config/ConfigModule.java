@@ -23,6 +23,7 @@ import dagger.Provides;
 import java.lang.annotation.Documented;
 import java.net.URI;
 import java.net.URL;
+import javax.annotation.Nullable;
 import javax.inject.Qualifier;
 import org.joda.money.CurrencyUnit;
 import org.joda.time.DateTimeConstants;
@@ -44,9 +45,9 @@ import org.joda.time.Duration;
  *
  * <p>It is recommended that users do not modify this file within a forked repository. It is
  * preferable to modify these settings by swapping out this module with a separate copied version
- * in the user's repository. For this to work, other files need to be copied too, such as
- * {@link google.registry.module.backend.BackendComponent BackendComponent}. This allows modules to
- * be substituted at the {@code @Component} level.
+ * in the user's repository. For this to work, other files need to be copied too, such as the
+ * {@code @Component} instances under {@code google.registry.module}.  This allows modules to be
+ * substituted at the {@code @Component} level.
  *
  * <p>There's also a deprecated configuration class that needs to be overridden and supplied via a
  * system property. See the instructions in {@link ProductionRegistryConfigExample} and
@@ -319,7 +320,7 @@ public final class ConfigModule {
    */
   @Provides
   @Config("rdeImportBucket")
-  public String provideRdeImportBucket(@Config("projectId") String projectId) {
+  public static String provideRdeImportBucket(@Config("projectId") String projectId) {
     return projectId + "-rde-import";
   }
 
@@ -533,14 +534,17 @@ public final class ConfigModule {
   }
 
   /**
-   * WHOIS server displayed in RDAP query responses.
+   * WHOIS server displayed in RDAP query responses. As per Gustavo Lozano of ICANN, this should be
+   * omitted, but the ICANN operational profile doesn't actually say that, so it's good to have the
+   * ability to reinstate this field if necessary.
    *
    * @see google.registry.rdap.RdapActionBase
    */
+  @Nullable
   @Provides
   @Config("rdapWhoisServer")
   public static String provideRdapWhoisServer() {
-    return "whois.nic.google";
+    return null;
   }
 
   /** Returns Braintree Merchant Account IDs for each supported currency. */
@@ -617,5 +621,41 @@ public final class ConfigModule {
         + "or (c) engage in or support unlawful behavior. CRR reserves the right to\n"
         + "restrict or deny your access to the Whois database, and may modify these terms\n"
         + "at any time.\n";
+  }
+
+  /**
+   * Maximum QPS for the Google Cloud Monitoring V3 (aka Stackdriver) API. The QPS limit can be
+   * adjusted by contacting Cloud Support.
+   *
+   * @see google.registry.monitoring.metrics.StackdriverWriter
+   */
+  @Provides
+  @Config("stackdriverMaxQps")
+  public static int provideStackdriverMaxQps() {
+    return 30;
+  }
+
+  /**
+   * Maximum number of points that can be sent to Stackdriver in a single TimeSeries.Create API
+   * call.
+   *
+   * @see google.registry.monitoring.metrics.StackdriverWriter
+   */
+  @Provides
+  @Config("stackdriverMaxPointsPerRequest")
+  public static int provideStackdriverMaxPointsPerRequest() {
+    return 200;
+  }
+
+  /**
+   * The reporting interval, for Metrics to be sent to a {@link
+   * google.registry.monitoring.metrics.MetricWriter}.
+   *
+   * @see google.registry.monitoring.metrics.MetricReporter
+   */
+  @Provides
+  @Config("metricsWriteInterval")
+  public static Duration provideMetricsWriteInterval() {
+    return Duration.standardSeconds(60);
   }
 }

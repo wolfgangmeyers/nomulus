@@ -157,6 +157,7 @@ class google.registry.model.contact.ContactResource {
   java.lang.String currentSponsorClientId;
   java.lang.String email;
   java.lang.String lastEppUpdateClientId;
+  java.lang.String searchName;
   java.util.Set<google.registry.model.eppcommon.StatusValue> status;
   org.joda.time.DateTime deletionTime;
   org.joda.time.DateTime lastEppUpdateTime;
@@ -285,10 +286,10 @@ class google.registry.model.domain.GracePeriod {
   org.joda.time.DateTime expirationTime;
 }
 class google.registry.model.domain.LrpToken {
-  @Id java.lang.String assignee;
+  @Id java.lang.String token;
   com.googlecode.objectify.Key<google.registry.model.reporting.HistoryEntry> redemptionHistoryEntry;
   google.registry.model.UpdateAutoTimestamp updateTimestamp;
-  java.lang.String token;
+  java.lang.String assignee;
   java.util.Set<java.lang.String> validTlds;
 }
 class google.registry.model.domain.Period {
@@ -713,6 +714,7 @@ class google.registry.model.registry.Registry {
   google.registry.model.common.TimedTransitionProperty<org.joda.money.Money, google.registry.model.registry.Registry$BillingCostTransition> eapFeeSchedule;
   google.registry.model.common.TimedTransitionProperty<org.joda.money.Money, google.registry.model.registry.Registry$BillingCostTransition> renewBillingCostTransitions;
   google.registry.model.registry.Registry$TldType tldType;
+  java.lang.String dnsWriter;
   java.lang.String driveFolderId;
   java.lang.String lordnUsername;
   java.lang.String pricingEngineClassName;
@@ -720,6 +722,7 @@ class google.registry.model.registry.Registry {
   java.lang.String tldStr;
   java.lang.String tldUnicode;
   java.util.Set<com.googlecode.objectify.Key<google.registry.model.registry.label.ReservedList>> reservedLists;
+  java.util.Set<google.registry.model.registry.Registry$TldState> lrpTldStates;
   java.util.Set<java.lang.String> allowedFullyQualifiedHostNames;
   java.util.Set<java.lang.String> allowedRegistrantContactIds;
   org.joda.money.CurrencyUnit currency;

@@ -255,6 +255,16 @@ public class Registry extends ImmutableObject implements Buildable {
     }
   }
 
+  /** Backfill the Registry entities that were saved before this field was added. */
+  // TODO(shikhman): Remove this backfill once it is populated on all Registry entities.
+  @OnLoad
+  void backfillDnsWriter() {
+    if (dnsWriter == null) {
+      dnsWriter = "VoidDnsWriter";
+    }
+  }
+
+
   /**
    * The name of the pricing engine that this TLD uses.
    *
@@ -265,6 +275,14 @@ public class Registry extends ImmutableObject implements Buildable {
    * restriction has since been relaxed and it may now be any unique string.
    */
   String pricingEngineClassName;
+
+  /**
+   * The name of the DnsWriter that this TLD uses.
+   *
+   * <p>This must be a valid key for the map of DnsWriters injected by <code>
+   * @Inject Map<String, DnsWriter></code>
+   */
+  String dnsWriter;
 
   /**
    * The unicode-aware representation of the TLD associated with this {@link Registry}.
@@ -379,6 +397,9 @@ public class Registry extends ImmutableObject implements Buildable {
 
   /** A whitelist of hosts allowed to be used on domains on this TLD (ignored if empty). */
   Set<String> allowedFullyQualifiedHostNames;
+
+  /** The set of {@link TldState}s for which LRP applications are accepted (ignored if empty). */
+  Set<TldState> lrpTldStates;
 
   public String getTldStr() {
     return tldStr;
@@ -545,12 +566,20 @@ public class Registry extends ImmutableObject implements Buildable {
     return pricingEngineClassName;
   }
 
+  public String getDnsWriter() {
+    return dnsWriter;
+  }
+
   public ImmutableSet<String> getAllowedRegistrantContactIds() {
     return nullToEmptyImmutableCopy(allowedRegistrantContactIds);
   }
 
   public ImmutableSet<String> getAllowedFullyQualifiedHostNames() {
     return nullToEmptyImmutableCopy(allowedFullyQualifiedHostNames);
+  }
+
+  public ImmutableSet<TldState> getLrpTldStates() {
+    return nullToEmptyImmutableCopy(lrpTldStates);
   }
 
   @Override
@@ -615,6 +644,12 @@ public class Registry extends ImmutableObject implements Buildable {
       getInstance().pricingEngineClassName = checkArgumentNotNull(pricingEngineClass);
       return this;
     }
+
+    public Builder setDnsWriter(String dnsWriter) {
+      getInstance().dnsWriter = checkArgumentNotNull(dnsWriter);
+      return this;
+    }
+
 
     public Builder setAddGracePeriodLength(Duration addGracePeriodLength) {
       checkArgument(addGracePeriodLength.isLongerThan(Duration.ZERO),
@@ -803,6 +838,11 @@ public class Registry extends ImmutableObject implements Buildable {
       return this;
     }
 
+    public Builder setLrpTldStates(ImmutableSet<TldState> lrpTldStates) {
+      getInstance().lrpTldStates = lrpTldStates;
+      return this;
+    }
+
     @Override
     public Registry build() {
       final Registry instance = getInstance();
@@ -820,6 +860,10 @@ public class Registry extends ImmutableObject implements Buildable {
       // cloned it into a new builder, to block re-building a Registry in an invalid state.
       instance.tldStateTransitions.checkValidity();
       instance.renewBillingCostTransitions.checkValidity();
+      checkArgument(
+          instance.tldStateTransitions.toValueMap().values()
+              .containsAll(instance.getLrpTldStates()),
+          "Cannot specify an LRP TLD state that is not part of the TLD state transitions.");
       instance.eapFeeSchedule.checkValidity();
       // All costs must be in the expected currency.
       // TODO(b/21854155): When we move PremiumList into datastore, verify its currency too.

@@ -19,6 +19,10 @@
           "eventAction": "registration",
           "eventActor": "foo",
           "eventDate": "2000-01-01T00:00:00.000Z"
+        },
+        {
+          "eventAction": "last update of RDAP database",
+          "eventDate": "2000-01-01T00:00:00.000Z"
         }
       ],
       "vcardArray" :
@@ -43,8 +47,7 @@
           ["tel", {"type" : ["fax"]}, "uri", "tel:+1.2126660420"],
           ["email", {}, "text", "blinky@b.tld"]
         ]
-      ],
-      "port43": "whois.example.tld"
+      ]
     },
     {
       "objectClassName" : "entity",
@@ -64,6 +67,10 @@
         {
           "eventAction": "registration",
           "eventActor": "2-Registrar",
+          "eventDate": "2000-01-01T00:00:00.000Z"
+        },
+        {
+          "eventAction": "last update of RDAP database",
           "eventDate": "2000-01-01T00:00:00.000Z"
         }
       ],
@@ -130,8 +137,7 @@
             ]
           ],
         }
-      ],
-      "port43": "whois.example.tld"
+      ]
     }
   ],
   "rdapConformance": [ "rdap_level_0" ],

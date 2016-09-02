@@ -75,7 +75,7 @@ public class RdapEntityActionTest {
     // lol
     createTld("lol");
     registrarLol = persistResource(makeRegistrar(
-        "evilregistrar", "Yes Virginia <script>", Registrar.State.ACTIVE));
+        "evilregistrar", "Yes Virginia <script>", Registrar.State.ACTIVE, 101L));
     persistSimpleResources(makeRegistrarContacts(registrarLol));
     registrant = makeAndPersistContactResource(
         "8372808-ERL",
@@ -108,8 +108,8 @@ public class RdapEntityActionTest {
         registrarLol));
     // xn--q9jyb4c
     createTld("xn--q9jyb4c");
-    Registrar registrarIdn =
-        persistResource(makeRegistrar("idnregistrar", "IDN Registrar", Registrar.State.ACTIVE));
+    Registrar registrarIdn = persistResource(
+        makeRegistrar("idnregistrar", "IDN Registrar", Registrar.State.ACTIVE, 102L));
     persistSimpleResources(makeRegistrarContacts(registrarIdn));
     persistResource(makeDomainResource("cat.みんな",
         registrant,
@@ -120,7 +120,7 @@ public class RdapEntityActionTest {
         registrarIdn));
     createTld("1.tld");
     Registrar registrar1tld = persistResource(
-        makeRegistrar("1tldregistrar", "Multilevel Registrar", Registrar.State.ACTIVE));
+        makeRegistrar("1tldregistrar", "Multilevel Registrar", Registrar.State.ACTIVE, 103L));
     persistSimpleResources(makeRegistrarContacts(registrar1tld));
     persistResource(makeDomainResource("cat.1.tld",
         registrant,
@@ -145,7 +145,7 @@ public class RdapEntityActionTest {
     action.clock = clock;
     action.response = response;
     action.rdapLinkBase = "https://example.com/rdap/";
-    action.rdapWhoisServer = "whois.example.tld";
+    action.rdapWhoisServer = null;
   }
 
   private Object generateActualJson(String name) {
@@ -179,9 +179,6 @@ public class RdapEntityActionTest {
       builder.putAll(map);
       if (!map.containsKey("rdapConformance")) {
         builder.put("rdapConformance", ImmutableList.of("rdap_level_0"));
-      }
-      if (!map.containsKey("port43")) {
-        builder.put("port43", "whois.example.tld");
       }
       if (!map.containsKey("notices")) {
         RdapTestHelper.addTermsOfServiceNotice(builder, "https://example.com/rdap/");
@@ -241,10 +238,27 @@ public class RdapEntityActionTest {
 
   @Test
   public void testRegistrar_works() throws Exception {
-    assertThat(generateActualJson(registrarLol.getClientIdentifier())).isEqualTo(
-        generateExpectedJsonWithTopLevelEntries(
-            registrarLol.getClientIdentifier(), "rdap_registrar.json"));
+    assertThat(generateActualJson("101")).isEqualTo(
+        generateExpectedJsonWithTopLevelEntries("101", "rdap_registrar.json"));
     assertThat(response.getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  public void testRegistrar102_works() throws Exception {
+    generateActualJson("102");
+    assertThat(response.getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  public void testRegistrar103_works() throws Exception {
+    generateActualJson("103");
+    assertThat(response.getStatus()).isEqualTo(200);
+  }
+
+  @Test
+  public void testRegistrar104_doesNotExist() throws Exception {
+    generateActualJson("104");
+    assertThat(response.getStatus()).isEqualTo(404);
   }
 
   @Test

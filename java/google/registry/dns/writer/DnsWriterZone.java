@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package google.registry.model.dns;
+package google.registry.dns.writer;
 
 import java.lang.annotation.Documented;
 import javax.inject.Qualifier;

@@ -15,10 +15,10 @@
 package google.registry.dns.writer;
 
 import com.google.common.base.Joiner;
-import google.registry.model.dns.DnsWriter;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Logger;
+import javax.inject.Inject;
 
 /**
  * {@link DnsWriter} that doesn't actually update records in a DNS server.
@@ -27,9 +27,18 @@ import java.util.logging.Logger;
  */
 public final class VoidDnsWriter implements DnsWriter {
 
+  /**
+   * The name of the pricing engine, as used in {@code Registry.dnsWriter}. Remember to change
+   * the value on affected Registry objects to prevent runtime failures.
+   */
+  public static final String NAME = "VoidDnsWriter";
+
   private static final Logger logger = Logger.getLogger(VoidDnsWriter.class.getName());
 
   private final Set<String> names = new HashSet<>();
+
+  @Inject
+  public VoidDnsWriter() {}
 
   @Override
   public void publishDomain(String domainName) {

@@ -77,7 +77,8 @@ public class RdapJsonFormatterTest {
 
   private static final String LINK_BASE = "http://myserver.google.com/";
   private static final String LINK_BASE_NO_TRAILING_SLASH = "http://myserver.google.com";
-  private static final String WHOIS_SERVER = "whois.google.com";
+  // Do not set a port43 whois server, as per Gustavo Lozano.
+  private static final String WHOIS_SERVER = null;
 
   @Before
   public void setUp() throws Exception {
@@ -202,36 +203,36 @@ public class RdapJsonFormatterTest {
 
   @Test
   public void testRegistrar() throws Exception {
-    assertThat(
-        RdapJsonFormatter.makeRdapJsonForRegistrar(registrar, false, LINK_BASE, WHOIS_SERVER))
-            .isEqualTo(loadJson("rdapjson_registrar.json"));
+    assertThat(RdapJsonFormatter.makeRdapJsonForRegistrar(
+            registrar, false, LINK_BASE, WHOIS_SERVER, clock.nowUtc()))
+        .isEqualTo(loadJson("rdapjson_registrar.json"));
   }
 
   @Test
   public void testHost_ipv4() throws Exception {
-    assertThat(
-        RdapJsonFormatter.makeRdapJsonForHost(hostResourceIpv4, false, LINK_BASE, WHOIS_SERVER))
-            .isEqualTo(loadJson("rdapjson_host_ipv4.json"));
+    assertThat(RdapJsonFormatter.makeRdapJsonForHost(
+            hostResourceIpv4, false, LINK_BASE, WHOIS_SERVER, clock.nowUtc()))
+        .isEqualTo(loadJson("rdapjson_host_ipv4.json"));
   }
 
   @Test
   public void testHost_ipv6() throws Exception {
-    assertThat(
-        RdapJsonFormatter.makeRdapJsonForHost(hostResourceIpv6, false, LINK_BASE, WHOIS_SERVER))
-            .isEqualTo(loadJson("rdapjson_host_ipv6.json"));
+    assertThat(RdapJsonFormatter.makeRdapJsonForHost(
+            hostResourceIpv6, false, LINK_BASE, WHOIS_SERVER, clock.nowUtc()))
+        .isEqualTo(loadJson("rdapjson_host_ipv6.json"));
   }
 
   @Test
   public void testHost_both() throws Exception {
-    assertThat(
-        RdapJsonFormatter.makeRdapJsonForHost(hostResourceBoth, false, LINK_BASE, WHOIS_SERVER))
-            .isEqualTo(loadJson("rdapjson_host_both.json"));
+    assertThat(RdapJsonFormatter.makeRdapJsonForHost(
+            hostResourceBoth, false, LINK_BASE, WHOIS_SERVER, clock.nowUtc()))
+        .isEqualTo(loadJson("rdapjson_host_both.json"));
   }
 
   @Test
   public void testHost_noAddresses() throws Exception {
     assertThat(RdapJsonFormatter.makeRdapJsonForHost(
-            hostResourceNoAddresses, false, LINK_BASE, WHOIS_SERVER))
+            hostResourceNoAddresses, false, LINK_BASE, WHOIS_SERVER, clock.nowUtc()))
         .isEqualTo(loadJson("rdapjson_host_no_addresses.json"));
   }
 
@@ -243,7 +244,8 @@ public class RdapJsonFormatterTest {
                 false,
                 Optional.of(DesignatedContact.Type.REGISTRANT),
                 LINK_BASE,
-                WHOIS_SERVER))
+                WHOIS_SERVER,
+                clock.nowUtc()))
         .isEqualTo(loadJson("rdapjson_registrant.json"));
   }
 
@@ -255,7 +257,8 @@ public class RdapJsonFormatterTest {
                 false,
                 Optional.of(DesignatedContact.Type.REGISTRANT),
                 LINK_BASE_NO_TRAILING_SLASH,
-                WHOIS_SERVER))
+                WHOIS_SERVER,
+                clock.nowUtc()))
         .isEqualTo(loadJson("rdapjson_registrant.json"));
   }
 
@@ -267,7 +270,8 @@ public class RdapJsonFormatterTest {
                 false,
                 Optional.of(DesignatedContact.Type.REGISTRANT),
                 null,
-                WHOIS_SERVER))
+                WHOIS_SERVER,
+                clock.nowUtc()))
         .isEqualTo(loadJson("rdapjson_registrant_nobase.json"));
   }
 
@@ -279,7 +283,8 @@ public class RdapJsonFormatterTest {
                 false,
                 Optional.of(DesignatedContact.Type.ADMIN),
                 LINK_BASE,
-                WHOIS_SERVER))
+                WHOIS_SERVER,
+                clock.nowUtc()))
         .isEqualTo(loadJson("rdapjson_admincontact.json"));
   }
 
@@ -291,7 +296,8 @@ public class RdapJsonFormatterTest {
                 false,
                 Optional.of(DesignatedContact.Type.TECH),
                 LINK_BASE,
-                WHOIS_SERVER))
+                WHOIS_SERVER,
+                clock.nowUtc()))
         .isEqualTo(loadJson("rdapjson_techcontact.json"));
   }
 
@@ -303,23 +309,22 @@ public class RdapJsonFormatterTest {
                 false,
                 Optional.<DesignatedContact.Type>absent(),
                 LINK_BASE,
-                WHOIS_SERVER))
+                WHOIS_SERVER,
+                clock.nowUtc()))
         .isEqualTo(loadJson("rdapjson_rolelesscontact.json"));
   }
 
   @Test
   public void testDomain_full() throws Exception {
-    assertThat(
-            RdapJsonFormatter.makeRdapJsonForDomain(
-                domainResourceFull, false, LINK_BASE, WHOIS_SERVER))
+    assertThat(RdapJsonFormatter.makeRdapJsonForDomain(
+            domainResourceFull, false, LINK_BASE, WHOIS_SERVER, clock.nowUtc()))
         .isEqualTo(loadJson("rdapjson_domain_full.json"));
   }
 
   @Test
   public void testDomain_noNameservers() throws Exception {
-    assertThat(
-            RdapJsonFormatter.makeRdapJsonForDomain(
-                domainResourceNoNameservers, false, LINK_BASE, WHOIS_SERVER))
+    assertThat(RdapJsonFormatter.makeRdapJsonForDomain(
+            domainResourceNoNameservers, false, LINK_BASE, WHOIS_SERVER, clock.nowUtc()))
         .isEqualTo(loadJson("rdapjson_domain_no_nameservers.json"));
   }
 
