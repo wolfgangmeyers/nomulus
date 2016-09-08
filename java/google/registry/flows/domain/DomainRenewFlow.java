@@ -30,7 +30,7 @@ import static google.registry.util.DateTimeUtils.leapSafeAddYears;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.googlecode.objectify.Ref;
+import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ObjectPendingTransferException;
 import google.registry.flows.EppException.ParameterValueRangeErrorException;
@@ -42,6 +42,7 @@ import google.registry.model.domain.DomainRenewData;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.Period;
+import google.registry.model.domain.fee.BaseFee.FeeType;
 import google.registry.model.domain.fee.Fee;
 import google.registry.model.domain.fee.FeeTransformCommandExtension;
 import google.registry.model.domain.rgp.GracePeriodStatus;
@@ -145,8 +146,8 @@ public class DomainRenewFlow extends OwnedResourceMutateFlow<DomainResource, Ren
     ofy().save().<Object>entities(explicitRenewEvent, newAutorenewEvent, newAutorenewPollMessage);
     return existingResource.asBuilder()
         .setRegistrationExpirationTime(newExpirationTime)
-        .setAutorenewBillingEvent(Ref.create(newAutorenewEvent))
-        .setAutorenewPollMessage(Ref.create(newAutorenewPollMessage))
+        .setAutorenewBillingEvent(Key.create(newAutorenewEvent))
+        .setAutorenewPollMessage(Key.create(newAutorenewPollMessage))
         .addGracePeriod(GracePeriod.forBillingEvent(GracePeriodStatus.RENEW, explicitRenewEvent))
         .build();
   }
@@ -174,13 +175,16 @@ public class DomainRenewFlow extends OwnedResourceMutateFlow<DomainResource, Ren
     return createOutput(
         Success,
         DomainRenewData.create(
-            newResource.getFullyQualifiedDomainName(),
-            newResource.getRegistrationExpirationTime()),
-        (feeRenew == null) ? null : ImmutableList.of(
-            feeRenew.createResponseBuilder()
-                .setCurrency(renewCost.getCurrencyUnit())
-                .setFees(ImmutableList.of(Fee.create(renewCost.getAmount(), "renew")))
-                .build()));
+            newResource.getFullyQualifiedDomainName(), newResource.getRegistrationExpirationTime()),
+        (feeRenew == null)
+            ? null
+            : ImmutableList.of(
+                feeRenew
+                    .createResponseBuilder()
+                    .setCurrency(renewCost.getCurrencyUnit())
+                    .setFees(
+                        ImmutableList.of(Fee.create(renewCost.getAmount(), FeeType.RENEW)))
+                    .build()));
   }
 
   /** The domain has a pending transfer on it and so can't be explicitly renewed. */
