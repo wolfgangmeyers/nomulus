@@ -28,7 +28,6 @@ import static google.registry.util.DateTimeUtils.END_OF_TIME;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
-import com.googlecode.objectify.Ref;
 import google.registry.flows.EppException;
 import google.registry.flows.ResourceTransferRequestFlow;
 import google.registry.model.billing.BillingEvent;
@@ -37,6 +36,7 @@ import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainCommand.Transfer;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.Period;
+import google.registry.model.domain.fee.BaseFee.FeeType;
 import google.registry.model.domain.fee.Fee;
 import google.registry.model.domain.fee.FeeTransformCommandExtension;
 import google.registry.model.eppoutput.EppResponse.ResponseExtension;
@@ -162,10 +162,12 @@ public class DomainTransferRequestFlow
   @Override
   protected ImmutableList<? extends ResponseExtension> getTransferResponseExtensions() {
     if (feeTransfer != null) {
-      return ImmutableList.of(feeTransfer.createResponseBuilder()
-          .setCurrency(renewCost.getCurrencyUnit())
-          .setFees(ImmutableList.of(Fee.create(renewCost.getAmount(), "renew")))
-          .build());
+      return ImmutableList.of(
+          feeTransfer
+              .createResponseBuilder()
+              .setCurrency(renewCost.getCurrencyUnit())
+              .setFees(ImmutableList.of(Fee.create(renewCost.getAmount(), FeeType.RENEW)))
+              .build());
     } else {
       return null;
     }
@@ -174,9 +176,9 @@ public class DomainTransferRequestFlow
   @Override
   protected void setTransferDataProperties(TransferData.Builder builder) {
     builder
-        .setServerApproveBillingEvent(Ref.create(transferBillingEvent))
-        .setServerApproveAutorenewEvent(Ref.create(gainingClientAutorenewEvent))
-        .setServerApproveAutorenewPollMessage(Ref.create(gainingClientAutorenewPollMessage))
+        .setServerApproveBillingEvent(Key.create(transferBillingEvent))
+        .setServerApproveAutorenewEvent(Key.create(gainingClientAutorenewEvent))
+        .setServerApproveAutorenewPollMessage(Key.create(gainingClientAutorenewPollMessage))
         .setExtendedRegistrationYears(command.getPeriod().getValue());
   }
 
@@ -208,7 +210,7 @@ public class DomainTransferRequestFlow
           .setClientId(existingResource.getCurrentSponsorClientId())
           .setEventTime(automaticTransferTime)
           .setBillingTime(expirationTime.plus(registry.getAutoRenewGracePeriodLength()))
-          .setRecurringEventRef(existingResource.getAutorenewBillingEvent())
+          .setRecurringEventKey(existingResource.getAutorenewBillingEvent())
           .setParent(historyEntry)
           .build();
       ofy().save().entity(autorenewCancellation);

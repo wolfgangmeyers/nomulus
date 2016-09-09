@@ -48,7 +48,6 @@ import javax.inject.Singleton;
 @Component(
     modules = {
         AppIdentityCredentialModule.class,
-        BackendMetricsModule.class,
         BigqueryModule.class,
         ConfigModule.class,
         DatastoreServiceModule.class,

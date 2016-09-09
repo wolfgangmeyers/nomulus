@@ -12,11 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package google.registry.tools;
+package google.registry.module.frontend;
 
-/** Password generator interface. */
-interface PasswordGenerator {
+import dagger.Module;
+import javax.inject.Singleton;
 
-  /** Generates a password of a specified length. */
-  String createPassword(int length);
-}
+/**
+ * Dagger module for injecting metrics. All metrics should have {@link Singleton} scope to avoid
+ * being recreated per-request, as the metrics generally track cumulative values.
+ */
+@Module
+public class FrontendMetricsModule {}

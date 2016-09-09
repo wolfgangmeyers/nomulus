@@ -28,7 +28,7 @@ import static google.registry.util.DateTimeUtils.END_OF_TIME;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.InternetDomainName;
-import com.googlecode.objectify.Ref;
+import com.googlecode.objectify.Key;
 import google.registry.dns.DnsQueue;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.CommandUseErrorException;
@@ -38,6 +38,7 @@ import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainCommand.Update;
 import google.registry.model.domain.DomainResource;
+import google.registry.model.domain.fee.BaseFee.FeeType;
 import google.registry.model.domain.fee.Fee;
 import google.registry.model.domain.fee.FeeTransformCommandExtension;
 import google.registry.model.domain.rgp.GracePeriodStatus;
@@ -160,8 +161,8 @@ public class DomainRestoreRequestFlow extends OwnedResourceMutateFlow<DomainReso
         .setStatusValues(null)
         .setGracePeriods(null)
         .setDeletePollMessage(null)
-        .setAutorenewBillingEvent(Ref.create(autorenewEvent))
-        .setAutorenewPollMessage(Ref.create(autorenewPollMessage))
+        .setAutorenewBillingEvent(Key.create(autorenewEvent))
+        .setAutorenewPollMessage(Key.create(autorenewPollMessage))
         .build();
   }
 
@@ -187,13 +188,17 @@ public class DomainRestoreRequestFlow extends OwnedResourceMutateFlow<DomainReso
     return createOutput(
         Success,
         null,
-        (feeUpdate == null) ? null : ImmutableList.of(
-            feeUpdate.createResponseBuilder()
-              .setCurrency(restoreCost.getCurrencyUnit())
-              .setFees(ImmutableList.of(
-                  Fee.create(restoreCost.getAmount(), "restore"),
-                  Fee.create(renewCost.getAmount(), "renew")))
-              .build()));
+        (feeUpdate == null)
+            ? null
+            : ImmutableList.of(
+                feeUpdate
+                    .createResponseBuilder()
+                    .setCurrency(restoreCost.getCurrencyUnit())
+                    .setFees(
+                        ImmutableList.of(
+                            Fee.create(restoreCost.getAmount(), FeeType.RESTORE),
+                            Fee.create(renewCost.getAmount(), FeeType.RENEW)))
+                    .build()));
   }
 
   /** Restore command cannot have other changes specified. */
