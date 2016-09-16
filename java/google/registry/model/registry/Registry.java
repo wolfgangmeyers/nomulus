@@ -57,14 +57,16 @@ import google.registry.model.common.EntityGroupRoot;
 import google.registry.model.common.TimedTransitionProperty;
 import google.registry.model.common.TimedTransitionProperty.TimedTransition;
 import google.registry.model.domain.fee.EapFee;
-import google.registry.model.registry.label.PremiumList;
+import google.registry.model.pricing.StaticPremiumListPricingEngine;
+import google.registry.model.registry.label.BasePremiumList;
 import google.registry.model.registry.label.ReservedList;
 import google.registry.util.Idn;
-import java.util.Set;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
+
+import java.util.Set;
 
 /** Persisted per-TLD configuration data. */
 @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
@@ -292,8 +294,8 @@ public class Registry extends ImmutableObject implements Buildable {
     return nullToEmptyImmutableCopy(reservedLists);
   }
 
-  /** The static {@link PremiumList} for this TLD, if there is one. */
-  Key<PremiumList> premiumList;
+  /** The static {@link BasePremiumList} for this TLD, if there is one. */
+  Key<BasePremiumList> premiumList;
 
   /** Should RDE upload a nightly escrow deposit for this TLD? */
   boolean escrowEnabled = DEFAULT_ESCROW_ENABLED;
@@ -465,7 +467,7 @@ public class Registry extends ImmutableObject implements Buildable {
     return anchorTenantAddGracePeriodLength;
   }
 
-  public Key<PremiumList> getPremiumList() {
+  public Key<BasePremiumList> getPremiumList() {
     return premiumList;
   }
 
@@ -725,7 +727,7 @@ public class Registry extends ImmutableObject implements Buildable {
       return this;
     }
 
-    public Builder setPremiumList(PremiumList premiumList) {
+    public Builder setPremiumList(BasePremiumList premiumList) {
       getInstance().premiumList = (premiumList == null) ? null : Key.create(premiumList);
       return this;
     }

@@ -48,6 +48,8 @@ import google.registry.model.rde.RdeRevision;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarContact;
 import google.registry.model.registry.Registry;
+import google.registry.model.registry.label.BasePremiumList;
+import google.registry.model.registry.label.CategorizedPremiumList;
 import google.registry.model.registry.label.PremiumList;
 import google.registry.model.registry.label.ReservedList;
 import google.registry.model.reporting.HistoryEntry;
@@ -67,10 +69,13 @@ public final class EntityClasses {
   @SuppressWarnings("unchecked")  // varargs
   public static final ImmutableSet<Class<? extends ImmutableObject>> ALL_CLASSES =
       ImmutableSet.<Class<? extends ImmutableObject>>of(
+          BasePremiumList.PremiumListRevision.class,
           BillingEvent.Cancellation.class,
           BillingEvent.Modification.class,
           BillingEvent.OneTime.class,
           BillingEvent.Recurring.class,
+          CategorizedPremiumList.class,
+          CategorizedPremiumList.CategorizedListEntry.class,
           ClaimsListShard.class,
           ClaimsListRevision.class,
           ClaimsListSingleton.class,
@@ -103,7 +108,6 @@ public final class EntityClasses {
           PollMessage.OneTime.class,
           PremiumList.class,
           PremiumList.PremiumListEntry.class,
-          PremiumList.PremiumListRevision.class,
           PricingCategory.class,
           RdeRevision.class,
           Registrar.class,

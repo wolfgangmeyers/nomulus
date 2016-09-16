@@ -1,4 +1,6 @@
 Cancellation
+CategorizedListEntry
+CategorizedPremiumList
 ContactResource
 Cursor
 DomainApplicationIndex

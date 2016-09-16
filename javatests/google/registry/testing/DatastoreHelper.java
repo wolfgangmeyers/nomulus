@@ -81,6 +81,7 @@ import google.registry.model.pricing.StaticPremiumListPricingEngine;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
+import google.registry.model.registry.label.CategorizedPremiumList;
 import google.registry.model.registry.label.PremiumList;
 import google.registry.model.registry.label.ReservedList;
 import google.registry.model.reporting.HistoryEntry;
@@ -90,9 +91,10 @@ import google.registry.model.transfer.TransferData.Builder;
 import google.registry.model.transfer.TransferData.TransferServerApproveEntity;
 import google.registry.model.transfer.TransferStatus;
 import google.registry.tmch.LordnTask;
-import java.util.List;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
+
+import java.util.List;
 
 /** Static utils for setting up test resources. */
 public class DatastoreHelper {
@@ -339,6 +341,20 @@ public class DatastoreHelper {
     ofy().saveWithoutBackup().entity(premiumList).now();
     ofy().saveWithoutBackup().entities(premiumList.getPremiumListEntries().values()).now();
     return premiumList;
+  }
+
+  public static CategorizedPremiumList persistCategorizedPremiumList(
+      CategorizedPremiumList categorizedPremiumList) {
+    // Persist the list and its child entities directly, rather than using its helper method, so
+    // that we can avoid writing commit logs. This would cause issues since many tests replace the
+    // clock in Ofy with a non-advancing FakeClock, and commit logs currently require
+    // monotonically increasing timestamps.
+    ofy().saveWithoutBackup().entity(categorizedPremiumList).now();
+    ofy()
+        .saveWithoutBackup()
+        .entities(categorizedPremiumList.getPremiumListEntries().values())
+        .now();
+    return categorizedPremiumList;
   }
 
   /** Creates and persists a tld. */
