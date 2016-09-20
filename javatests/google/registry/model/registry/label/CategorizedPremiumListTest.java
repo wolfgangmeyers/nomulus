@@ -1,5 +1,6 @@
 package google.registry.model.registry.label;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import google.registry.model.pricing.PricingCategory;
@@ -106,6 +107,15 @@ public class CategorizedPremiumListTest {
         nullablePremiumList.getPremiumListEntries().get(LABEL_ONE);
     thrown.expect(NullPointerException.class);
     entry.getNextTransitionDateTime();
+  }
+
+  @Test
+  public void testGetPremiumPrice_shouldReturnCurrentPriceForLabel() {
+    Optional<Money> result = premiumList.getPremiumPrice(LABEL_ONE);
+    Money expected = Money.parse(EURO_PRICE);
+
+    assertThat(result).isPresent();
+    assertThat(result.get()).isEqualTo(expected);
   }
 
   /**

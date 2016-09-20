@@ -19,6 +19,7 @@ import com.googlecode.objectify.cmd.Query;
 import google.registry.model.ImmutableObject;
 import google.registry.model.annotations.VirtualEntity;
 import google.registry.model.registry.Registry;
+import org.joda.money.Money;
 
 import java.util.List;
 import java.util.Map;
@@ -96,10 +97,7 @@ public abstract class BasePremiumList<T extends Comparable<?>, D extends DomainL
    * Gets the premium price for the specified label in the current PremiumList, or returns
    * Optional.absent if there is no premium price.
    */
-  public Optional<T> getPremiumPrice(String label) {
-    return Optional.fromNullable(
-            premiumListMap.containsKey(label) ? premiumListMap.get(label).getValue() : null);
-  }
+  public abstract Optional<Money> getPremiumPrice(String label);
 
   protected abstract LoadingCache<String, ?> getCache();
 

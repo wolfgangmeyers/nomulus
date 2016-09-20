@@ -242,6 +242,12 @@ public class PremiumList extends BasePremiumList<Money, PremiumList.PremiumListE
   }
 
   @Override
+  public Optional<Money> getPremiumPrice(String label) {
+    return Optional.fromNullable(
+        premiumListMap.containsKey(label) ? premiumListMap.get(label).getValue() : null);
+  }
+
+  @Override
   protected LoadingCache<String, PremiumList> getCache() {
     return PremiumList.cache;
   }

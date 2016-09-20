@@ -31,6 +31,7 @@ import google.registry.model.Buildable;
 import google.registry.model.common.TimedTransitionProperty;
 import google.registry.model.pricing.PricingCategory;
 import google.registry.util.DateTimeUtils;
+import org.joda.money.Money;
 import org.joda.time.DateTime;
 
 import java.util.List;
@@ -219,6 +220,12 @@ public class CategorizedPremiumList
       oldPremiumList.get().deleteEntries();
     }
     return updated;
+  }
+
+  @Override
+  public Optional<Money> getPremiumPrice(String label) {
+    return Optional.fromNullable(
+        premiumListMap.containsKey(label) ? premiumListMap.get(label).getValue().getPrice() : null);
   }
 
   @Override
