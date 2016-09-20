@@ -17,12 +17,13 @@ package google.registry.flows.domain;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static google.registry.flows.domain.DomainFlowUtils.checkAllowedAccessToTld;
 import static google.registry.flows.domain.DomainFlowUtils.updateAutorenewRecurrenceEndTime;
-import static google.registry.model.eppoutput.Result.Code.Success;
-import static google.registry.model.eppoutput.Result.Code.SuccessWithActionPending;
+import static google.registry.model.eppoutput.Result.Code.SUCCESS;
+import static google.registry.model.eppoutput.Result.Code.SUCCESS_WITH_ACTION_PENDING;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.pricing.PricingEngineProxy.getDomainRenewCost;
 import static google.registry.util.CollectionUtils.nullToEmpty;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
@@ -36,6 +37,7 @@ import google.registry.model.domain.DomainCommand.Delete;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.DomainResource.Builder;
 import google.registry.model.domain.GracePeriod;
+import google.registry.model.domain.fee.BaseFee.FeeType;
 import google.registry.model.domain.fee.Credit;
 import google.registry.model.domain.fee.FeeTransformResponseExtension;
 import google.registry.model.domain.fee06.FeeDeleteResponseExtensionV06;
@@ -76,11 +78,14 @@ public class DomainDeleteFlow extends ResourceSyncDeleteFlow<DomainResource, Bui
 
   ImmutableList<Credit> credits;
 
+  protected Optional<RegistryExtraFlowLogic> extraFlowLogic;
+
   @Inject DomainDeleteFlow() {}
 
   @Override
   protected void initResourceCreateOrMutateFlow() throws EppException {
     registerExtensions(SecDnsUpdateExtension.class);
+    extraFlowLogic = RegistryExtraFlowLogicProxy.newInstanceForDomain(existingResource);
   }
 
   @Override
@@ -93,7 +98,7 @@ public class DomainDeleteFlow extends ResourceSyncDeleteFlow<DomainResource, Bui
   }
 
   @Override
-  protected final void setDeleteProperties(Builder builder) {
+  protected final void setDeleteProperties(Builder builder) throws EppException {
     // Only set to PENDING_DELETE if this domain is not in the Add Grace Period. If domain is in Add
     // Grace Period, we delete it immediately.
     // The base class code already handles the immediate delete case, so we only have to handle the
@@ -121,6 +126,12 @@ public class DomainDeleteFlow extends ResourceSyncDeleteFlow<DomainResource, Bui
               now.plus(registry.getRedemptionGracePeriodLength()),
               getClientId())))
           .setDeletePollMessage(Key.create(deletePollMessage));
+    }
+
+    // Handle extra flow logic, if any.
+    if (extraFlowLogic.isPresent()) {
+      extraFlowLogic.get().performAdditionalDomainDeleteLogic(
+          existingResource, getClientId(), now, eppInput, historyEntry);
     }
   }
 
@@ -151,8 +162,7 @@ public class DomainDeleteFlow extends ResourceSyncDeleteFlow<DomainResource, Bui
               ofy().load().key(checkNotNull(gracePeriod.getOneTimeBillingEvent())).now().getCost();
         }
         creditsBuilder.add(Credit.create(
-            cost.negated().getAmount(),
-            String.format("%s credit", gracePeriod.getType().getXmlName())));
+            cost.negated().getAmount(), FeeType.CREDIT, gracePeriod.getType().getXmlName()));
         creditsCurrencyUnit = cost.getCurrencyUnit();
       }
     }
@@ -165,6 +175,10 @@ public class DomainDeleteFlow extends ResourceSyncDeleteFlow<DomainResource, Bui
     // Close the autorenew billing event and poll message. This may delete the poll message.
     updateAutorenewRecurrenceEndTime(existingResource, now);
 
+    if (extraFlowLogic.isPresent()) {
+      extraFlowLogic.get().commitAdditionalLogicChanges();
+    }
+
     // If there's a pending transfer, the gaining client's autorenew billing
     // event and poll message will already have been deleted in
     // ResourceDeleteFlow since it's listed in serverApproveEntities.
@@ -173,7 +187,7 @@ public class DomainDeleteFlow extends ResourceSyncDeleteFlow<DomainResource, Bui
   @Override
   protected final Code getDeleteResultCode() {
     return newResource.getDeletionTime().isAfter(now)
-        ? SuccessWithActionPending : Success;
+        ? SUCCESS_WITH_ACTION_PENDING : SUCCESS;
   }
 
   @Nullable

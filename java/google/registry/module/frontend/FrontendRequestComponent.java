@@ -21,6 +21,8 @@ import google.registry.flows.CheckApiAction.CheckApiModule;
 import google.registry.flows.EppConsoleAction;
 import google.registry.flows.EppTlsAction;
 import google.registry.flows.FlowComponent;
+import google.registry.flows.TlsCredentials.EppTlsModule;
+import google.registry.monitoring.whitebox.WhiteboxModule;
 import google.registry.rdap.RdapAutnumAction;
 import google.registry.rdap.RdapDomainAction;
 import google.registry.rdap.RdapDomainSearchAction;
@@ -50,6 +52,7 @@ import google.registry.whois.WhoisServer;
         RdapModule.class,
         RegistrarUserModule.class,
         RequestModule.class,
+        WhiteboxModule.class,
         WhoisModule.class,
     })
 interface FrontendRequestComponent {
