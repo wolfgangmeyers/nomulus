@@ -8,20 +8,16 @@
   </queue>
 
   <queue>
-    <name>dns-cron</name>
-    <!-- There is no point allowing more than 10/s because the pull queue that feeds
-         this job will refuse to service more than 10 qps. See
-         https://cloud.google.com/appengine/docs/java/javadoc/com/google/appengine/api/taskqueue/Queue#leaseTasks-long-java.util.concurrent.TimeUnit-long- -->
-    <rate>10/s</rate>
-    <bucket-size>100</bucket-size>
-    <retry-parameters>
-      <task-retry-limit>1</task-retry-limit>
-    </retry-parameters>
-  </queue>
-
-  <queue>
     <name>dns-pull</name>
     <mode>pull</mode>
+  </queue>
+
+  <!-- Queue for launching asynchronous actions (e.g. mapreduces) from async flows. -->
+  <!-- TODO(b/26140521): Remove queue once new batch async handling mapreduces are deployed. -->
+  <queue>
+    <name>flows-async</name>
+    <rate>1/m</rate>
+    <target>backend</target>
   </queue>
 
   <queue>
@@ -30,14 +26,9 @@
     <bucket-size>100</bucket-size>
   </queue>
 
-  <!-- Queue for launching asynchronous actions (e.g. mapreduces) from async flows. -->
   <queue>
-    <name>flows-async</name>
-    <!-- Note: rate-limiting a bit here because each of these will kick off an MR.
-         TODO(b/26140521): do more intelligent/aggressive batching than this. -->
-    <rate>1/m</rate>
-    <!-- Async flow tasks should run on the backend module. -->
-    <target>backend</target>
+    <name>async-delete-pull</name>
+    <mode>pull</mode>
   </queue>
 
   <queue>
