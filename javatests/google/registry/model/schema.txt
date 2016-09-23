@@ -777,11 +777,11 @@ class google.registry.model.registry.label.CategorizedPremiumList {
 class google.registry.model.registry.label.CategorizedPremiumList$CategorizedListEntry {
   @Id java.lang.String label;
   @Parent com.googlecode.objectify.Key<google.registry.model.registry.label.BasePremiumList$PremiumListRevision> parent;
-  google.registry.model.common.TimedTransitionProperty<google.registry.model.pricing.PricingCategory, google.registry.model.registry.label.CategorizedPremiumList$CategorizedListEntry$PricingCategoryTransition> categoryTransitions;
+  google.registry.model.common.TimedTransitionProperty<java.lang.String, google.registry.model.registry.label.CategorizedPremiumList$CategorizedListEntry$PricingCategoryTransition> categoryTransitions;
   java.lang.String comment;
 }
 class google.registry.model.registry.label.CategorizedPremiumList$CategorizedListEntry$PricingCategoryTransition {
-  google.registry.model.pricing.PricingCategory pricingCategory;
+  java.lang.String pricingCategory;
   org.joda.time.DateTime transitionTime;
 }
 class google.registry.model.registry.label.PremiumList {

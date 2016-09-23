@@ -30,6 +30,7 @@ import com.googlecode.objectify.Work;
 import com.googlecode.objectify.annotation.Cache;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Id;
+import com.googlecode.objectify.annotation.Ignore;
 import com.googlecode.objectify.annotation.Parent;
 import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
@@ -47,6 +48,9 @@ import java.util.concurrent.ExecutionException;
 @Entity
 public class PricingCategory extends ImmutableObject
     implements Buildable, Comparable<PricingCategory> {
+
+  @Ignore
+  public static final String UNINITIALIZED = "UNINITIALIZED";
 
   @Parent Key<EntityGroupRoot> parent = getCrossTldKey();
 

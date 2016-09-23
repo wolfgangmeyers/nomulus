@@ -24,6 +24,7 @@ import com.googlecode.objectify.Work;
 import com.googlecode.objectify.annotation.Cache;
 import com.googlecode.objectify.annotation.Embed;
 import com.googlecode.objectify.annotation.Entity;
+import com.googlecode.objectify.annotation.Mapify;
 import com.googlecode.objectify.annotation.Parent;
 import com.googlecode.objectify.cmd.Query;
 import google.registry.config.RegistryEnvironment;
@@ -43,7 +44,7 @@ import javax.annotation.Nullable;
 @Entity
 @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
 public class CategorizedPremiumList
-    extends BasePremiumList<PricingCategory, CategorizedPremiumList.CategorizedListEntry> {
+    extends BasePremiumList<String, CategorizedPremiumList.CategorizedListEntry> {
 
   private static LoadingCache<String, CategorizedPremiumList> cache = CacheBuilder
       .newBuilder()
@@ -81,29 +82,33 @@ public class CategorizedPremiumList
    */
   @Entity
   @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
-  public static class CategorizedListEntry
-      extends DomainLabelEntry<PricingCategory, CategorizedListEntry> implements Buildable {
+  public static class CategorizedListEntry extends DomainLabelEntry<String, CategorizedListEntry>
+      implements Buildable {
 
     @Embed
     public static class PricingCategoryTransition
-        extends TimedTransitionProperty.TimedTransition<PricingCategory> {
-      private PricingCategory pricingCategory;
+        extends TimedTransitionProperty.TimedTransition<String> {
+      private String pricingCategory;
 
       @Override
-      protected PricingCategory getValue() {
-        return pricingCategory;
+      protected String getValue() {
+        final Optional<PricingCategory> pc = PricingCategory.get(pricingCategory);
+        checkArgument(pc.isPresent(), "Unable to find pricing category [" + pricingCategory + "]");
+        return pc.get().getName();
       }
 
       @Override
-      protected void setValue(PricingCategory value) {
+      protected void setValue(String value) {
         this.pricingCategory = value;
       }
     }
 
     @Parent Key<BasePremiumList.PremiumListRevision> parent;
 
-    // TODO: Do we need a default pricing category?
-    TimedTransitionProperty<PricingCategory, PricingCategoryTransition> categoryTransitions;
+    @Mapify(TimedTransitionProperty.TimeMapper.class)
+    TimedTransitionProperty<String, PricingCategoryTransition> categoryTransitions =
+        TimedTransitionProperty.forMapify(
+            PricingCategory.UNINITIALIZED, PricingCategoryTransition.class);
 
     @Override
     public Builder asBuilder() {
@@ -111,8 +116,9 @@ public class CategorizedPremiumList
     }
 
     @Override
-    public PricingCategory getValue() {
-      return categoryTransitions.getValueAtTime(DateTime.now());
+    public String getValue() {
+      String name = categoryTransitions.getValueAtTime(DateTime.now());
+      return name;
     }
 
     @Nullable
@@ -121,7 +127,8 @@ public class CategorizedPremiumList
     }
 
     public PricingCategory getValueAtTime(DateTime time) {
-      return categoryTransitions.getValueAtTime(time);
+      String pc = categoryTransitions.getValueAtTime(time);
+      return PricingCategory.get(pc).get();
     }
 
     public static class Builder extends DomainLabelEntry.Builder<CategorizedListEntry, Builder> {
@@ -137,7 +144,7 @@ public class CategorizedPremiumList
       }
 
       public Builder setPricingCategoryTransitions(
-          ImmutableSortedMap<DateTime, PricingCategory> pricingCategoryTransitions) {
+          ImmutableSortedMap<DateTime, String> pricingCategoryTransitions) {
         getInstance().categoryTransitions =
             TimedTransitionProperty.fromValueMap(
                 pricingCategoryTransitions, PricingCategoryTransition.class);
@@ -155,13 +162,13 @@ public class CategorizedPremiumList
     String categoryName = words[2].trim();
     Optional<PricingCategory> pricingCategory = PricingCategory.get(categoryName);
     checkArgument(
-            pricingCategory.isPresent(),
-            String.format("The pricing category '%s' doesn't exist", categoryName));
+        pricingCategory.isPresent(),
+        String.format("The pricing category '%s' doesn't exist", categoryName));
     return new CategorizedListEntry.Builder()
-            .setLabel(label)
-            .setPricingCategoryTransitions(
-                    ImmutableSortedMap.of(DateTimeUtils.START_OF_TIME, pricingCategory.get()))
-            .build();
+        .setLabel(label)
+        .setPricingCategoryTransitions(
+            ImmutableSortedMap.of(DateTimeUtils.START_OF_TIME, pricingCategory.get().getName()))
+        .build();
   }
 
   /**
@@ -224,8 +231,14 @@ public class CategorizedPremiumList
 
   @Override
   public Optional<Money> getPremiumPrice(String label) {
-    return Optional.fromNullable(
-        premiumListMap.containsKey(label) ? premiumListMap.get(label).getValue().getPrice() : null);
+    if (!premiumListMap.containsKey(label)) {
+      return Optional.absent();
+    }
+    Optional<PricingCategory> pc = PricingCategory.get(premiumListMap.get(label).getValue());
+    if (!pc.isPresent()) {
+      return Optional.absent();
+    }
+    return Optional.of(pc.get().getPrice());
   }
 
   @Override

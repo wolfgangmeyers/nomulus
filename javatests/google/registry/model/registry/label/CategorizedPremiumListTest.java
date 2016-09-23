@@ -1,5 +1,10 @@
 package google.registry.model.registry.label;
 
+import static com.google.common.truth.Truth.assertThat;
+import static google.registry.testing.DatastoreHelper.createTld;
+import static google.registry.testing.DatastoreHelper.persistResource;
+import static google.registry.util.DateTimeUtils.START_OF_TIME;
+
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
@@ -13,11 +18,6 @@ import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
-
-import static com.google.common.truth.Truth.assertThat;
-import static google.registry.testing.DatastoreHelper.createTld;
-import static google.registry.testing.DatastoreHelper.persistResource;
-import static google.registry.util.DateTimeUtils.START_OF_TIME;
 
 /** Unit tests for {@link CategorizedPremiumList} */
 public class CategorizedPremiumListTest {
@@ -56,15 +56,17 @@ public class CategorizedPremiumListTest {
     // ordering for testing method 'getNextTransitionDateTime'
     premiumList =
         buildPremiumList(
-            ImmutableSortedMap.of(FIVE_DAYS, pc, START_OF_TIME, pc2, THREE_DAYS, pc3),
+            ImmutableSortedMap.of(
+                FIVE_DAYS, pc.getName(), START_OF_TIME, pc2.getName(), THREE_DAYS, pc3.getName()),
             TLD_ONE,
             LABEL_ONE);
     createTld(TLD_ONE);
+    persistResource(premiumList);
     persistResource(Registry.get(TLD_ONE).asBuilder().setPremiumList(premiumList).build());
 
     // Second Premium List for testing for the @Nullable of method 'getNextTransitionDateTime'
     nullablePremiumList =
-        buildPremiumList(ImmutableSortedMap.of(START_OF_TIME, pc), TLD_TWO, LABEL_TWO);
+        buildPremiumList(ImmutableSortedMap.of(START_OF_TIME, pc.getName()), TLD_TWO, LABEL_TWO);
     createTld(TLD_TWO);
     persistResource(Registry.get(TLD_TWO).asBuilder().setPremiumList(nullablePremiumList).build());
   }
@@ -73,7 +75,7 @@ public class CategorizedPremiumListTest {
   public void testCreateFromLine_shouldHandleCreate() {
     CategorizedPremiumList.CategorizedListEntry entry =
         premiumList.createFromLine("A, car, " + US_PRICE_CATEGORY);
-    assertThat(entry.getValue().getName()).isEqualTo(US_PRICE_CATEGORY);
+    assertThat(entry.getValue()).isEqualTo(US_PRICE_CATEGORY);
   }
 
   @Test
@@ -111,6 +113,9 @@ public class CategorizedPremiumListTest {
 
   @Test
   public void testGetPremiumPrice_shouldReturnCurrentPriceForLabel() {
+    Registry registry = Registry.get(TLD_ONE);
+    CategorizedPremiumList premiumList = CategorizedPremiumList.get(registry.getPremiumList()
+                                                                        .getName()).get();
     Optional<Money> result = premiumList.getPremiumPrice(LABEL_ONE);
     Money expected = Money.parse(EURO_PRICE);
 
@@ -129,7 +134,7 @@ public class CategorizedPremiumListTest {
    * @return A CategorizedPremiumList object
    */
   private CategorizedPremiumList buildPremiumList(
-      ImmutableSortedMap<DateTime, PricingCategory> map, String tld, String label) {
+      ImmutableSortedMap<DateTime, String> map, String tld, String label) {
 
     return new CategorizedPremiumList.Builder()
         .setName(tld)
@@ -140,7 +145,7 @@ public class CategorizedPremiumListTest {
                     .setLabel(label)
                     .setPricingCategoryTransitions(map)
                     .build()))
-        .build();
+        .build().saveAndUpdateEntries();
   }
 
   /**
