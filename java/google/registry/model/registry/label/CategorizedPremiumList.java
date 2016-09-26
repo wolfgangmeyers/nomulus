@@ -211,7 +211,7 @@ public class CategorizedPremiumList
                     .id(name)
                     .now(),
                   oldPremiumList.orNull()),
-              "PremiumList was concurrently edited");
+              "CategorizedPremiumList was concurrently edited");
           CategorizedPremiumList newList = CategorizedPremiumList.this.asBuilder()
               .setLastUpdateTime(now)
               .setCreationTime(
