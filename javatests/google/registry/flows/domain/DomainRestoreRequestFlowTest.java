@@ -40,7 +40,7 @@ import com.googlecode.objectify.Key;
 import google.registry.flows.EppException.UnimplementedExtensionException;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
-import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
+import google.registry.flows.ResourceMutateFlow.ResourceDoesNotExistException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyUnitMismatchException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyValueScaleException;
 import google.registry.flows.domain.DomainFlowUtils.DomainReservedException;
@@ -129,7 +129,7 @@ public class DomainRestoreRequestFlowTest extends
     assertThat(getPollMessages("TheRegistrar", clock.nowUtc().plusMonths(1)))
         .hasSize(1);
     runFlowAssertResponse(readFile("domain_update_response.xml"));
-    DomainResource domain = reloadResourceByUniqueId();
+    DomainResource domain = reloadResourceByForeignKey();
     HistoryEntry historyEntryDomainRestore =
         getOnlyHistoryEntryOfType(domain, HistoryEntry.Type.DOMAIN_RESTORE);
     assertThat(ofy().load().key(domain.getAutorenewBillingEvent()).now().getEventTime())
@@ -343,7 +343,7 @@ public class DomainRestoreRequestFlowTest extends
   @Test
   public void testFailure_doesNotExist() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -453,7 +453,7 @@ public class DomainRestoreRequestFlowTest extends
 
   @Test
   public void testFailure_fullyDeleted() throws Exception {
-    thrown.expect(ResourceToMutateDoesNotExistException.class);
+    thrown.expect(ResourceDoesNotExistException.class);
     persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc());
     runFlow();
   }
