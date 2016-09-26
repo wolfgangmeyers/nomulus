@@ -415,7 +415,7 @@ public final class ConfigModule {
   @Provides
   @Config("rdeSshIdentity")
   public static String provideSshIdentity() {
-    return "rde@charlestonroadregistry.com";
+    return "mercury-donuts-test@example.test";
   }
 
   /**
