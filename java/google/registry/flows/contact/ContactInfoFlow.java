@@ -14,39 +14,45 @@
 
 package google.registry.flows.contact;
 
+import static google.registry.flows.ResourceFlowUtils.loadResourceForQuery;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
 import static google.registry.model.EppResourceUtils.cloneResourceWithLinkedStatus;
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
 import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 
 import com.google.common.base.Optional;
 import google.registry.flows.EppException;
+import google.registry.flows.FlowModule.ClientId;
 import google.registry.flows.FlowModule.TargetId;
 import google.registry.flows.LoggedInFlow;
-import google.registry.flows.exceptions.ResourceToQueryDoesNotExistException;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.eppcommon.AuthInfo;
 import google.registry.model.eppoutput.EppOutput;
 import javax.inject.Inject;
 
 /**
- * An EPP flow that reads a contact.
+ * An EPP flow that returns information about a contact.
+ *
+ * <p>The response includes the contact's postal info, phone numbers, emails, the authInfo which can
+ * be used to request a transfer and the details of the contact's most recent transfer if it has
+ * ever been transferred. Any registrar can see any contact's information, but the authInfo is only
+ * visible to the registrar that owns the contact or to a registrar that already supplied it.
  *
  * @error {@link google.registry.flows.exceptions.ResourceToQueryDoesNotExistException}
  */
-public class ContactInfoFlow extends LoggedInFlow {
+public final class ContactInfoFlow extends LoggedInFlow {
 
+  @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
   @Inject Optional<AuthInfo> authInfo;
   @Inject ContactInfoFlow() {}
 
   @Override
   public final EppOutput run() throws EppException {
-    ContactResource existingResource = loadByUniqueId(ContactResource.class, targetId, now);
-    if (existingResource == null) {
-      throw new ResourceToQueryDoesNotExistException(ContactResource.class, targetId);
+    ContactResource contact = loadResourceForQuery(ContactResource.class, targetId, now);
+    verifyOptionalAuthInfoForResource(authInfo, contact);
+    if (!clientId.equals(contact.getCurrentSponsorClientId()) && !authInfo.isPresent()) {
+      contact = contact.asBuilder().setAuthInfo(null).build();
     }
-    verifyOptionalAuthInfoForResource(authInfo, existingResource);
-    return createOutput(SUCCESS, cloneResourceWithLinkedStatus(existingResource, now));
+    return createOutput(SUCCESS, cloneResourceWithLinkedStatus(contact, now));
   }
 }

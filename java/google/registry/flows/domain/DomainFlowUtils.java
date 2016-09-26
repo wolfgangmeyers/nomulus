@@ -56,6 +56,7 @@ import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.DesignatedContact.Type;
+import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.DomainCommand.CreateOrUpdate;
 import google.registry.model.domain.DomainCommand.InvalidReferencesException;
@@ -71,13 +72,16 @@ import google.registry.model.domain.fee.FeeTransformCommandExtension;
 import google.registry.model.domain.launch.LaunchExtension;
 import google.registry.model.domain.launch.LaunchPhase;
 import google.registry.model.domain.secdns.DelegationSignerData;
+import google.registry.model.domain.secdns.SecDnsInfoExtension;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppinput.ResourceCommand.SingleResourceCommand;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.host.HostResource;
 import google.registry.model.mark.Mark;
 import google.registry.model.mark.ProtectedMark;
 import google.registry.model.mark.Trademark;
+import google.registry.model.poll.PendingActionNotificationResponse.DomainPendingActionNotificationResponse;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
@@ -88,6 +92,8 @@ import google.registry.model.smd.AbstractSignedMark;
 import google.registry.model.smd.EncodedSignedMark;
 import google.registry.model.smd.SignedMark;
 import google.registry.model.smd.SignedMarkRevocationList;
+import google.registry.model.transfer.TransferData;
+import google.registry.model.transfer.TransferResponse.DomainTransferResponse;
 import google.registry.tmch.TmchXmlSignature;
 import google.registry.tmch.TmchXmlSignature.CertificateSignatureException;
 import google.registry.util.Idn;
@@ -283,12 +289,10 @@ public class DomainFlowUtils {
     if (!whitelist.isEmpty() && count == 0) {
       throw new NameserversNotSpecifiedException();
     }
-
     if (count > MAX_NAMESERVERS_PER_DOMAIN) {
       throw new TooManyNameserversException(String.format(
           "Only %d nameservers are allowed per domain", MAX_NAMESERVERS_PER_DOMAIN));
     }
-
   }
 
   static void validateNoDuplicateContacts(Set<DesignatedContact> contacts)
@@ -384,17 +388,25 @@ public class DomainFlowUtils {
     }
   }
 
+  /** Verifies that an application's domain name matches the target id (from a command). */
+  static void verifyApplicationDomainMatchesTargetId(
+      DomainApplication application, String targetId) throws EppException {
+    if (!application.getFullyQualifiedDomainName().equals(targetId)) {
+      throw new ApplicationDomainNameMismatchException();
+    }
+  }
+
   /**
    * Verifies that a domain name is allowed to be delegated to the given client id. The only case
    * where it would not be allowed is if domain name is premium, and premium names are blocked by
    * this registrar.
    */
   static void verifyPremiumNameIsNotBlocked(
-      String domainName, DateTime priceTime, String clientIdentifier) throws EppException {
+      String domainName, DateTime priceTime, String clientId) throws EppException {
     if (getPricesForDomainName(domainName, priceTime).isPremium()) {
       // NB: The load of the Registar object is transactionless, which means that it should hit
       // memcache most of the time.
-      if (Registrar.loadByClientId(clientIdentifier).getBlockPremiumNames()) {
+      if (Registrar.loadByClientId(clientId).getBlockPremiumNames()) {
         throw new PremiumNameBlockedException();
       }
     }
@@ -565,7 +577,7 @@ public class DomainFlowUtils {
       FeeQueryCommandExtensionItem feeRequest,
       FeeQueryResponseExtensionItem.Builder builder,
       InternetDomainName domain,
-      String clientIdentifier,
+      String clientId,
       @Nullable CurrencyUnit topLevelCurrency,
       DateTime now,
       EppInput eppInput) throws EppException {
@@ -599,13 +611,13 @@ public class DomainFlowUtils {
         } else {
           builder.setAvailIfSupported(true);
           builder.setFees(TldSpecificLogicProxy.getCreatePrice(
-              registry, domainNameString, clientIdentifier, now, years, eppInput).getFees());
+              registry, domainNameString, clientId, now, years, eppInput).getFees());
         }
         break;
       case RENEW:
         builder.setAvailIfSupported(true);
         builder.setFees(TldSpecificLogicProxy.getRenewPrice(
-            registry, domainNameString, clientIdentifier, now, years, eppInput).getFees());
+            registry, domainNameString, clientId, now, years, eppInput).getFees());
         break;
       case RESTORE:
         if (years != 1) {
@@ -613,17 +625,17 @@ public class DomainFlowUtils {
         }
         builder.setAvailIfSupported(true);
         builder.setFees(TldSpecificLogicProxy.getRestorePrice(
-            registry, domainNameString, clientIdentifier, now, eppInput).getFees());
+            registry, domainNameString, clientId, now, eppInput).getFees());
         break;
       case TRANSFER:
         builder.setAvailIfSupported(true);
         builder.setFees(TldSpecificLogicProxy.getTransferPrice(
-            registry, domainNameString, clientIdentifier, now, years, eppInput).getFees());
+            registry, domainNameString, clientId, now, years, eppInput).getFees());
         break;
       case UPDATE:
         builder.setAvailIfSupported(true);
         builder.setFees(TldSpecificLogicProxy.getUpdatePrice(
-            registry, domainNameString, clientIdentifier, now, eppInput).getFees());
+            registry, domainNameString, clientId, now, eppInput).getFees());
         break;
       default:
         throw new UnknownFeeCommandException(feeRequest.getUnparsedCommandName());
@@ -681,6 +693,74 @@ public class DomainFlowUtils {
     }
     if (!feeTotal.equals(costTotal)) {
       throw new FeesMismatchException(costTotal);
+    }
+  }
+
+  /** Create a poll message for the gaining client in a transfer. */
+  static PollMessage createGainingTransferPollMessage(
+      String targetId,
+      TransferData transferData,
+      @Nullable DateTime extendedRegistrationExpirationTime,
+      HistoryEntry historyEntry) {
+    return new PollMessage.OneTime.Builder()
+        .setClientId(transferData.getGainingClientId())
+        .setEventTime(transferData.getPendingTransferExpirationTime())
+        .setMsg(transferData.getTransferStatus().getMessage())
+        .setResponseData(ImmutableList.of(
+            createTransferResponse(targetId, transferData, extendedRegistrationExpirationTime),
+            DomainPendingActionNotificationResponse.create(
+                  targetId,
+                  transferData.getTransferStatus().isApproved(),
+                  transferData.getTransferRequestTrid(),
+                  historyEntry.getModificationTime())))
+        .setParent(historyEntry)
+        .build();
+  }
+
+  /** Create a poll message for the losing client in a transfer. */
+  static PollMessage createLosingTransferPollMessage(
+      String targetId,
+      TransferData transferData,
+      @Nullable DateTime extendedRegistrationExpirationTime,
+      HistoryEntry historyEntry) {
+    return new PollMessage.OneTime.Builder()
+        .setClientId(transferData.getLosingClientId())
+        .setEventTime(transferData.getPendingTransferExpirationTime())
+        .setMsg(transferData.getTransferStatus().getMessage())
+        .setResponseData(ImmutableList.of(
+            createTransferResponse(targetId, transferData, extendedRegistrationExpirationTime)))
+        .setParent(historyEntry)
+        .build();
+  }
+
+  /** Create a {@link DomainTransferResponse} off of the info in a {@link TransferData}. */
+  static DomainTransferResponse createTransferResponse(
+      String targetId,
+      TransferData transferData,
+      @Nullable DateTime extendedRegistrationExpirationTime) {
+    return new DomainTransferResponse.Builder()
+        .setFullyQualifiedDomainNameName(targetId)
+        .setGainingClientId(transferData.getGainingClientId())
+        .setLosingClientId(transferData.getLosingClientId())
+        .setPendingTransferExpirationTime(transferData.getPendingTransferExpirationTime())
+        .setTransferRequestTime(transferData.getTransferRequestTime())
+        .setTransferStatus(transferData.getTransferStatus())
+        .setExtendedRegistrationExpirationTime(extendedRegistrationExpirationTime)
+        .build();
+  }
+
+  /**
+   * Adds a secDns extension to a list if the given set of dsData is non-empty.
+   *
+   * <p>According to RFC 5910 section 2, we should only return this if the client specified the
+   * "urn:ietf:params:xml:ns:secDNS-1.1" when logging in. However, this is a "SHOULD" not a "MUST"
+   * and we are going to ignore it; clients who don't care about secDNS can just ignore it.
+   */
+  static void addSecDnsExtensionIfPresent(
+      ImmutableList.Builder<ResponseExtension> extensions,
+      ImmutableSet<DelegationSignerData> dsData) {
+    if (!dsData.isEmpty()) {
+      extensions.add(SecDnsInfoExtension.create(dsData));
     }
   }
 

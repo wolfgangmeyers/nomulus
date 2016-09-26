@@ -56,17 +56,16 @@ import google.registry.model.ImmutableObject;
 import google.registry.model.common.EntityGroupRoot;
 import google.registry.model.common.TimedTransitionProperty;
 import google.registry.model.common.TimedTransitionProperty.TimedTransition;
-import google.registry.model.domain.fee.EapFee;
-import google.registry.model.pricing.StaticPremiumListPricingEngine;
+import google.registry.model.domain.fee.BaseFee.FeeType;
+import google.registry.model.domain.fee.Fee;
 import google.registry.model.registry.label.BasePremiumList;
 import google.registry.model.registry.label.ReservedList;
 import google.registry.util.Idn;
+import java.util.Set;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
-
-import java.util.Set;
 
 /** Persisted per-TLD configuration data. */
 @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
@@ -520,15 +519,19 @@ public class Registry extends ImmutableObject implements Buildable {
   /**
    * Returns the EAP fee for the registry at the given time.
    */
-  public EapFee getEapFeeFor(DateTime now) {
+  public Fee getEapFeeFor(DateTime now) {
     ImmutableSortedMap<DateTime, Money> valueMap = eapFeeSchedule.toValueMap();
     DateTime periodStart = valueMap.floorKey(now);
     DateTime periodEnd = valueMap.ceilingKey(now);
-    return EapFee.create(
-        eapFeeSchedule.getValueAtTime(now),
-        Range.closedOpen(
-            periodStart != null ? periodStart : START_OF_TIME,
-            periodEnd != null ? periodEnd : END_OF_TIME));
+    // NOTE: assuming END_OF_TIME would never be reached...
+    Range<DateTime> validPeriod = Range.closedOpen(
+        periodStart != null ? periodStart : START_OF_TIME,
+            periodEnd != null ? periodEnd : END_OF_TIME);
+    return Fee.create(
+        eapFeeSchedule.getValueAtTime(now).getAmount(),
+        FeeType.EAP,
+        validPeriod,
+        validPeriod.upperEndpoint());
   }
 
   public String getLordnUsername() {

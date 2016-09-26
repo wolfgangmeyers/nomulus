@@ -15,16 +15,15 @@
 package google.registry.flows.contact;
 
 import static google.registry.flows.ResourceFlowUtils.failfastForAsyncDelete;
+import static google.registry.flows.ResourceFlowUtils.loadResourceToMutate;
 import static google.registry.flows.ResourceFlowUtils.verifyNoDisallowedStatuses;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
 import static google.registry.flows.ResourceFlowUtils.verifyResourceOwnership;
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
 import static google.registry.model.eppoutput.Result.Code.SUCCESS_WITH_ACTION_PENDING;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
 import google.registry.config.ConfigModule.Config;
@@ -34,10 +33,6 @@ import google.registry.flows.FlowModule.TargetId;
 import google.registry.flows.LoggedInFlow;
 import google.registry.flows.TransactionalFlow;
 import google.registry.flows.async.AsyncFlowEnqueuer;
-import google.registry.flows.async.AsyncFlowUtils;
-import google.registry.flows.async.DeleteContactResourceAction;
-import google.registry.flows.async.DeleteEppResourceAction;
-import google.registry.flows.exceptions.ResourceToMutateDoesNotExistException;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.metadata.MetadataExtension;
@@ -49,14 +44,21 @@ import javax.inject.Inject;
 import org.joda.time.Duration;
 
 /**
- * An EPP flow that deletes a contact resource.
+/**
+ * An EPP flow that deletes a contact.
+ *
+ * <p>Contacts that are in use by any domain cannot be deleted. The flow may return immediately if a
+ * quick smoke check determines that deletion is impossible due to an existing reference. However, a
+ * successful delete will always be asynchronous, as all existing domains must be checked for
+ * references to the host before the deletion is allowed to proceed. A poll message will be written
+ * with the success or failure message when the process is complete.
  *
  * @error {@link google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException}
  * @error {@link google.registry.flows.exceptions.ResourceStatusProhibitsOperationException}
  * @error {@link google.registry.flows.exceptions.ResourceToDeleteIsReferencedException}
  * @error {@link google.registry.flows.exceptions.ResourceToMutateDoesNotExistException}
  */
-public class ContactDeleteFlow extends LoggedInFlow implements TransactionalFlow {
+public final class ContactDeleteFlow extends LoggedInFlow implements TransactionalFlow {
 
   private static final ImmutableSet<StatusValue> DISALLOWED_STATUSES = ImmutableSet.of(
       StatusValue.LINKED,
@@ -87,34 +89,20 @@ public class ContactDeleteFlow extends LoggedInFlow implements TransactionalFlow
   @Override
   public final EppOutput run() throws EppException {
     failfastForAsyncDelete(targetId, now, ContactResource.class, GET_REFERENCED_CONTACTS);
-    ContactResource existingResource = loadByUniqueId(ContactResource.class, targetId, now);
-    if (existingResource == null) {
-      throw new ResourceToMutateDoesNotExistException(ContactResource.class, targetId);
-    }
-    verifyNoDisallowedStatuses(existingResource, DISALLOWED_STATUSES);
-    verifyOptionalAuthInfoForResource(authInfo, existingResource);
+    ContactResource existingContact = loadResourceToMutate(ContactResource.class, targetId, now);
+    verifyNoDisallowedStatuses(existingContact, DISALLOWED_STATUSES);
+    verifyOptionalAuthInfoForResource(authInfo, existingContact);
     if (!isSuperuser) {
-      verifyResourceOwnership(clientId, existingResource);
+      verifyResourceOwnership(clientId, existingContact);
     }
-    AsyncFlowUtils.enqueueMapreduceAction(
-        DeleteContactResourceAction.class,
-        ImmutableMap.of(
-            DeleteEppResourceAction.PARAM_RESOURCE_KEY,
-            Key.create(existingResource).getString(),
-            DeleteEppResourceAction.PARAM_REQUESTING_CLIENT_ID,
-            clientId,
-            DeleteEppResourceAction.PARAM_IS_SUPERUSER,
-            Boolean.toString(isSuperuser)),
-        mapreduceDelay);
-    // TODO(b/26140521): Switch over to batch async operations as follows:
-    // asyncFlowEnqueuer.enqueueAsyncDelete(existingResource, getClientId(), isSuperuser);
-    ContactResource newResource =
-        existingResource.asBuilder().addStatusValue(StatusValue.PENDING_DELETE).build();
+    asyncFlowEnqueuer.enqueueAsyncDelete(existingContact, clientId, isSuperuser);
+    ContactResource newContact =
+        existingContact.asBuilder().addStatusValue(StatusValue.PENDING_DELETE).build();
     historyBuilder
         .setType(HistoryEntry.Type.CONTACT_PENDING_DELETE)
         .setModificationTime(now)
-        .setParent(Key.create(existingResource));
-    ofy().save().<Object>entities(newResource, historyBuilder.build());
+        .setParent(Key.create(existingContact));
+    ofy().save().<Object>entities(newContact, historyBuilder.build());
     return createOutput(SUCCESS_WITH_ACTION_PENDING);
   }
 }

@@ -15,20 +15,19 @@
 package google.registry.flows.host;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
+import static google.registry.flows.ResourceFlowUtils.loadResourceToMutate;
 import static google.registry.flows.ResourceFlowUtils.verifyNoDisallowedStatuses;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
 import static google.registry.flows.ResourceFlowUtils.verifyResourceOwnership;
 import static google.registry.flows.host.HostFlowUtils.lookupSuperordinateDomain;
 import static google.registry.flows.host.HostFlowUtils.validateHostName;
 import static google.registry.flows.host.HostFlowUtils.verifyDomainIsSameRegistrar;
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
 import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 import static google.registry.model.index.ForeignKeyIndex.loadAndGetKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.util.CollectionUtils.isNullOrEmpty;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.googlecode.objectify.Key;
@@ -39,13 +38,12 @@ import google.registry.flows.EppException.ParameterValueRangeErrorException;
 import google.registry.flows.EppException.RequiredParameterMissingException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
 import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.FlowModule.TargetId;
 import google.registry.flows.LoggedInFlow;
 import google.registry.flows.TransactionalFlow;
-import google.registry.flows.async.AsyncFlowUtils;
-import google.registry.flows.async.DnsRefreshForHostRenameAction;
+import google.registry.flows.async.AsyncFlowEnqueuer;
 import google.registry.flows.exceptions.AddRemoveSameValueEppException;
 import google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException;
-import google.registry.flows.exceptions.ResourceToMutateDoesNotExistException;
 import google.registry.flows.exceptions.StatusNotClientSettableException;
 import google.registry.model.ImmutableObject;
 import google.registry.model.domain.DomainResource;
@@ -62,10 +60,19 @@ import google.registry.model.index.ForeignKeyIndex;
 import google.registry.model.reporting.HistoryEntry;
 import java.util.Objects;
 import javax.inject.Inject;
-import org.joda.time.Duration;
 
 /**
- * An EPP flow that updates a host resource.
+ * An EPP flow that updates a host.
+ *
+ * <p>Hosts can be "external", or "internal" (also known as "in bailiwick"). Internal hosts are
+ * those that are under a top level domain within this registry, and external hosts are all other
+ * hosts. Internal hosts must have at least one IP address associated with them, whereas external
+ * hosts cannot have any.
+ *
+ * <p>This flow allows changing a host name, and adding or removing IP addresses to hosts. When
+ * a host is renamed from internal to external all IP addresses must be simultaneously removed, and
+ * when it is renamed from external to internal at least one must be added. If the host is renamed
+ * or IP addresses are added, tasks are enqueued to update DNS accordingly.
  *
  * @error {@link google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException}
  * @error {@link google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException}
@@ -81,7 +88,7 @@ import org.joda.time.Duration;
  * @error {@link RenameHostToExternalRemoveIpException}
  * @error {@link RenameHostToSubordinateRequiresIpException}
  */
-public class HostUpdateFlow extends LoggedInFlow implements TransactionalFlow {
+public final class HostUpdateFlow extends LoggedInFlow implements TransactionalFlow {
 
   /**
    * Note that CLIENT_UPDATE_PROHIBITED is intentionally not in this list. This is because it
@@ -95,7 +102,9 @@ public class HostUpdateFlow extends LoggedInFlow implements TransactionalFlow {
   @Inject ResourceCommand resourceCommand;
   @Inject Optional<AuthInfo> authInfo;
   @Inject @ClientId String clientId;
+  @Inject @TargetId String targetId;
   @Inject HistoryEntry.Builder historyBuilder;
+  @Inject AsyncFlowEnqueuer asyncFlowEnqueuer;
   @Inject HostUpdateFlow() {}
 
   @Override
@@ -107,21 +116,17 @@ public class HostUpdateFlow extends LoggedInFlow implements TransactionalFlow {
   public final EppOutput run() throws EppException {
     Update command = (Update) resourceCommand;
     String suppliedNewHostName = command.getInnerChange().getFullyQualifiedHostName();
-    String targetId = command.getTargetId();
-    HostResource existingResource = loadByUniqueId(HostResource.class, targetId, now);
-    if (existingResource == null) {
-      throw new ResourceToMutateDoesNotExistException(HostResource.class, targetId);
-    }
+    HostResource existingHost = loadResourceToMutate(HostResource.class, targetId, now);
     boolean isHostRename = suppliedNewHostName != null;
     String oldHostName = targetId;
     String newHostName = firstNonNull(suppliedNewHostName, oldHostName);
     Optional<DomainResource> superordinateDomain =
         Optional.fromNullable(lookupSuperordinateDomain(validateHostName(newHostName), now));
-    verifyUpdateAllowed(command, existingResource, superordinateDomain.orNull());
+    verifyUpdateAllowed(command, existingHost, superordinateDomain.orNull());
     if (isHostRename && loadAndGetKey(HostResource.class, newHostName, now) != null) {
       throw new HostAlreadyExistsException(newHostName);
     }
-    Builder builder = existingResource.asBuilder();
+    Builder builder = existingHost.asBuilder();
     try {
       command.applyTo(builder);
     } catch (AddRemoveSameValueException e) {
@@ -137,23 +142,23 @@ public class HostUpdateFlow extends LoggedInFlow implements TransactionalFlow {
             superordinateDomain.isPresent() ? Key.create(superordinateDomain.get()) : null)
         .setLastSuperordinateChange(superordinateDomain == null ? null : now);
     // Rely on the host's cloneProjectedAtTime() method to handle setting of transfer data.
-    HostResource newResource = builder.build().cloneProjectedAtTime(now);
-    verifyHasIpsIffIsExternal(command, existingResource, newResource);
+    HostResource newHost = builder.build().cloneProjectedAtTime(now);
+    verifyHasIpsIffIsExternal(command, existingHost, newHost);
     ImmutableSet.Builder<ImmutableObject> entitiesToSave = new ImmutableSet.Builder<>();
-    entitiesToSave.add(newResource);
+    entitiesToSave.add(newHost);
     // Keep the {@link ForeignKeyIndex} for this host up to date.
     if (isHostRename) {
       // Update the foreign key for the old host name and save one for the new host name.
       entitiesToSave.add(
-          ForeignKeyIndex.create(existingResource, now),
-          ForeignKeyIndex.create(newResource, newResource.getDeletionTime()));
-      updateSuperordinateDomains(existingResource, newResource);
+          ForeignKeyIndex.create(existingHost, now),
+          ForeignKeyIndex.create(newHost, newHost.getDeletionTime()));
+      updateSuperordinateDomains(existingHost, newHost);
     }
-    enqueueTasks(existingResource, newResource);
+    enqueueTasks(existingHost, newHost);
     entitiesToSave.add(historyBuilder
         .setType(HistoryEntry.Type.HOST_UPDATE)
         .setModificationTime(now)
-        .setParent(Key.create(existingResource))
+        .setParent(Key.create(existingHost))
         .build());
     ofy().save().entities(entitiesToSave.build());
     return createOutput(SUCCESS);
@@ -225,12 +230,7 @@ public class HostUpdateFlow extends LoggedInFlow implements TransactionalFlow {
       }
       // We must also enqueue updates for all domains that use this host as their nameserver so
       // that their NS records can be updated to point at the new name.
-      AsyncFlowUtils.enqueueMapreduceAction(
-          DnsRefreshForHostRenameAction.class,
-          ImmutableMap.of(
-              DnsRefreshForHostRenameAction.PARAM_HOST_KEY,
-              Key.create(existingResource).getString()),
-          Duration.ZERO);
+      asyncFlowEnqueuer.enqueueAsyncDnsRefresh(existingResource);
     }
   }
 
@@ -270,33 +270,33 @@ public class HostUpdateFlow extends LoggedInFlow implements TransactionalFlow {
     }
   }
 
-  /** Cannot add ip addresses to an external host. */
+  /** Cannot add IP addresses to an external host. */
   static class CannotAddIpToExternalHostException extends ParameterValueRangeErrorException {
     public CannotAddIpToExternalHostException() {
-      super("Cannot add ip addresses to external hosts");
+      super("Cannot add IP addresses to external hosts");
     }
   }
 
-  /** Cannot remove all ip addresses from a subordinate host. */
+  /** Cannot remove all IP addresses from a subordinate host. */
   static class CannotRemoveSubordinateHostLastIpException
       extends StatusProhibitsOperationException {
     public CannotRemoveSubordinateHostLastIpException() {
-      super("Cannot remove all ip addresses from a subordinate host");
+      super("Cannot remove all IP addresses from a subordinate host");
     }
   }
 
-  /** Host rename from external to subordinate must also add an ip addresses. */
+  /** Host rename from external to subordinate must also add an IP addresses. */
   static class RenameHostToSubordinateRequiresIpException
       extends RequiredParameterMissingException {
     public RenameHostToSubordinateRequiresIpException() {
-      super("Host rename from external to subordinate must also add an ip address");
+      super("Host rename from external to subordinate must also add an IP address");
     }
   }
 
-  /** Host rename from subordinate to external must also remove all ip addresses. */
+  /** Host rename from subordinate to external must also remove all IP addresses. */
   static class RenameHostToExternalRemoveIpException extends ParameterValueRangeErrorException {
     public RenameHostToExternalRemoveIpException() {
-      super("Host rename from subordinate to external must also remove all ip addresses");
+      super("Host rename from subordinate to external must also remove all IP addresses");
     }
   }
 }

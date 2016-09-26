@@ -15,7 +15,6 @@
 package google.registry.flows.domain;
 
 import static com.google.common.base.Preconditions.checkArgument;
-import static com.google.common.base.Preconditions.checkState;
 import static google.registry.model.EppResourceUtils.loadByUniqueId;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.pricing.PricingEngineProxy.getPricesForDomainName;
@@ -34,7 +33,6 @@ import google.registry.model.domain.LrpToken;
 import google.registry.model.domain.fee.BaseFee;
 import google.registry.model.domain.fee.BaseFee.FeeType;
 import google.registry.model.domain.fee.Credit;
-import google.registry.model.domain.fee.EapFee;
 import google.registry.model.domain.fee.Fee;
 import google.registry.model.eppinput.EppInput;
 import google.registry.model.pricing.PremiumPricingEngine.DomainPrices;
@@ -140,7 +138,7 @@ public final class TldSpecificLogicProxy {
   public static EppCommandOperations getCreatePrice(
       Registry registry,
       String domainName,
-      String clientIdentifier,
+      String clientId,
       DateTime date,
       int years,
       EppInput eppInput) throws EppException {
@@ -152,7 +150,7 @@ public final class TldSpecificLogicProxy {
         RegistryExtraFlowLogicProxy.newInstanceForTld(registry.getTldStr());
     if (extraFlowLogic.isPresent()) {
       createFeeOrCredit = extraFlowLogic.get()
-          .getCreateFeeOrCredit(domainName, clientIdentifier, date, years, eppInput);
+          .getCreateFeeOrCredit(domainName, clientId, date, years, eppInput);
     } else {
       DomainPrices prices = getPricesForDomainName(domainName, date);
       createFeeOrCredit =
@@ -160,14 +158,9 @@ public final class TldSpecificLogicProxy {
     }
 
     // Create fees for the cost and the EAP fee, if any.
-    EapFee eapFee = registry.getEapFeeFor(date);
-    Money eapFeeCost = eapFee.getCost();
-    checkState(eapFeeCost.getCurrencyUnit().equals(currency));
-    if (!eapFeeCost.getAmount().equals(Money.zero(currency).getAmount())) {
-      return new EppCommandOperations(
-          currency,
-          createFeeOrCredit,
-          Fee.create(eapFeeCost.getAmount(), FeeType.EAP, eapFee.getPeriod().upperEndpoint()));
+    Fee eapFee = registry.getEapFeeFor(date);
+    if (!eapFee.hasZeroCost()) {
+      return new EppCommandOperations(currency, createFeeOrCredit, eapFee);
     } else {
       return new EppCommandOperations(currency, createFeeOrCredit);
     }
@@ -180,7 +173,7 @@ public final class TldSpecificLogicProxy {
   static BaseFee getRenewFeeOrCredit(
       Registry registry,
       String domainName,
-      String clientIdentifier,
+      String clientId,
       DateTime date,
       int years,
       EppInput eppInput) throws EppException {
@@ -193,7 +186,7 @@ public final class TldSpecificLogicProxy {
         throw new ResourceToMutateDoesNotExistException(DomainResource.class, domainName);
       }
       return
-          extraFlowLogic.get().getRenewFeeOrCredit(domain, clientIdentifier, date, years, eppInput);
+          extraFlowLogic.get().getRenewFeeOrCredit(domain, clientId, date, years, eppInput);
     } else {
       DomainPrices prices = getPricesForDomainName(domainName, date);
       return Fee.create(prices.getRenewCost().multipliedBy(years).getAmount(), FeeType.RENEW);
@@ -204,25 +197,25 @@ public final class TldSpecificLogicProxy {
   public static EppCommandOperations getRenewPrice(
       Registry registry,
       String domainName,
-      String clientIdentifier,
+      String clientId,
       DateTime date,
       int years,
       EppInput eppInput) throws EppException {
     return new EppCommandOperations(
         registry.getCurrency(),
-        getRenewFeeOrCredit(registry, domainName, clientIdentifier, date, years, eppInput));
+        getRenewFeeOrCredit(registry, domainName, clientId, date, years, eppInput));
   }
 
   /** Returns a new restore price for the pricer. */
   public static EppCommandOperations getRestorePrice(
       Registry registry,
       String domainName,
-      String clientIdentifier,
+      String clientId,
       DateTime date,
       EppInput eppInput) throws EppException {
     return new EppCommandOperations(
         registry.getCurrency(),
-        getRenewFeeOrCredit(registry, domainName, clientIdentifier, date, 1, eppInput),
+        getRenewFeeOrCredit(registry, domainName, clientId, date, 1, eppInput),
         Fee.create(registry.getStandardRestoreCost().getAmount(), FeeType.RESTORE));
   }
 
@@ -230,20 +223,20 @@ public final class TldSpecificLogicProxy {
   public static EppCommandOperations getTransferPrice(
       Registry registry,
       String domainName,
-      String clientIdentifier,
+      String clientId,
       DateTime transferDate,
       int years,
       EppInput eppInput) throws EppException {
     // Currently, all transfer prices = renew prices, so just pass through.
     return getRenewPrice(
-        registry, domainName, clientIdentifier, transferDate, years, eppInput);
+        registry, domainName, clientId, transferDate, years, eppInput);
   }
 
   /** Returns a new update price for the pricer. */
   public static EppCommandOperations getUpdatePrice(
       Registry registry,
       String domainName,
-      String clientIdentifier,
+      String clientId,
       DateTime date,
       EppInput eppInput) throws EppException {
     CurrencyUnit currency = registry.getCurrency();
@@ -259,7 +252,7 @@ public final class TldSpecificLogicProxy {
         throw new ResourceToMutateDoesNotExistException(DomainResource.class, domainName);
       }
       feeOrCredit =
-          extraFlowLogic.get().getUpdateFeeOrCredit(domain, clientIdentifier, date, eppInput);
+          extraFlowLogic.get().getUpdateFeeOrCredit(domain, clientId, date, eppInput);
     } else {
       feeOrCredit = Fee.create(Money.zero(registry.getCurrency()).getAmount(), FeeType.UPDATE);
     }

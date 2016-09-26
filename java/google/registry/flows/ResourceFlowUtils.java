@@ -15,6 +15,7 @@
 package google.registry.flows;
 
 import static com.google.common.base.Preconditions.checkState;
+import static google.registry.model.EppResourceUtils.loadByUniqueId;
 import static google.registry.model.EppResourceUtils.queryDomainsUsingResource;
 import static google.registry.model.domain.DomainResource.extendRegistrationWithCap;
 import static google.registry.model.ofy.ObjectifyService.ofy;
@@ -30,9 +31,14 @@ import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Work;
 import google.registry.flows.EppException.AuthorizationErrorException;
 import google.registry.flows.EppException.InvalidAuthorizationInformationErrorException;
+import google.registry.flows.exceptions.MissingTransferRequestAuthInfoException;
+import google.registry.flows.exceptions.NotPendingTransferException;
+import google.registry.flows.exceptions.NotTransferInitiatorException;
+import google.registry.flows.exceptions.ResourceAlreadyExistsException;
 import google.registry.flows.exceptions.ResourceStatusProhibitsOperationException;
 import google.registry.flows.exceptions.ResourceToDeleteIsReferencedException;
 import google.registry.flows.exceptions.ResourceToMutateDoesNotExistException;
+import google.registry.flows.exceptions.ResourceToQueryDoesNotExistException;
 import google.registry.model.EppResource;
 import google.registry.model.EppResource.Builder;
 import google.registry.model.EppResource.ForeignKeyedEppResource;
@@ -136,14 +142,14 @@ public class ResourceFlowUtils {
    */
   @SuppressWarnings("unchecked")
   public static <R extends EppResource> Builder<R, ? extends Builder<R, ?>>
-      prepareDeletedResourceAsBuilder(R existingResource, DateTime now) {
+      prepareDeletedResourceAsBuilder(R resource, DateTime now) {
     Builder<R, ? extends Builder<R, ?>> builder =
-        (Builder<R, ? extends Builder<R, ?>>) existingResource.asBuilder()
+        (Builder<R, ? extends Builder<R, ?>>) resource.asBuilder()
             .setDeletionTime(now)
             .setStatusValues(null)
             .setTransferData(
-                existingResource.getStatusValues().contains(StatusValue.PENDING_TRANSFER)
-                    ? existingResource.getTransferData().asBuilder()
+                resource.getStatusValues().contains(StatusValue.PENDING_TRANSFER)
+                    ? resource.getTransferData().asBuilder()
                         .setTransferStatus(TransferStatus.SERVER_CANCELLED)
                         .setServerApproveEntities(null)
                         .setServerApproveBillingEvent(null)
@@ -151,7 +157,7 @@ public class ResourceFlowUtils {
                         .setServerApproveAutorenewPollMessage(null)
                         .setPendingTransferExpirationTime(null)
                         .build()
-                    : existingResource.getTransferData())
+                    : resource.getTransferData())
             .wipeOut();
     return builder;
   }
@@ -165,9 +171,9 @@ public class ResourceFlowUtils {
 
   /** If there is a transfer out, delete the server-approve entities and enqueue a poll message. */
   public static <R extends EppResource> void handlePendingTransferOnDelete(
-      R existingResource, R newResource, DateTime now, HistoryEntry historyEntry) {
-    if (existingResource.getStatusValues().contains(StatusValue.PENDING_TRANSFER)) {
-      TransferData oldTransferData = existingResource.getTransferData();
+      R resource, R newResource, DateTime now, HistoryEntry historyEntry) {
+    if (resource.getStatusValues().contains(StatusValue.PENDING_TRANSFER)) {
+      TransferData oldTransferData = resource.getTransferData();
       ofy().delete().keys(oldTransferData.getServerApproveEntities());
       ofy().save().entity(new PollMessage.OneTime.Builder()
           .setClientId(oldTransferData.getGainingClientId())
@@ -176,7 +182,7 @@ public class ResourceFlowUtils {
           .setResponseData(ImmutableList.of(
               createTransferResponse(newResource, newResource.getTransferData(), now),
               createPendingTransferNotificationResponse(
-                  existingResource, oldTransferData.getTransferRequestTrid(), false, now)))
+                  resource, oldTransferData.getTransferRequestTrid(), false, now)))
           .setParent(historyEntry)
           .build());
     }
@@ -217,6 +223,99 @@ public class ResourceFlowUtils {
     }
   }
 
+  /**
+   * Turn a resource into a builder with its pending transfer resolved.
+   *
+   * <p>This removes the {@link StatusValue#PENDING_TRANSFER} status, sets the
+   * {@link TransferStatus}, clears all the server-approve fields on the {@link TransferData}
+   * including the extended registration years field, and sets the expiration time of the last
+   * pending transfer to now.
+   */
+  @SuppressWarnings("unchecked")
+  private static <R extends EppResource> EppResource.Builder<R, ?> resolvePendingTransfer(
+      R resource, TransferStatus transferStatus, DateTime now) {
+    return (EppResource.Builder<R, ?>) resource.asBuilder()
+        .removeStatusValue(StatusValue.PENDING_TRANSFER)
+        .setTransferData(resource.getTransferData().asBuilder()
+            .setExtendedRegistrationYears(null)
+            .setServerApproveEntities(null)
+            .setServerApproveBillingEvent(null)
+            .setServerApproveAutorenewEvent(null)
+            .setServerApproveAutorenewPollMessage(null)
+            .setTransferStatus(transferStatus)
+            .setPendingTransferExpirationTime(now)
+            .build());
+  }
+
+  /**
+   * Resolve a pending transfer by awarding it to the gaining client.
+   *
+   * <p>This removes the {@link StatusValue#PENDING_TRANSFER} status, sets the
+   * {@link TransferStatus}, clears all the server-approve fields on the {@link TransferData}
+   * including the extended registration years field, and sets the expiration time of the last
+   * pending transfer to now.
+   */
+  public static <R extends EppResource> R approvePendingTransfer(
+      R resource, TransferStatus transferStatus, DateTime now) {
+    Builder<R, ?> builder = resolvePendingTransfer(resource, transferStatus, now);
+    builder
+        .setLastTransferTime(now)
+        .setCurrentSponsorClientId(resource.getTransferData().getGainingClientId());
+    return builder.build();
+  }
+
+  /**
+   * Resolve a pending transfer by denying it.
+   *
+   * <p>This removes the {@link StatusValue#PENDING_TRANSFER} status, sets the
+   * {@link TransferStatus}, clears all the server-approve fields on the {@link TransferData}
+   * including the extended registration years field, sets the new client id, and sets the last
+   * transfer time and the expiration time of the last pending transfer to now.
+   */
+  public static <R extends EppResource> R denyPendingTransfer(
+      R resource, TransferStatus transferStatus, DateTime now) {
+    return resolvePendingTransfer(resource, transferStatus, now).build();
+  }
+
+  public static void verifyHasPendingTransfer(EppResource resource)
+      throws NotPendingTransferException {
+    if (resource.getTransferData().getTransferStatus() != TransferStatus.PENDING) {
+      throw new NotPendingTransferException(resource.getForeignKey());
+    }
+  }
+
+  public static <R extends EppResource> R loadResourceForQuery(
+      Class<R> clazz, String targetId, DateTime now) throws ResourceToQueryDoesNotExistException {
+    R resource = loadByUniqueId(clazz, targetId, now);
+    if (resource == null) {
+      throw new ResourceToQueryDoesNotExistException(clazz, targetId);
+    }
+    return resource;
+  }
+
+  public static <R extends EppResource> R loadResourceToMutate(
+      Class<R> clazz, String targetId, DateTime now) throws ResourceToMutateDoesNotExistException {
+    R resource = loadByUniqueId(clazz, targetId, now);
+    if (resource == null) {
+      throw new ResourceToMutateDoesNotExistException(clazz, targetId);
+    }
+    return resource;
+  }
+
+  public static <R extends EppResource> void verifyResourceDoesNotExist(
+      Class<R> clazz, String targetId, DateTime now)  throws EppException {
+    if (loadByUniqueId(clazz, targetId, now) != null) {
+      throw new ResourceAlreadyExistsException(targetId);
+    }
+  }
+
+  public static void verifyIsGainingRegistrar(EppResource resource, String clientId)
+      throws NotTransferInitiatorException {
+    if (!clientId.equals(resource.getTransferData().getGainingClientId())) {
+      throw new NotTransferInitiatorException();
+    }
+  }
+
   /** The specified resource belongs to another client. */
   public static class ResourceNotOwnedException extends AuthorizationErrorException {
     public ResourceNotOwnedException() {
@@ -230,6 +329,15 @@ public class ResourceFlowUtils {
     if (authInfo.isPresent()) {
       verifyAuthInfoForResource(authInfo.get(), resource);
     }
+  }
+
+  /** Check that the given AuthInfo is present and valid for a resource being transferred. */
+  public static void verifyRequiredAuthInfoForResourceTransfer(
+      Optional<AuthInfo> authInfo, EppResource existingResource) throws EppException {
+    if (!authInfo.isPresent()) {
+      throw new MissingTransferRequestAuthInfoException();
+    }
+    verifyOptionalAuthInfoForResource(authInfo, existingResource);
   }
 
   /** Check that the given AuthInfo is valid for the given resource. */
