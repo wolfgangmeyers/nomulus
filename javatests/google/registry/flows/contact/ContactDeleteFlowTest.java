@@ -25,10 +25,10 @@ import static google.registry.testing.DatastoreHelper.persistResource;
 
 import com.google.common.collect.ImmutableSet;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
 import google.registry.flows.exceptions.ResourceStatusProhibitsOperationException;
 import google.registry.flows.exceptions.ResourceToDeleteIsReferencedException;
-import google.registry.flows.exceptions.ResourceToMutateDoesNotExistException;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.reporting.HistoryEntry;
@@ -66,7 +66,7 @@ public class ContactDeleteFlowTest
     clock.advanceOneMilli();
     assertTransactionalFlow(true);
     runFlowAssertResponse(readFile("contact_delete_response.xml"));
-    ContactResource deletedContact = reloadResourceByUniqueId();
+    ContactResource deletedContact = reloadResourceByForeignKey();
     assertAboutContacts().that(deletedContact).hasStatusValue(StatusValue.PENDING_DELETE);
     assertAsyncDeletionTaskEnqueued(deletedContact, "TheRegistrar", false);
     assertAboutContacts().that(deletedContact)
@@ -78,7 +78,7 @@ public class ContactDeleteFlowTest
   @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -86,7 +86,7 @@ public class ContactDeleteFlowTest
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     persistDeletedContact(getUniqueIdFromCommand(), clock.nowUtc());
     runFlow();
@@ -125,7 +125,7 @@ public class ContactDeleteFlowTest
     clock.advanceOneMilli();
     runFlowAssertResponse(
         CommitMode.LIVE, UserPrivileges.SUPERUSER, readFile("contact_delete_response.xml"));
-    ContactResource deletedContact = reloadResourceByUniqueId();
+    ContactResource deletedContact = reloadResourceByForeignKey();
     assertAboutContacts().that(deletedContact).hasStatusValue(StatusValue.PENDING_DELETE);
     assertAsyncDeletionTaskEnqueued(deletedContact, "NewRegistrar", true);
     assertAboutContacts().that(deletedContact)

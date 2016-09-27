@@ -15,7 +15,7 @@
 package google.registry.flows.contact;
 
 import static google.registry.flows.ResourceFlowUtils.denyPendingTransfer;
-import static google.registry.flows.ResourceFlowUtils.loadResourceToMutate;
+import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
 import static google.registry.flows.contact.ContactFlowUtils.createLosingTransferPollMessage;
 import static google.registry.flows.contact.ContactFlowUtils.createTransferResponse;
@@ -43,7 +43,6 @@ import google.registry.model.transfer.TransferStatus;
 import javax.inject.Inject;
 
 /**
-/**
  * An EPP flow that cancels a pending transfer on a contact.
  *
  * <p>The "gaining" registrar requests a transfer from the "losing" (aka current) registrar. The
@@ -52,9 +51,9 @@ import javax.inject.Inject;
  * withdraw the transfer request.
  *
  * @error {@link google.registry.flows.ResourceFlowUtils.BadAuthInfoForResourceException}
+ * @error {@link google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException}
  * @error {@link google.registry.flows.exceptions.NotPendingTransferException}
  * @error {@link google.registry.flows.exceptions.NotTransferInitiatorException}
- * @error {@link google.registry.flows.exceptions.ResourceToMutateDoesNotExistException}
  */
 public final class ContactTransferCancelFlow extends LoggedInFlow implements TransactionalFlow {
 
@@ -72,7 +71,7 @@ public final class ContactTransferCancelFlow extends LoggedInFlow implements Tra
 
   @Override
   protected final EppOutput run() throws EppException {
-    ContactResource existingContact = loadResourceToMutate(ContactResource.class, targetId, now);
+    ContactResource existingContact = loadAndVerifyExistence(ContactResource.class, targetId, now);
     verifyOptionalAuthInfoForResource(authInfo, existingContact);
     TransferData transferData = existingContact.getTransferData();
     if (transferData.getTransferStatus() != TransferStatus.PENDING) {

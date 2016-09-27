@@ -14,14 +14,14 @@
 
 package google.registry.rdap;
 
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
+import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.request.Action.Method.GET;
 import static google.registry.request.Action.Method.HEAD;
 
 import com.google.common.collect.ImmutableMap;
 import google.registry.model.domain.DomainResource;
+import google.registry.rdap.RdapJsonFormatter.OutputDataType;
 import google.registry.request.Action;
-import google.registry.request.HttpException;
 import google.registry.request.HttpException.NotFoundException;
 import google.registry.util.Clock;
 import javax.inject.Inject;
@@ -50,17 +50,16 @@ public class RdapDomainAction extends RdapActionBase {
 
   @Override
   public ImmutableMap<String, Object> getJsonObjectForResource(
-      String pathSearchString, boolean isHeadRequest, String linkBase) throws HttpException {
+      String pathSearchString, boolean isHeadRequest, String linkBase) {
     DateTime now = clock.nowUtc();
     pathSearchString = canonicalizeName(pathSearchString);
     validateDomainName(pathSearchString);
     // The query string is not used; the RDAP syntax is /rdap/domain/mydomain.com.
-    DomainResource domainResource =
-        loadByUniqueId(DomainResource.class, pathSearchString, now);
+    DomainResource domainResource = loadByForeignKey(DomainResource.class, pathSearchString, now);
     if (domainResource == null) {
       throw new NotFoundException(pathSearchString + " not found");
     }
     return RdapJsonFormatter.makeRdapJsonForDomain(
-        domainResource, true, rdapLinkBase, rdapWhoisServer, now);
+        domainResource, true, rdapLinkBase, rdapWhoisServer, now, OutputDataType.FULL);
   }
 }

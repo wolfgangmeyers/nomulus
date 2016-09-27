@@ -27,10 +27,10 @@ import static google.registry.testing.TaskQueueHelper.assertNoDnsTasksEnqueued;
 import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
 import google.registry.flows.exceptions.ResourceStatusProhibitsOperationException;
 import google.registry.flows.exceptions.ResourceToDeleteIsReferencedException;
-import google.registry.flows.exceptions.ResourceToMutateDoesNotExistException;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.host.HostResource;
 import google.registry.model.reporting.HistoryEntry;
@@ -67,7 +67,7 @@ public class HostDeleteFlowTest extends ResourceFlowTestCase<HostDeleteFlow, Hos
     clock.advanceOneMilli();
     assertTransactionalFlow(true);
     runFlowAssertResponse(readFile("host_delete_response.xml"));
-    HostResource deletedHost = reloadResourceByUniqueId();
+    HostResource deletedHost = reloadResourceByForeignKey();
     assertAboutHosts().that(deletedHost).hasStatusValue(StatusValue.PENDING_DELETE);
     assertAsyncDeletionTaskEnqueued(deletedHost, "TheRegistrar", false);
     assertAboutHosts().that(deletedHost)
@@ -80,7 +80,7 @@ public class HostDeleteFlowTest extends ResourceFlowTestCase<HostDeleteFlow, Hos
   @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -88,7 +88,7 @@ public class HostDeleteFlowTest extends ResourceFlowTestCase<HostDeleteFlow, Hos
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     persistDeletedHost(getUniqueIdFromCommand(), clock.nowUtc());
     runFlow();
@@ -127,7 +127,7 @@ public class HostDeleteFlowTest extends ResourceFlowTestCase<HostDeleteFlow, Hos
     clock.advanceOneMilli();
     runFlowAssertResponse(
         CommitMode.LIVE, UserPrivileges.SUPERUSER, readFile("host_delete_response.xml"));
-    HostResource deletedHost = reloadResourceByUniqueId();
+    HostResource deletedHost = reloadResourceByForeignKey();
     assertAboutHosts().that(deletedHost).hasStatusValue(StatusValue.PENDING_DELETE);
     assertAsyncDeletionTaskEnqueued(deletedHost, "NewRegistrar", true);
     assertAboutHosts().that(deletedHost)

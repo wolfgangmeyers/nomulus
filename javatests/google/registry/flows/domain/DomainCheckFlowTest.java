@@ -29,7 +29,6 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
-import google.registry.flows.ResourceCheckFlow.TooManyResourceChecksException;
 import google.registry.flows.ResourceCheckFlowTestCase;
 import google.registry.flows.domain.DomainCheckFlow.OnlyCheckedNamesCanBeFeeCheckedException;
 import google.registry.flows.domain.DomainFlowUtils.BadDomainNameCharacterException;
@@ -48,6 +47,7 @@ import google.registry.flows.domain.DomainFlowUtils.RestoresAreAlwaysForOneYearE
 import google.registry.flows.domain.DomainFlowUtils.TldDoesNotExistException;
 import google.registry.flows.domain.DomainFlowUtils.TrailingDashException;
 import google.registry.flows.domain.DomainFlowUtils.UnknownFeeCommandException;
+import google.registry.flows.exceptions.TooManyResourceChecksException;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.launch.ApplicationStatus;
 import google.registry.model.domain.launch.LaunchPhase;
@@ -60,6 +60,7 @@ import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /** Unit tests for {@link DomainCheckFlow}. */
@@ -705,7 +706,7 @@ public class DomainCheckFlowTest
     setEppInput("domain_check_fee_not_in_avail.xml");
     runFlow();
   }
-  
+
   @Test
   public void testFeeExtension_multiyearRestore_v06() throws Exception {
     thrown.expect(RestoresAreAlwaysForOneYearException.class);
@@ -803,5 +804,11 @@ public class DomainCheckFlowTest
     runEapFeeCheckTest("domain_check_fee_date_v12.xml",
         "domain_check_eap_fee_response_date_v12.xml");
   }
-
+  
+  @Ignore
+  @Test
+  public void testSuccess_feeCheck_multipleRanges() throws Exception {
+    // TODO: If at some point we have more than one type of fees that are time dependent, populate
+    // this test to test if the notAfter date is the earliest of the end points of the ranges.
+  }
 }

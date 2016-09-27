@@ -15,7 +15,7 @@
 package google.registry.flows.contact;
 
 import static google.registry.flows.ResourceFlowUtils.failfastForAsyncDelete;
-import static google.registry.flows.ResourceFlowUtils.loadResourceToMutate;
+import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyNoDisallowedStatuses;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
 import static google.registry.flows.ResourceFlowUtils.verifyResourceOwnership;
@@ -44,7 +44,6 @@ import javax.inject.Inject;
 import org.joda.time.Duration;
 
 /**
-/**
  * An EPP flow that deletes a contact.
  *
  * <p>Contacts that are in use by any domain cannot be deleted. The flow may return immediately if a
@@ -53,10 +52,10 @@ import org.joda.time.Duration;
  * references to the host before the deletion is allowed to proceed. A poll message will be written
  * with the success or failure message when the process is complete.
  *
+ * @error {@link google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException}
  * @error {@link google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException}
  * @error {@link google.registry.flows.exceptions.ResourceStatusProhibitsOperationException}
  * @error {@link google.registry.flows.exceptions.ResourceToDeleteIsReferencedException}
- * @error {@link google.registry.flows.exceptions.ResourceToMutateDoesNotExistException}
  */
 public final class ContactDeleteFlow extends LoggedInFlow implements TransactionalFlow {
 
@@ -89,7 +88,7 @@ public final class ContactDeleteFlow extends LoggedInFlow implements Transaction
   @Override
   public final EppOutput run() throws EppException {
     failfastForAsyncDelete(targetId, now, ContactResource.class, GET_REFERENCED_CONTACTS);
-    ContactResource existingContact = loadResourceToMutate(ContactResource.class, targetId, now);
+    ContactResource existingContact = loadAndVerifyExistence(ContactResource.class, targetId, now);
     verifyNoDisallowedStatuses(existingContact, DISALLOWED_STATUSES);
     verifyOptionalAuthInfoForResource(authInfo, existingContact);
     if (!isSuperuser) {
