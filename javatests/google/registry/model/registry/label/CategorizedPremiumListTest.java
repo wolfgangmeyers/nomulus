@@ -1,12 +1,11 @@
 package google.registry.model.registry.label;
 
 import static com.google.common.truth.Truth.assertThat;
-import static google.registry.testing.DatastoreHelper.createTld;
-import static google.registry.testing.DatastoreHelper.persistResource;
+import static google.registry.testing.DatastoreHelper.persistCategorizedPremiumList;
+import static google.registry.testing.DatastoreHelper.persistPricingCategory;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
 
 import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import google.registry.model.pricing.PricingCategory;
 import google.registry.model.registry.Registry;
@@ -44,31 +43,22 @@ public class CategorizedPremiumListTest {
 
   @Before
   public void before() throws Exception {
-    PricingCategory pc = buildPricingCategory(US_PRICE_CATEGORY, USD_PRICE);
-    PricingCategory pc2 = buildPricingCategory(EURO_PRICE_CATEGORY, EURO_PRICE);
-    PricingCategory pc3 = buildPricingCategory(JAPANESE_PRICE_CATEGORY, JAPANESE_PRICE);
-
-    persistResource(pc);
-    persistResource(pc2);
-    persistResource(pc3);
+    PricingCategory pc = persistPricingCategory(US_PRICE_CATEGORY, USD_PRICE);
+    PricingCategory pc2 = persistPricingCategory(EURO_PRICE_CATEGORY, EURO_PRICE);
+    PricingCategory pc3 = persistPricingCategory(JAPANESE_PRICE_CATEGORY, JAPANESE_PRICE);
 
     // Adding three pricing categories with three different dates purposely to verify date
     // ordering for testing method 'getNextTransitionDateTime'
     premiumList =
-        buildPremiumList(
+        persistCategorizedPremiumList(
             ImmutableSortedMap.of(
                 FIVE_DAYS, pc.getName(), START_OF_TIME, pc2.getName(), THREE_DAYS, pc3.getName()),
             TLD_ONE,
             LABEL_ONE);
-    createTld(TLD_ONE);
-    persistResource(premiumList);
-    persistResource(Registry.get(TLD_ONE).asBuilder().setPremiumList(premiumList).build());
 
     // Second Premium List for testing for the @Nullable of method 'getNextTransitionDateTime'
     nullablePremiumList =
-        buildPremiumList(ImmutableSortedMap.of(START_OF_TIME, pc.getName()), TLD_TWO, LABEL_TWO);
-    createTld(TLD_TWO);
-    persistResource(Registry.get(TLD_TWO).asBuilder().setPremiumList(nullablePremiumList).build());
+        persistCategorizedPremiumList(ImmutableSortedMap.of(START_OF_TIME, pc.getName()), TLD_TWO, LABEL_TWO);
   }
 
   @Test
@@ -123,39 +113,5 @@ public class CategorizedPremiumListTest {
     assertThat(result.get()).isEqualTo(expected);
   }
 
-  /**
-   * Method returns a CategorizedPremiumList to allow for multiple to be built out for testing
-   * purposes
-   *
-   * @param map An ImmutableSortedMap that represents a DateTime value and associated
-   *     PricingCategory
-   * @param tld A string value representing a top level domain
-   * @param label A string value representing a key for the map
-   * @return A CategorizedPremiumList object
-   */
-  private CategorizedPremiumList buildPremiumList(
-      ImmutableSortedMap<DateTime, String> map, String tld, String label) {
 
-    return new CategorizedPremiumList.Builder()
-        .setName(tld)
-        .setPremiumListMap(
-            ImmutableMap.of(
-                label,
-                new CategorizedPremiumList.CategorizedListEntry.Builder()
-                    .setLabel(label)
-                    .setPricingCategoryTransitions(map)
-                    .build()))
-        .build().saveAndUpdateEntries();
-  }
-
-  /**
-   * Method returns a PricingCategory object
-   *
-   * @param category A string value representing the category
-   * @param money A sting value representing the money "USD 5.00"
-   * @return A PricingCategory object
-   */
-  private PricingCategory buildPricingCategory(String category, String money) {
-    return new PricingCategory.Builder().setName(category).setPrice(Money.parse(money)).build();
-  }
 }
