@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package google.registry.tools.server;
+package google.registry.batch;
 
 import static com.google.common.base.Verify.verifyNotNull;
 import static google.registry.mapreduce.MapreduceRunner.PARAM_DRY_RUN;
@@ -67,8 +67,7 @@ public class DeleteProberDataAction implements Runnable {
   public void run() {
     response.sendJavaScriptRedirect(PipelineUtils.createJobPath(mrRunner
         .setJobName("Delete prober data")
-        // TODO(b/27309488): maybe move this to the backend module.
-        .setModuleName("tools")
+        .setModuleName("backend")
         .runMapOnly(
             new DeleteProberDataMapper(getProberRoidSuffixes(), isDryRun),
             ImmutableList.of(EppResourceInputs.createKeyInput(DomainBase.class)))));
