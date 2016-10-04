@@ -24,6 +24,7 @@ import com.googlecode.objectify.Work;
 import com.googlecode.objectify.annotation.Cache;
 import com.googlecode.objectify.annotation.Embed;
 import com.googlecode.objectify.annotation.Entity;
+import com.googlecode.objectify.annotation.Ignore;
 import com.googlecode.objectify.annotation.Mapify;
 import com.googlecode.objectify.annotation.Parent;
 import com.googlecode.objectify.cmd.Query;
@@ -45,6 +46,8 @@ import javax.annotation.Nullable;
 @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
 public class CategorizedPremiumList
     extends BasePremiumList<String, CategorizedPremiumList.CategorizedListEntry> {
+
+  @Ignore private boolean entriesWereUpdated;
 
   private static LoadingCache<String, CategorizedPremiumList> cache = CacheBuilder
       .newBuilder()
@@ -180,11 +183,8 @@ public class CategorizedPremiumList
    */
   public CategorizedPremiumList saveAndUpdateEntries() {
     final Optional<CategorizedPremiumList> oldPremiumList = get(name);
-    // Only update entries if there's actually a new revision of the list to save (which there will
-    // be if the list content changes, vs just the description/metadata).
-    boolean entriesToUpdate =
-        !oldPremiumList.isPresent()
-            || !Objects.equals(oldPremiumList.get().revisionKey, this.revisionKey);
+    // Only update entries if there's actually changes to the entries
+    boolean entriesToUpdate = !oldPremiumList.isPresent() || entriesWereUpdated;
     // If needed, save the new child entities in a series of transactions.
     if (entriesToUpdate) {
       for (final List<CategorizedListEntry> batch
@@ -197,22 +197,11 @@ public class CategorizedPremiumList
       }
     }
     // Save the new PremiumList itself.
-    CategorizedPremiumList updated = ofy().transactNew(new Work<CategorizedPremiumList>() {
+    final CategorizedPremiumList updated = ofy().transactNew(new Work<CategorizedPremiumList>() {
         @Override
         public CategorizedPremiumList run() {
-          DateTime now = ofy().getTransactionTime();
-          // Assert that the premium list hasn't been changed since we started this process.
-          checkState(
-              Objects.equals(
-                  ofy()
-                    .load()
-                    .type(CategorizedPremiumList.class)
-                    .parent(getCrossTldKey())
-                    .id(name)
-                    .now(),
-                  oldPremiumList.orNull()),
-              "CategorizedPremiumList was concurrently edited");
-          CategorizedPremiumList newList = CategorizedPremiumList.this.asBuilder()
+          final DateTime now = ofy().getTransactionTime();
+          final CategorizedPremiumList newList = CategorizedPremiumList.this.asBuilder()
               .setLastUpdateTime(now)
               .setCreationTime(
                   oldPremiumList.isPresent() ? oldPremiumList.get().creationTime : now)
@@ -264,10 +253,8 @@ public class CategorizedPremiumList
       super(instance);
     }
 
-    private boolean entriesWereUpdated;
-
     public Builder setPremiumListMap(ImmutableMap<String, CategorizedListEntry> premiumListMap) {
-      entriesWereUpdated = true;
+      getInstance().entriesWereUpdated = true;
       getInstance().premiumListMap = premiumListMap;
       return this;
     }
@@ -279,7 +266,9 @@ public class CategorizedPremiumList
     @Override
     public CategorizedPremiumList build() {
       final CategorizedPremiumList instance = getInstance();
-      if (getInstance().revisionKey == null || entriesWereUpdated) {
+
+      // Only create a new revision if this is a new instance
+      if (getInstance().revisionKey == null) {
         getInstance().revisionKey = PremiumListRevision.createKey(instance);
       }
 

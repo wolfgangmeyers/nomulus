@@ -6,9 +6,11 @@ import static google.registry.testing.DatastoreHelper.persistPricingCategory;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import google.registry.model.pricing.PricingCategory;
 import google.registry.model.registry.Registry;
+import google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.ExceptionRule;
 import org.joda.money.CurrencyUnit;
@@ -57,13 +59,13 @@ public class CategorizedPremiumListTest {
             LABEL_ONE);
 
     // Second Premium List for testing for the @Nullable of method 'getNextTransitionDateTime'
-    nullablePremiumList =
-        persistCategorizedPremiumList(ImmutableSortedMap.of(START_OF_TIME, pc.getName()), TLD_TWO, LABEL_TWO);
+    nullablePremiumList = persistCategorizedPremiumList(
+        ImmutableSortedMap.of(START_OF_TIME, pc.getName()), TLD_TWO, LABEL_TWO);
   }
 
   @Test
   public void testCreateFromLine_shouldHandleCreate() {
-    CategorizedPremiumList.CategorizedListEntry entry =
+    CategorizedListEntry entry =
         premiumList.createFromLine("A, car, " + US_PRICE_CATEGORY);
     assertThat(entry.getValue()).isEqualTo(US_PRICE_CATEGORY);
   }
@@ -83,7 +85,7 @@ public class CategorizedPremiumListTest {
 
   @Test
   public void testGetNextTransitionDateTime_futureDate() {
-    CategorizedPremiumList.CategorizedListEntry entry =
+    CategorizedListEntry entry =
         premiumList.getPremiumListEntries().get(LABEL_ONE);
     DateTime nextTransitionDateTime = entry.getNextTransitionDateTime();
     PricingCategory futurePriceCategory = entry.getValueAtTime(nextTransitionDateTime);
@@ -95,7 +97,7 @@ public class CategorizedPremiumListTest {
 
   @Test
   public void testGetNextTransitionDateTime_whenTransitionDateTimeIsNullable() {
-    CategorizedPremiumList.CategorizedListEntry entry =
+    CategorizedListEntry entry =
         nullablePremiumList.getPremiumListEntries().get(LABEL_ONE);
     thrown.expect(NullPointerException.class);
     entry.getNextTransitionDateTime();
@@ -113,5 +115,32 @@ public class CategorizedPremiumListTest {
     assertThat(result.get()).isEqualTo(expected);
   }
 
+  @Test
+  public void updateEntitiesSameRevision() {
+    // Add to the existing entries
+    final ImmutableMap<String, CategorizedListEntry> updatedEntries =
+        ImmutableMap.<String, CategorizedListEntry>builder()
+            .putAll(premiumList.getPremiumListEntries())
+            .put("test",
+                new CategorizedListEntry.Builder()
+                    .setLabel("test")
+                    .setPricingCategoryTransitions(
+                        ImmutableSortedMap.of(START_OF_TIME, US_PRICE_CATEGORY))
+                    .build())
+            .build();
+
+    // Save and update should save the new entries while persisting the revision number
+    final CategorizedPremiumList updatedPremiumList = premiumList.asBuilder()
+        .setPremiumListMap(updatedEntries)
+        .build()
+        .saveAndUpdateEntries();
+
+    // Verify the revision key has not changed
+    assertThat(premiumList.getRevisionKey()).isEqualTo(updatedPremiumList.getRevisionKey());
+
+    // Verify the new entity has been added to the existing revision
+    assertThat(updatedPremiumList.getPremiumListEntries().size())
+        .isEqualTo(premiumList.getPremiumListEntries().size() + 1);
+  }
 
 }
