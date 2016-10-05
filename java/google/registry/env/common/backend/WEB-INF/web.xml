@@ -240,18 +240,10 @@
     <url-pattern>/_dr/task/exportDomainLists</url-pattern>
   </servlet-mapping>
 
-  <!-- Deletes the specified contact resource if it is not referenced by any domains. -->
-  <!-- TODO(b/26140521): Delete this mapping once non-batched async operations are deleted. -->
+  <!--  Mapreduce to delete all prober data. -->
   <servlet-mapping>
     <servlet-name>backend-servlet</servlet-name>
-    <url-pattern>/_dr/task/deleteContactResource</url-pattern>
-  </servlet-mapping>
-
-  <!-- Deletes the specified host resource if it is not referenced by any domains. -->
-  <!-- TODO(b/26140521): Delete this mapping once non-batched async operations are deleted. -->
-  <servlet-mapping>
-    <servlet-name>backend-servlet</servlet-name>
-    <url-pattern>/_dr/task/deleteHostResource</url-pattern>
+    <url-pattern>/_dr/task/deleteProberData</url-pattern>
   </servlet-mapping>
 
   <!--
@@ -267,6 +259,12 @@
   <servlet-mapping>
     <servlet-name>backend-servlet</servlet-name>
     <url-pattern>/_dr/task/dnsRefreshForHostRename</url-pattern>
+  </servlet-mapping>
+
+  <!-- Enqueues DNS update tasks following a host rename. -->
+  <servlet-mapping>
+    <servlet-name>backend-servlet</servlet-name>
+    <url-pattern>/_dr/task/refreshDnsOnHostRename</url-pattern>
   </servlet-mapping>
 
   <!--  Mapreduce to expand recurring billing events into OneTimes. -->

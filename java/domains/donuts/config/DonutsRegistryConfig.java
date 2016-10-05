@@ -220,13 +220,4 @@ public final class DonutsRegistryConfig implements RegistryConfig {
     return "Donuts";
   }
 
-  @Override
-  public Duration getAsyncDeleteFlowMapreduceDelay() {
-    return Duration.standardSeconds(90);
-  }
-
-  @Override
-  public Duration getAsyncFlowFailureBackoff() {
-    return Duration.standardMinutes(10);
-  }
 }

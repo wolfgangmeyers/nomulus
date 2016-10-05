@@ -39,8 +39,8 @@ import com.google.common.collect.ImmutableSortedMap;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException.UnimplementedExtensionException;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
-import google.registry.flows.ResourceMutateFlow.ResourceDoesNotExistException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyUnitMismatchException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyValueScaleException;
 import google.registry.flows.domain.DomainFlowUtils.DomainReservedException;
@@ -57,6 +57,7 @@ import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.TestExtraLogicManager;
+import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.poll.PollMessage;
@@ -454,7 +455,7 @@ public class DomainRestoreRequestFlowTest extends
   @Test
   public void testFailure_fullyDeleted() throws Exception {
     thrown.expect(ResourceDoesNotExistException.class);
-    persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc());
+    persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc().minusDays(1));
     runFlow();
   }
 
@@ -556,7 +557,7 @@ public class DomainRestoreRequestFlowTest extends
   public void testSuccess_flags() throws Exception {
     setEppInput("domain_update_restore_request_flags.xml");
     persistPendingDeleteDomain();
-    thrown.expect(IllegalArgumentException.class, "restored");
+    thrown.expect(TestExtraLogicManagerSuccessException.class, "restored");
     runFlow();
   }
 }

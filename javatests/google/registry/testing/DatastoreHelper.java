@@ -130,6 +130,13 @@ public class DatastoreHelper {
         domainName, generateNewDomainRoid(getTldFromDomainName(domainName)), contact);
   }
 
+  public static DomainResource newDomainResource(String domainName, HostResource host) {
+    return newDomainResource(domainName)
+        .asBuilder()
+        .setNameservers(ImmutableSet.of(Key.create(host)))
+        .build();
+  }
+
   public static DomainResource newDomainResource(
       String domainName, String repoId, ContactResource contact) {
     Key<ContactResource> contactKey = Key.create(contact);
@@ -215,6 +222,7 @@ public class DatastoreHelper {
         .setContactId(contactId)
         .setCurrentSponsorClientId("TheRegistrar")
         .setAuthInfo(ContactAuthInfo.create(PasswordAuth.create("2fooBAR")))
+        .setCreationTimeForTest(START_OF_TIME)
         .build();
   }
 
@@ -246,12 +254,10 @@ public class DatastoreHelper {
     return persistResource(newContactResource(contactId));
   }
 
-  public static ContactResource persistDeletedContact(String contactId, DateTime now) {
+  /** Persists a contact resource with the given contact id deleted at the specified time. */
+  public static ContactResource persistDeletedContact(String contactId, DateTime deletionTime) {
     return persistResource(
-        newContactResource(contactId)
-            .asBuilder()
-            .setDeletionTime(now.minusDays(1))
-            .build());
+        newContactResource(contactId).asBuilder().setDeletionTime(deletionTime).build());
   }
 
   public static HostResource persistActiveHost(String hostName) {
@@ -268,9 +274,10 @@ public class DatastoreHelper {
             .build());
   }
 
-  public static HostResource persistDeletedHost(String hostName, DateTime now) {
+  /** Persists a host resource with the given hostname deleted at the specified time. */
+  public static HostResource persistDeletedHost(String hostName, DateTime deletionTime) {
     return persistResource(
-        newHostResource(hostName).asBuilder().setDeletionTime(now.minusDays(1)).build());
+        newHostResource(hostName).asBuilder().setDeletionTime(deletionTime).build());
   }
 
   public static DomainResource persistActiveDomain(String domainName) {
@@ -286,17 +293,28 @@ public class DatastoreHelper {
     return persistResource(newDomainApplication(domainName, contact, phase));
   }
 
-  public static DomainApplication persistDeletedDomainApplication(String domainName, DateTime now) {
-    return persistResource(newDomainApplication(domainName).asBuilder()
-        .setDeletionTime(now.minusDays(1)).build());
+  /**
+   * Persists a domain application resource with the given domain name deleted at the specified
+   * time.
+   */
+  public static DomainApplication persistDeletedDomainApplication(
+      String domainName, DateTime deletionTime) {
+    return persistResource(
+        newDomainApplication(domainName).asBuilder().setDeletionTime(deletionTime).build());
   }
 
-  public static DomainResource persistDeletedDomain(String domainName, DateTime now) {
-    return persistDomainAsDeleted(newDomainResource(domainName), now);
+  /** Persists a domain resource with the given domain name deleted at the specified time. */
+  public static DomainResource persistDeletedDomain(String domainName, DateTime deletionTime) {
+    return persistDomainAsDeleted(newDomainResource(domainName), deletionTime);
   }
 
-  public static DomainResource persistDomainAsDeleted(DomainResource domain, DateTime now) {
-    return persistResource(domain.asBuilder().setDeletionTime(now.minusDays(1)).build());
+  /**
+   * Returns a persisted domain that is the passed-in domain modified to be deleted at the specified
+   * time.
+   */
+  public static DomainResource persistDomainAsDeleted(
+      DomainResource domain, DateTime deletionTime) {
+    return persistResource(domain.asBuilder().setDeletionTime(deletionTime).build());
   }
 
   /** Persists a domain and enqueues a LORDN task of the appropriate type for it. */

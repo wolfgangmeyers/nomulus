@@ -33,7 +33,6 @@ import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.secdns.DelegationSignerData;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.host.HostResource;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.soy.UniformRapidSuspensionSoyInfo;
 import java.util.ArrayList;
 import java.util.List;
@@ -48,7 +47,7 @@ import org.json.simple.parser.ParseException;
 /** A command to suspend a domain for the Uniform Rapid Suspension process. */
 @Parameters(separators = " =",
     commandDescription = "Suspend a domain for Uniform Rapid Suspension.")
-final class UniformRapidSuspensionCommand extends MutatingEppToolCommand implements GtechCommand {
+final class UniformRapidSuspensionCommand extends MutatingEppToolCommand {
 
   private static final ImmutableSet<String> URS_LOCKS = ImmutableSet.of(
       StatusValue.SERVER_DELETE_PROHIBITED.getXmlName(),
@@ -181,7 +180,8 @@ final class UniformRapidSuspensionCommand extends MutatingEppToolCommand impleme
     if (undo) {
       return "";
     }
-    StringBuilder undoBuilder = new StringBuilder("UNDO COMMAND:\n\ngtech_tool -e ")
+    StringBuilder undoBuilder = new StringBuilder("UNDO COMMAND:\n\n)")
+        .append("registry_tool -e ")
         .append(RegistryToolEnvironment.get())
         .append(" uniform_rapid_suspension --undo --domain_name ")
         .append(domainName);

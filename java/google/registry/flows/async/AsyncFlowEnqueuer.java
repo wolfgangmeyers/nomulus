@@ -14,21 +14,18 @@
 
 package google.registry.flows.async;
 
-import static com.google.appengine.api.taskqueue.QueueFactory.getQueue;
 import static google.registry.flows.async.DeleteContactsAndHostsAction.PARAM_IS_SUPERUSER;
 import static google.registry.flows.async.DeleteContactsAndHostsAction.PARAM_REQUESTING_CLIENT_ID;
 import static google.registry.flows.async.DeleteContactsAndHostsAction.PARAM_RESOURCE_KEY;
 import static google.registry.flows.async.DnsRefreshForHostRenameAction.PARAM_HOST_KEY;
-import static google.registry.request.Actions.getPathForAction;
+import static google.registry.flows.async.RefreshDnsOnHostRenameAction.QUEUE_ASYNC_HOST_RENAME;
 
 import com.google.appengine.api.taskqueue.Queue;
-import com.google.appengine.api.taskqueue.RetryOptions;
 import com.google.appengine.api.taskqueue.TaskOptions;
 import com.google.appengine.api.taskqueue.TaskOptions.Method;
 import com.google.appengine.api.taskqueue.TransientFailureException;
 import com.googlecode.objectify.Key;
 import google.registry.config.ConfigModule.Config;
-import google.registry.config.RegistryEnvironment;
 import google.registry.model.EppResource;
 import google.registry.model.host.HostResource;
 import google.registry.util.FormattingLogger;
@@ -45,6 +42,7 @@ public final class AsyncFlowEnqueuer {
 
   @Inject @Config("asyncDeleteFlowMapreduceDelay") Duration asyncDeleteDelay;
   @Inject @Named("async-delete-pull") Queue asyncDeletePullQueue;
+  @Inject @Named(QUEUE_ASYNC_HOST_RENAME) Queue asyncDnsRefreshPullQueue;
   @Inject Retrier retrier;
   @Inject AsyncFlowEnqueuer() {}
 
@@ -53,9 +51,9 @@ public final class AsyncFlowEnqueuer {
       EppResource resourceToDelete, String requestingClientId, boolean isSuperuser) {
     Key<EppResource> resourceKey = Key.create(resourceToDelete);
     logger.infofmt(
-        "Enqueueing async deletion of %s on behalf of registrar %s.",
+        "Enqueuing async deletion of %s on behalf of registrar %s.",
         resourceKey, requestingClientId);
-    final TaskOptions task =
+    TaskOptions task =
         TaskOptions.Builder
             .withMethod(Method.PULL)
             .countdownMillis(asyncDeleteDelay.getMillis())
@@ -65,19 +63,13 @@ public final class AsyncFlowEnqueuer {
     addTaskToQueueWithRetry(asyncDeletePullQueue, task);
   }
 
-  /** Enqueues a task to asynchronously refresh DNS for a host. */
+  /** Enqueues a task to asynchronously refresh DNS for a renamed host. */
   public void enqueueAsyncDnsRefresh(HostResource host) {
-    logger.infofmt("Enqueueing async DNS refresh for host %s", Key.create(host));
-    // Aggressively back off if the task fails, to minimize flooding the logs.
-    RetryOptions retryOptions =
-        RetryOptions.Builder.withMinBackoffSeconds(
-            RegistryEnvironment.get().config().getAsyncFlowFailureBackoff().getStandardSeconds());
-    final TaskOptions task =
-        TaskOptions.Builder.withUrl(getPathForAction(DnsRefreshForHostRenameAction.class))
-            .retryOptions(retryOptions)
-            .param(PARAM_HOST_KEY, Key.create(host).getString())
-            .method(Method.GET);
-    addTaskToQueueWithRetry(getQueue("flows-async"), task);
+    Key<HostResource> hostKey = Key.create(host);
+    logger.infofmt("Enqueuing async DNS refresh for renamed host %s.", hostKey);
+    addTaskToQueueWithRetry(
+        asyncDnsRefreshPullQueue,
+        TaskOptions.Builder.withMethod(Method.PULL).param(PARAM_HOST_KEY, hostKey.getString()));
   }
 
   /**
