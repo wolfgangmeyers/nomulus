@@ -440,6 +440,7 @@ afterReleaseBuild.dependsOn 'publish'
 release {
     failOnUnversionedFiles = false
     git {
+        requireBranch = '' // Jenkins checks out master in a detached state
         pushOptions = ['--no-verify']
     }
 }
