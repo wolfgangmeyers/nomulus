@@ -439,6 +439,7 @@ afterReleaseBuild.dependsOn 'publish'
 
 release {
     failOnUnversionedFiles = false
-    // TODO: remove
-    failOnCommitNeeded = false
+    git {
+        pushOptions = ['--no-verify']
+    }
 }
