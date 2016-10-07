@@ -18,7 +18,7 @@ node {
     if (currentBranch.contains('origin/master')) {
         stage 'Release'
         // Jenkins works in a detached state. Reattach back to master
-        sh 'git checkout -b origin/master'
+        sh 'git checkout -b master'
         sh './gradlew release -x check'
     }
 }
