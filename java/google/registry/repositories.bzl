@@ -432,12 +432,6 @@ def domain_registry_repositories():
   )
 
   native.maven_jar(
-      name = "protobuf_java",
-      artifact = "com.google.protobuf:protobuf-java:3.0.0-beta-3",
-      sha1 = "ed8c2f9a63cfa770292f8173fd0172bdaa014fe3",
-  )
-
-  native.maven_jar(
       name = "qdox",
       artifact = "com.thoughtworks.qdox:qdox:1.12.1",
       sha1 = "f7122f6ab1f64bdf9f5970b0e89bfb355e036897",
@@ -469,8 +463,8 @@ def domain_registry_repositories():
 
   native.maven_jar(
       name = "truth",
-      artifact = "com.google.truth:truth:0.28",
-      sha1 = "0a388c7877c845ff4b8e19689dda5ac9d34622c4",
+      artifact = "com.google.truth:truth:0.30",
+      sha1 = "9d591b5a66eda81f0b88cf1c748ab8853d99b18b",
   )
 
   native.maven_jar(
