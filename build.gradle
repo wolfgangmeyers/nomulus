@@ -74,7 +74,7 @@ ext {
     closureTemplatesVersion = '20151008.0.0'
     hamcrestVersion = '1.3'
     junitVersion = '4.11'
-    googleTruthVersion = '0.28'
+    googleTruthVersion = '0.30'
     mockitoVersion = '1.9.5'
     ftpServerCoreVersion = '1.0.6'
     fastUtilVersion = '6.4.3'
@@ -255,7 +255,7 @@ def adding_custom_package_info() {
     def out_dir = "$projectDir/build/generated/jaxb/java/ublConfig/google/registry/xjc"
     def result = exec {
         workingDir "$projectDir/java/google/registry/xjc/"
-        commandLine 'sh', "make_pkginfo.sh", 'package-info.java.in', out_dir
+        commandLine './make_pkginfo.sh', 'package-info.java.in', out_dir
     }
 }
 
@@ -354,7 +354,7 @@ def genFieldExposer(String exposer, String output) {
     def stdout = new ByteArrayOutputStream()
         def result = exec {
             workingDir "$projectDir/java/google/registry/model/"
-            commandLine 'sh', "generate_field_exposer.sh", "/model/" + exposer
+            commandLine "./generate_field_exposer.sh", "/model/" + exposer
             standardOutput = stdout
         }
         def resultAsString = stdout.toString()
@@ -371,7 +371,7 @@ task genFieldExposerRegistry << {
     def stdout = new ByteArrayOutputStream()
     exec {
         workingDir "$projectDir/java/google/registry/model/"
-        commandLine 'sh', 'generate_field_exposer_registry.sh', FIELD_EXPOSERS.join(", "),');'
+        commandLine './generate_field_exposer_registry.sh', FIELD_EXPOSERS.join(", "),');'
         standardOutput = stdout
     }
 

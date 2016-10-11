@@ -44,7 +44,6 @@ import javax.inject.Inject;
  * @error {@link google.registry.flows.LoggedInFlow.UndeclaredServiceExtensionException}
  * @error {@link google.registry.flows.ResourceCreateFlow.ResourceAlreadyExistsException}
  * @error {@link google.registry.flows.ResourceCreateOrMutateFlow.OnlyToolCanPassMetadataException}
- * @error {@link google.registry.flows.ResourceFlow.BadCommandForRegistryPhaseException}
  * @error {@link google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException}
  * @error {@link BaseDomainCreateFlow.AcceptedTooLongAgoException}
  * @error {@link BaseDomainCreateFlow.ClaimsPeriodEndedException}
@@ -161,7 +160,7 @@ public class DomainCreateFlow extends DomainCreateOrAllocateFlow {
             .setParent(historyEntry)
             .build();
     ofy().save().entity(createEvent);
-    
+
     // Bill for EAP cost, if any.
     if (!commandOperations.getEapCost().isZero()) {
       BillingEvent.OneTime eapEvent =

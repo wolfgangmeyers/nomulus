@@ -5,8 +5,21 @@ working registry system up and running. Broadly speaking, configuration works in
 two ways -- globally, for the entire sytem, and per-TLD. Global configuration is
 managed by editing code and deploying a new version, whereas per-TLD
 configuration is data that lives in Datastore in `Registry` entities, and is
-updated by running `registry_tool` commands without having to deploy a new
-version.
+updated by running `nomulus` commands without having to deploy a new version.
+
+[TOC]
+
+## Initial configuration
+
+Here's a checklist of things that need to be configured upon initial
+installation of the project:
+
+*   Create Google Cloud Storage buckets (see the [App Engine architecture
+    guide](./app-engine-architecture.md)).
+*   Modify `ConfigModule.java` and set project-specific settings such as product
+    name (see below).
+*   Copy and edit `ProductionRegistryConfigExample.java` with your
+    project-specific settings (see below).
 
 ## Environments
 
@@ -54,13 +67,17 @@ If you are adding new options, prefer adding them to `ConfigModule`.
 **`RegistryConfig`** is an interface, of which you write an implementing class
 containing the configuration values. `RegistryConfigLoader` is the class that
 provides the instance of `RegistryConfig`, and defaults to returning
-`ProductionRegistryConfigExample`. In order to create a configuration specific
-to your registry, we recommend copying the `ProductionRegistryConfigExample`
-class to a new class that will not be shared publicly, setting the
-`com.google.domain.registry.config` system property in `appengine-web.xml` to
-the fully qualified class name of that new class so that `RegistryConfigLoader`
-will load it instead, and then editing said new class to add your specific
-configuration options.
+`ProductionRegistryConfigExample`.
+
+In order to create a configuration specific to your registry, we recommend
+copying the `ProductionRegistryConfigExample` class to a new class that will not
+be shared publicly, setting the `google.registry.config` system property in the
+`appengine-web.xml` files to the fully qualified class name of that new class
+so that `RegistryConfigLoader` will load it instead, and then editing said new
+class to add your specific configuration options. There is one
+`appengine-web.xml` file per service (so three per environment). The same
+configuration class must be used for each service, but different ones can be
+used for different environments.
 
 The `RegistryConfig` class has documentation on all of the methods that should
 be sufficient to explain what each option is, and
@@ -112,9 +129,9 @@ to provide from `Keyring`, and you can see examples of them in action in
 configuration. They contain any kind of configuration that is specific to a TLD,
 such as the create/renew price of a domain name, the pricing engine
 implementation, the DNS writer implementation, whether escrow exports are
-enabled, the default currency, the reserved label lists, and more. The
-`update_tld` command in `registry_tool` is used to set all of these options. See
-the "Registry tool" documentation for more information, as well as the
+enabled, the default currency, the reserved label lists, and more. The `nomulus
+update_tld` command is used to set all of these options. See the [admin tool
+documentation](./admin-tool.md) for more information, as well as the
 command-line help for the `update_tld` command. Unlike global configuration
 above, per-TLD configuration options are stored as data in the running system,
 and thus do not require code pushes to update.

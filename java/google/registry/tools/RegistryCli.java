@@ -50,7 +50,7 @@ final class RegistryCli {
 
   // The <? extends Class<? extends Command>> wildcard looks a little funny, but is needed so that
   // we can accept maps with value types that are subtypes of Class<? extends Command> rather than
-  // literally that type (e.g. Class<? extends GtechCommand>).  For more explanation, see:
+  // literally that type.  For more explanation, see:
   //   http://www.angelikalanger.com/GenericsFAQ/FAQSections/TypeArguments.html#FAQ104
   void run(
       String programName,
@@ -85,7 +85,7 @@ final class RegistryCli {
       } else {
         jcommander.usage(jcommander.getParsedCommand());
       }
-      // Don't rethrow if we said: registry_tool command --help
+      // Don't rethrow if we said: nomulus command --help
       if ("Unknown option: --help".equals(e.getMessage())) {
         return;
       }
