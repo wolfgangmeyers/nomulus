@@ -16,7 +16,9 @@ package google.registry.model;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
+
 import com.googlecode.objectify.Key;
+
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.RegistrarBillingEntry;
 import google.registry.model.billing.RegistrarCredit;
@@ -31,6 +33,7 @@ import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.LrpToken;
 import google.registry.model.export.LogsExportCursor;
 import google.registry.model.host.HostResource;
+import google.registry.model.icann.IcannReportField;
 import google.registry.model.index.DomainApplicationIndex;
 import google.registry.model.index.EppResourceIndex;
 import google.registry.model.index.EppResourceIndexBucket;
@@ -62,10 +65,14 @@ import google.registry.model.tmch.ClaimsListShard.ClaimsListSingleton;
 import google.registry.model.tmch.TmchCrl;
 import google.registry.model.user.User;
 
-/** Sets of classes of the Objectify-registered entities in use throughout the model. */
+/**
+ * Sets of classes of the Objectify-registered entities in use throughout the model.
+ */
 public final class EntityClasses {
 
-  /** Set of entity classes. */
+  /**
+   * Set of entity classes.
+   */
   @SuppressWarnings("unchecked")  // varargs
   public static final ImmutableSet<Class<? extends ImmutableObject>> ALL_CLASSES =
       ImmutableSet.<Class<? extends ImmutableObject>>of(
@@ -99,6 +106,7 @@ public final class EntityClasses {
           GaeUserIdConverter.class,
           HistoryEntry.class,
           HostResource.class,
+          IcannReportField.class,
           Lock.class,
           LogsExportCursor.class,
           LrpToken.class,
@@ -138,5 +146,6 @@ public final class EntityClasses {
         }
       };
 
-  private EntityClasses() {}
+  private EntityClasses() {
+  }
 }

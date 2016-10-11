@@ -401,6 +401,21 @@ class google.registry.model.host.HostResource {
   org.joda.time.DateTime lastSuperordinateChange;
   org.joda.time.DateTime lastTransferTime;
 }
+class google.registry.model.icann.IcannReportField {
+  @Id java.lang.String id;
+  @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
+  google.registry.model.icann.IcannReportField$Type type;
+  java.lang.Integer count;
+  java.lang.String month;
+  java.lang.String name;
+  java.lang.String tld;
+  java.lang.String year;
+}
+enum google.registry.model.icann.IcannReportField$Type {
+  DNS;
+  REGISTRAR;
+  TLD;
+}
 class google.registry.model.index.DomainApplicationIndex {
   @Id java.lang.String fullyQualifiedDomainName;
   google.registry.model.UpdateAutoTimestamp updateTimestamp;
