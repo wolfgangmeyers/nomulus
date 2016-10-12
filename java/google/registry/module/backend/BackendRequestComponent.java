@@ -42,7 +42,6 @@ import google.registry.export.sheet.SheetModule;
 import google.registry.export.sheet.SyncRegistrarsSheetAction;
 import google.registry.flows.async.AsyncFlowsModule;
 import google.registry.flows.async.DeleteContactsAndHostsAction;
-import google.registry.flows.async.DnsRefreshForHostRenameAction;
 import google.registry.flows.async.RefreshDnsOnHostRenameAction;
 import google.registry.mapreduce.MapreduceModule;
 import google.registry.monitoring.whitebox.MetricsExportAction;
@@ -91,7 +90,6 @@ interface BackendRequestComponent {
   DeleteContactsAndHostsAction deleteContactsAndHostsAction();
   DeleteOldCommitLogsAction deleteOldCommitLogsAction();
   DeleteProberDataAction deleteProberDataAction();
-  DnsRefreshForHostRenameAction dnsRefreshForHostRenameAction();
   ExpandRecurringBillingEventsAction expandRecurringBillingEventsAction();
   ExportCommitLogDiffAction exportCommitLogDiffAction();
   ExportDomainListsAction exportDomainListsAction();

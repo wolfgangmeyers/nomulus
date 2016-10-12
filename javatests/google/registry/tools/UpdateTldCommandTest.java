@@ -482,8 +482,6 @@ public class UpdateTldCommandTest extends CommandTestCase<UpdateTldCommand> {
 
   @Test
   public void testFailure_setCurrentTldState_outOfOrder() throws Exception {
-    thrown.expect(
-        IllegalArgumentException.class, "The TLD states are chronologically out of order");
     persistResource(
         Registry.get("xn--q9jyb4c").asBuilder()
             .setTldStateTransitions(
@@ -491,14 +489,13 @@ public class UpdateTldCommandTest extends CommandTestCase<UpdateTldCommand> {
                     START_OF_TIME, TldState.PREDELEGATION,
                     now.minusMonths(1), TldState.GENERAL_AVAILABILITY))
             .build());
+    thrown.expect(
+        IllegalArgumentException.class, "The TLD states are chronologically out of order");
     runCommandForced("--set_current_tld_state=SUNRISE", "xn--q9jyb4c");
   }
 
   @Test
   public void testFailure_setCurrentTldState_laterTransitionScheduled() throws Exception {
-    thrown.expect(
-        IllegalArgumentException.class,
-        " when there is a later transition already scheduled");
     persistResource(
         Registry.get("xn--q9jyb4c").asBuilder()
             .setTldStateTransitions(
@@ -506,14 +503,14 @@ public class UpdateTldCommandTest extends CommandTestCase<UpdateTldCommand> {
                     START_OF_TIME, TldState.PREDELEGATION,
                     now.plusMonths(1), TldState.GENERAL_AVAILABILITY))
             .build());
+    thrown.expect(
+        IllegalArgumentException.class,
+        " when there is a later transition already scheduled");
     runCommandForced("--set_current_tld_state=SUNRISE", "xn--q9jyb4c");
   }
 
   @Test
   public void testFailure_setCurrentTldState_inProduction() throws Exception {
-    thrown.expect(
-        IllegalArgumentException.class,
-        "--set_current_tld_state is not safe to use in production.");
     persistResource(
         Registry.get("xn--q9jyb4c").asBuilder()
             .setTldStateTransitions(
@@ -521,6 +518,9 @@ public class UpdateTldCommandTest extends CommandTestCase<UpdateTldCommand> {
                     START_OF_TIME, TldState.PREDELEGATION,
                     now.minusMonths(1), TldState.GENERAL_AVAILABILITY))
             .build());
+    thrown.expect(
+        IllegalArgumentException.class,
+        "--set_current_tld_state is not safe to use in production.");
     runCommandInEnvironment(
         RegistryToolEnvironment.PRODUCTION,
         "--set_current_tld_state=SUNRISE",
