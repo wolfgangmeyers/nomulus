@@ -21,7 +21,6 @@ import com.beust.jcommander.Parameters;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.InetAddresses;
 import com.google.template.soy.data.SoyMapData;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.soy.HostCreateSoyInfo;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
@@ -30,13 +29,13 @@ import java.util.List;
 
 /** A command to create a new host via EPP. */
 @Parameters(separators = " =", commandDescription = "Create a new host via EPP.")
-final class CreateHostCommand extends MutatingEppToolCommand implements GtechCommand {
+final class CreateHostCommand extends MutatingEppToolCommand {
 
   @Parameter(
       names = {"-c", "--client"},
       description = "Client identifier of the registrar to execute the command as.",
       required = true)
-  String clientIdentifier;
+  String clientId;
 
   @Parameter(
       names = "--host",
@@ -67,7 +66,7 @@ final class CreateHostCommand extends MutatingEppToolCommand implements GtechCom
       }
     }
     addSoyRecord(
-        clientIdentifier,
+        clientId,
         new SoyMapData(
             "hostname", hostName,
             "ipv4addresses", ipv4Addresses.build(),

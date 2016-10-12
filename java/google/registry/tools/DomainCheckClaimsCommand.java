@@ -18,20 +18,19 @@ import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.collect.Multimap;
 import com.google.template.soy.data.SoyMapData;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.soy.DomainCheckClaimsSoyInfo;
 import java.util.Collection;
 import java.util.List;
 
 /** A command to execute a domain check claims epp command. */
 @Parameters(separators = " =", commandDescription = "Check claims on domain(s)")
-final class DomainCheckClaimsCommand extends EppToolCommand implements GtechCommand {
+final class DomainCheckClaimsCommand extends EppToolCommand {
 
   @Parameter(
       names = {"-c", "--client"},
       description = "Client identifier of the registrar to execute the command as",
       required = true)
-  String clientIdentifier;
+  String clientId;
 
   @Parameter(
       description = "Domain(s) to check.",
@@ -44,7 +43,7 @@ final class DomainCheckClaimsCommand extends EppToolCommand implements GtechComm
     for (Collection<String> values : domainNameMap.asMap().values()) {
       setSoyTemplate(
           DomainCheckClaimsSoyInfo.getInstance(), DomainCheckClaimsSoyInfo.DOMAINCHECKCLAIMS);
-      addSoyRecord(clientIdentifier, new SoyMapData("domainNames", values));
+      addSoyRecord(clientId, new SoyMapData("domainNames", values));
     }
   }
 }

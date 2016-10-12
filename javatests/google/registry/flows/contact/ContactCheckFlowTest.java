@@ -18,8 +18,8 @@ import static google.registry.model.eppoutput.CheckData.ContactCheck.create;
 import static google.registry.testing.DatastoreHelper.persistActiveContact;
 import static google.registry.testing.DatastoreHelper.persistDeletedContact;
 
-import google.registry.flows.ResourceCheckFlow.TooManyResourceChecksException;
 import google.registry.flows.ResourceCheckFlowTestCase;
+import google.registry.flows.exceptions.TooManyResourceChecksException;
 import google.registry.model.contact.ContactResource;
 import org.junit.Test;
 
@@ -52,7 +52,7 @@ public class ContactCheckFlowTest
 
   @Test
   public void testOneExistsButWasDeleted() throws Exception {
-    persistDeletedContact("sh8013", clock.nowUtc());
+    persistDeletedContact("sh8013", clock.nowUtc().minusDays(1));
     // These ids come from the check xml.
     doCheckTest(
         create(true, "sh8013", null),

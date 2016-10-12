@@ -36,11 +36,13 @@ import google.registry.xjc.rderegistrar.XjcRdeRegistrar;
 import java.io.IOException;
 import java.io.InputStream;
 import javax.inject.Inject;
+import javax.xml.bind.JAXBException;
 import javax.xml.stream.XMLStreamException;
-import org.joda.time.DateTime;
 
-/** Utility functions for escrow file import. */
-public final class RdeImportUtils {
+/**
+ * Utility functions for escrow file import.
+ */
+public class RdeImportUtils {
 
   private static final FormattingLogger logger = FormattingLogger.getLoggerForCallerClass();
 
@@ -131,7 +133,7 @@ public final class RdeImportUtils {
         String tld = parser.getHeader().getTld();
         try {
           Registry registry = Registry.get(tld);
-          TldState currentState = registry.getTldState(DateTime.now());
+          TldState currentState = registry.getTldState(clock.nowUtc());
           checkArgument(
               currentState == TldState.PREDELEGATION,
               String.format("Tld '%s' is in state %s and cannot be imported", tld, currentState));
@@ -147,7 +149,7 @@ public final class RdeImportUtils {
                 String.format("Registrar '%s' not found in the registry", registrar.getId()));
           }
         }
-      } catch (XMLStreamException e) {
+      } catch (XMLStreamException | JAXBException e) {
         throw new IllegalArgumentException(
             String.format("Invalid XML file: '%s'", escrowFilePath), e);
       }

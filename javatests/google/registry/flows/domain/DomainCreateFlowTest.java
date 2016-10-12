@@ -21,6 +21,7 @@ import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.pricing.PricingEngineProxy.getPricesForDomainName;
 import static google.registry.testing.DatastoreHelper.assertBillingEvents;
 import static google.registry.testing.DatastoreHelper.createTld;
+import static google.registry.testing.DatastoreHelper.createTlds;
 import static google.registry.testing.DatastoreHelper.deleteTld;
 import static google.registry.testing.DatastoreHelper.getHistoryEntries;
 import static google.registry.testing.DatastoreHelper.newContactResource;
@@ -52,7 +53,6 @@ import google.registry.flows.EppRequestSource;
 import google.registry.flows.LoggedInFlow.UndeclaredServiceExtensionException;
 import google.registry.flows.ResourceCreateFlow.ResourceAlreadyExistsException;
 import google.registry.flows.ResourceCreateOrMutateFlow.OnlyToolCanPassMetadataException;
-import google.registry.flows.ResourceFlow.BadCommandForRegistryPhaseException;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.domain.BaseDomainCreateFlow.AcceptedTooLongAgoException;
 import google.registry.flows.domain.BaseDomainCreateFlow.ClaimsPeriodEndedException;
@@ -104,6 +104,8 @@ import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.LrpToken;
+import google.registry.model.domain.TestExtraLogicManager;
+import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.launch.ApplicationStatus;
 import google.registry.model.domain.launch.LaunchNotice;
 import google.registry.model.domain.rgp.GracePeriodStatus;
@@ -134,7 +136,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
 
   @Before
   public void initCreateTest() throws Exception {
-    createTld("tld");
+    createTlds("tld", "flags");
     persistResource(Registry.get("tld").asBuilder()
         .setReservedLists(persistReservedList(
             "tld-reserved",
@@ -142,6 +144,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
             "anchor,RESERVED_FOR_ANCHOR_TENANT,2fooBAR"))
         .build());
     persistClaimsList(ImmutableMap.of("example-one", CLAIMS_KEY));
+    RegistryExtraFlowLogicProxy.setOverride("flags", TestExtraLogicManager.class);
   }
 
   /**
@@ -162,13 +165,14 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   }
 
   private void assertSuccessfulCreate(String domainTld, boolean isAnchorTenant) throws Exception {
-    DomainResource domain = reloadResourceByUniqueId();
+    DomainResource domain = reloadResourceByForeignKey();
 
     // Calculate the total cost.
     Money cost = getPricesForDomainName(getUniqueIdFromCommand(), clock.nowUtc()).isPremium()
         ? Money.of(USD, 200)
         : Money.of(USD, 26);
-    Money eapFee = Registry.get(domainTld).getEapFeeFor(clock.nowUtc()).getCost();
+    Money eapFee = Money.of(Registry.get(domainTld).getCurrency(),
+        Registry.get(domainTld).getEapFeeFor(clock.nowUtc()).getCost());
 
     DateTime billingTime = isAnchorTenant
         ? clock.nowUtc().plus(Registry.get(domainTld).getAnchorTenantAddGracePeriodLength())
@@ -208,34 +212,26 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
             .setParent(historyEntry)
             .build();
 
-    ImmutableSet<BillingEvent> billingEvents = ImmutableSet.of(
-        createBillingEvent, renewBillingEvent);
+    ImmutableSet.Builder<BillingEvent> expectedBillingEvents =
+        new ImmutableSet.Builder<BillingEvent>().add(createBillingEvent).add(renewBillingEvent);
 
     // If EAP is applied, a billing event for EAP should be present.
     if (!eapFee.isZero()) {
-      ImmutableSet<BillingEvent.Flag> eapFlags =
-          isAnchorTenant
-              ? ImmutableSet.of(BillingEvent.Flag.ANCHOR_TENANT, BillingEvent.Flag.EAP)
-              : ImmutableSet.of(BillingEvent.Flag.EAP);
       BillingEvent.OneTime eapBillingEvent =
           new BillingEvent.OneTime.Builder()
-              .setReason(Reason.CREATE)
+              .setReason(Reason.FEE_EARLY_ACCESS)
               .setTargetId(getUniqueIdFromCommand())
               .setClientId("TheRegistrar")
               .setCost(eapFee)
-              .setPeriodYears(2)
               .setEventTime(clock.nowUtc())
               .setBillingTime(billingTime)
-              .setFlags(eapFlags)
+              .setFlags(billingFlags)
               .setParent(historyEntry)
               .build();
-      billingEvents = ImmutableSet.<BillingEvent>builder()
-          .addAll(billingEvents)
-          .add(eapBillingEvent)
-          .build();
+      expectedBillingEvents.add(eapBillingEvent);
     }
-    assertBillingEvents(billingEvents);
-    
+    assertBillingEvents(expectedBillingEvents.build());
+
     assertGracePeriods(
         domain.getGracePeriods(),
         ImmutableMap.of(
@@ -251,21 +247,21 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
 
   private void assertNoLordn() throws Exception {
     // TODO(b/26161326): Assert tasks NOT enqueued.
-    assertAboutDomains().that(reloadResourceByUniqueId())
+    assertAboutDomains().that(reloadResourceByForeignKey())
         .hasSmdId(null).and()
         .hasLaunchNotice(null);
   }
 
   private void assertSunriseLordn() throws Exception {
     // TODO(b/26161326): Assert tasks enqueued.
-    assertAboutDomains().that(reloadResourceByUniqueId())
+    assertAboutDomains().that(reloadResourceByForeignKey())
         .hasSmdId("0000001761376042759136-65535").and()
         .hasLaunchNotice(null);
   }
 
   private void assertClaimsLordn() throws Exception {
     // TODO(b/26161326): Assert tasks enqueued.
-    assertAboutDomains().that(reloadResourceByUniqueId())
+    assertAboutDomains().that(reloadResourceByForeignKey())
         .hasSmdId(null).and()
         .hasLaunchNotice(LaunchNotice.create(
             "370d0b7c9223372036854775807",
@@ -475,7 +471,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
     setEppInput("domain_create_metadata.xml");
     persistContactsAndHosts();
     doSuccessfulTest();
-    assertAboutDomains().that(reloadResourceByUniqueId())
+    assertAboutDomains().that(reloadResourceByForeignKey())
         .hasOnlyOneHistoryEntryWhich()
         .hasType(HistoryEntry.Type.DOMAIN_CREATE).and()
         .hasMetadataReason("domain-create-test").and()
@@ -524,7 +520,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   @Test
   public void testSuccess_existedButWasDeleted() throws Exception {
     persistContactsAndHosts();
-    persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc());
+    persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc().minusDays(1));
     clock.advanceOneMilli();
     doSuccessfulTest();
   }
@@ -541,7 +537,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
     setEppInput("domain_create_dsdata_no_maxsiglife.xml");
     persistContactsAndHosts("tld");  // For some reason this sample uses "tld".
     doSuccessfulTest("tld");
-    assertAboutDomains().that(reloadResourceByUniqueId()).hasExactlyDsData(
+    assertAboutDomains().that(reloadResourceByForeignKey()).hasExactlyDsData(
         DelegationSignerData.create(12345, 3, 1, base16().decode("49FD46E6C4B45C55D4AC")));
   }
 
@@ -550,7 +546,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
     setEppInput("domain_create_dsdata_8_records.xml");
     persistContactsAndHosts("tld");  // For some reason this sample uses "tld".
     doSuccessfulTest("tld");
-    assertAboutDomains().that(reloadResourceByUniqueId()).hasNumDsData(8);
+    assertAboutDomains().that(reloadResourceByForeignKey()).hasNumDsData(8);
   }
 
   @Test
@@ -577,7 +573,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
     persistContactsAndHosts();
     runFlowAssertResponse(readFile("domain_create_response.xml"),
         "epp.response.resData.creData.exDate");  // Ignore expiration date; we verify it below
-    assertAboutDomains().that(reloadResourceByUniqueId())
+    assertAboutDomains().that(reloadResourceByForeignKey())
         .hasRegistrationExpirationTime(clock.nowUtc().plusYears(1));
     assertDnsTasksEnqueued("example.tld");
   }
@@ -966,7 +962,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
 
   @Test
   public void testFailure_predelegation() throws Exception {
-    thrown.expect(BadCommandForRegistryPhaseException.class);
+    thrown.expect(NoGeneralRegistrationsInCurrentPhaseException.class);
     createTld("tld", TldState.PREDELEGATION);
     persistContactsAndHosts();
     runFlow();
@@ -1603,5 +1599,21 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
             clock.nowUtc().minusDays(1), Money.of(USD, 0)))
         .build());
     doSuccessfulTest("tld", "domain_create_response.xml");
+  }
+
+  @Test
+  public void testFailure_flags_feeMismatch() throws Exception {
+    persistContactsAndHosts();
+    setEppInput("domain_create_flags.xml", ImmutableMap.of("FEE", "12"));
+    thrown.expect(FeesMismatchException.class);
+    runFlow();
+  }
+
+  @Test
+  public void testSuccess_flags() throws Exception {
+    persistContactsAndHosts();
+    setEppInput("domain_create_flags.xml", ImmutableMap.of("FEE", "42"));
+    thrown.expect(TestExtraLogicManagerSuccessException.class, "flag1,flag2");
+    runFlow();
   }
 }

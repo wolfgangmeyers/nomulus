@@ -15,14 +15,21 @@
 package google.registry.flows.host;
 
 import static com.google.common.base.MoreObjects.firstNonNull;
+import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
+import static google.registry.flows.ResourceFlowUtils.verifyNoDisallowedStatuses;
+import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
+import static google.registry.flows.ResourceFlowUtils.verifyResourceOwnership;
 import static google.registry.flows.host.HostFlowUtils.lookupSuperordinateDomain;
 import static google.registry.flows.host.HostFlowUtils.validateHostName;
 import static google.registry.flows.host.HostFlowUtils.verifyDomainIsSameRegistrar;
+import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 import static google.registry.model.index.ForeignKeyIndex.loadAndGetKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.util.CollectionUtils.isNullOrEmpty;
 
-import com.google.common.collect.ImmutableMap;
+import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Sets;
 import com.googlecode.objectify.Key;
 import google.registry.dns.DnsQueue;
 import google.registry.flows.EppException;
@@ -30,10 +37,22 @@ import google.registry.flows.EppException.ObjectAlreadyExistsException;
 import google.registry.flows.EppException.ParameterValueRangeErrorException;
 import google.registry.flows.EppException.RequiredParameterMissingException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
-import google.registry.flows.ResourceUpdateFlow;
-import google.registry.flows.async.AsyncFlowUtils;
-import google.registry.flows.async.DnsRefreshForHostRenameAction;
+import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.FlowModule.TargetId;
+import google.registry.flows.LoggedInFlow;
+import google.registry.flows.TransactionalFlow;
+import google.registry.flows.async.AsyncFlowEnqueuer;
+import google.registry.flows.exceptions.AddRemoveSameValueEppException;
+import google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException;
+import google.registry.flows.exceptions.StatusNotClientSettableException;
+import google.registry.model.ImmutableObject;
 import google.registry.model.domain.DomainResource;
+import google.registry.model.domain.metadata.MetadataExtension;
+import google.registry.model.eppcommon.AuthInfo;
+import google.registry.model.eppcommon.StatusValue;
+import google.registry.model.eppinput.ResourceCommand;
+import google.registry.model.eppinput.ResourceCommand.AddRemoveSameValueException;
+import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.host.HostCommand.Update;
 import google.registry.model.host.HostResource;
 import google.registry.model.host.HostResource.Builder;
@@ -41,16 +60,25 @@ import google.registry.model.index.ForeignKeyIndex;
 import google.registry.model.reporting.HistoryEntry;
 import java.util.Objects;
 import javax.inject.Inject;
-import org.joda.time.Duration;
 
 /**
- * An EPP flow that updates a host resource.
+ * An EPP flow that updates a host.
  *
+ * <p>Hosts can be "external", or "internal" (also known as "in bailiwick"). Internal hosts are
+ * those that are under a top level domain within this registry, and external hosts are all other
+ * hosts. Internal hosts must have at least one IP address associated with them, whereas external
+ * hosts cannot have any.
+ *
+ * <p>This flow allows changing a host name, and adding or removing IP addresses to hosts. When
+ * a host is renamed from internal to external all IP addresses must be simultaneously removed, and
+ * when it is renamed from external to internal at least one must be added. If the host is renamed
+ * or IP addresses are added, tasks are enqueued to update DNS accordingly.
+ *
+ * @error {@link google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException}
  * @error {@link google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException}
- * @error {@link google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException}
- * @error {@link google.registry.flows.ResourceUpdateFlow.ResourceHasClientUpdateProhibitedException}
- * @error {@link google.registry.flows.ResourceUpdateFlow.StatusNotClientSettableException}
- * @error {@link google.registry.flows.SingleResourceFlow.ResourceStatusProhibitsOperationException}
+ * @error {@link google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException}
+ * @error {@link google.registry.flows.exceptions.ResourceStatusProhibitsOperationException}
+ * @error {@link google.registry.flows.exceptions.StatusNotClientSettableException}
  * @error {@link HostFlowUtils.HostNameTooShallowException}
  * @error {@link HostFlowUtils.InvalidHostNameException}
  * @error {@link HostFlowUtils.SuperordinateDomainDoesNotExistException}
@@ -60,40 +88,113 @@ import org.joda.time.Duration;
  * @error {@link RenameHostToExternalRemoveIpException}
  * @error {@link RenameHostToSubordinateRequiresIpException}
  */
-public class HostUpdateFlow extends ResourceUpdateFlow<HostResource, Builder, Update> {
+public final class HostUpdateFlow extends LoggedInFlow implements TransactionalFlow {
 
-  private Key<DomainResource> superordinateDomain;
+  /**
+   * Note that CLIENT_UPDATE_PROHIBITED is intentionally not in this list. This is because it
+   * requires special checking, since you must be able to clear the status off the object with an
+   * update.
+   */
+  private static final ImmutableSet<StatusValue> DISALLOWED_STATUSES = ImmutableSet.of(
+      StatusValue.PENDING_DELETE,
+      StatusValue.SERVER_UPDATE_PROHIBITED);
 
-  private String oldHostName;
-  private String newHostName;
-  private boolean isHostRename;
-
+  @Inject ResourceCommand resourceCommand;
+  @Inject Optional<AuthInfo> authInfo;
+  @Inject @ClientId String clientId;
+  @Inject @TargetId String targetId;
+  @Inject HistoryEntry.Builder historyBuilder;
+  @Inject AsyncFlowEnqueuer asyncFlowEnqueuer;
   @Inject HostUpdateFlow() {}
 
   @Override
-  protected void initResourceCreateOrMutateFlow() throws EppException {
-    String suppliedNewHostName = command.getInnerChange().getFullyQualifiedHostName();
-    isHostRename = suppliedNewHostName != null;
-    oldHostName = targetId;
-    newHostName = firstNonNull(suppliedNewHostName, oldHostName);
-    superordinateDomain =
-        lookupSuperordinateDomain(validateHostName(newHostName), now);
+  protected final void initLoggedInFlow() throws EppException {
+    registerExtensions(MetadataExtension.class);
   }
 
   @Override
-  protected void verifyUpdateIsAllowed() throws EppException {
-    verifyDomainIsSameRegistrar(superordinateDomain, getClientId());
-    if (isHostRename
-        && loadAndGetKey(HostResource.class, newHostName, now) != null) {
+  public final EppOutput run() throws EppException {
+    Update command = (Update) resourceCommand;
+    String suppliedNewHostName = command.getInnerChange().getFullyQualifiedHostName();
+    HostResource existingHost = loadAndVerifyExistence(HostResource.class, targetId, now);
+    boolean isHostRename = suppliedNewHostName != null;
+    String oldHostName = targetId;
+    String newHostName = firstNonNull(suppliedNewHostName, oldHostName);
+    Optional<DomainResource> superordinateDomain =
+        Optional.fromNullable(lookupSuperordinateDomain(validateHostName(newHostName), now));
+    verifyUpdateAllowed(command, existingHost, superordinateDomain.orNull());
+    if (isHostRename && loadAndGetKey(HostResource.class, newHostName, now) != null) {
       throw new HostAlreadyExistsException(newHostName);
     }
+    Builder builder = existingHost.asBuilder();
+    try {
+      command.applyTo(builder);
+    } catch (AddRemoveSameValueException e) {
+      throw new AddRemoveSameValueEppException();
+    }
+    builder
+        .setLastEppUpdateTime(now)
+        .setLastEppUpdateClientId(clientId)
+        // The superordinateDomain can be missing if the new name is external.
+        // Note that the value of superordinateDomain is projected to the current time inside of
+        // the lookupSuperordinateDomain(...) call above, so that it will never be stale.
+        .setSuperordinateDomain(
+            superordinateDomain.isPresent() ? Key.create(superordinateDomain.get()) : null)
+        .setLastSuperordinateChange(superordinateDomain == null ? null : now);
+    // Rely on the host's cloneProjectedAtTime() method to handle setting of transfer data.
+    HostResource newHost = builder.build().cloneProjectedAtTime(now);
+    verifyHasIpsIffIsExternal(command, existingHost, newHost);
+    ImmutableSet.Builder<ImmutableObject> entitiesToSave = new ImmutableSet.Builder<>();
+    entitiesToSave.add(newHost);
+    // Keep the {@link ForeignKeyIndex} for this host up to date.
+    if (isHostRename) {
+      // Update the foreign key for the old host name and save one for the new host name.
+      entitiesToSave.add(
+          ForeignKeyIndex.create(existingHost, now),
+          ForeignKeyIndex.create(newHost, newHost.getDeletionTime()));
+      updateSuperordinateDomains(existingHost, newHost);
+    }
+    enqueueTasks(existingHost, newHost);
+    entitiesToSave.add(historyBuilder
+        .setType(HistoryEntry.Type.HOST_UPDATE)
+        .setModificationTime(now)
+        .setParent(Key.create(existingHost))
+        .build());
+    ofy().save().entities(entitiesToSave.build());
+    return createOutput(SUCCESS);
   }
 
-  @Override
-  protected void verifyNewUpdatedStateIsAllowed() throws EppException {
+  private void verifyUpdateAllowed(
+      Update command, HostResource existingResource, DomainResource superordinateDomain)
+      throws EppException {
+    verifyOptionalAuthInfoForResource(authInfo, existingResource);
+    if (!isSuperuser) {
+      verifyResourceOwnership(clientId, existingResource);
+      // If the resource is marked with clientUpdateProhibited, and this update does not clear that
+      // status, then the update must be disallowed (unless a superuser is requesting the change).
+      if (!isSuperuser
+          && existingResource.getStatusValues().contains(StatusValue.CLIENT_UPDATE_PROHIBITED)
+          && !command.getInnerRemove().getStatusValues()
+              .contains(StatusValue.CLIENT_UPDATE_PROHIBITED)) {
+        throw new ResourceHasClientUpdateProhibitedException();
+      }
+   }
+    for (StatusValue statusValue : Sets.union(
+        command.getInnerAdd().getStatusValues(),
+        command.getInnerRemove().getStatusValues())) {
+      if (!isSuperuser && !statusValue.isClientSettable()) {  // The superuser can set any status.
+        throw new StatusNotClientSettableException(statusValue.getXmlName());
+      }
+    }
+    verifyDomainIsSameRegistrar(superordinateDomain, clientId);
+    verifyNoDisallowedStatuses(existingResource, DISALLOWED_STATUSES);
+  }
+
+  private void verifyHasIpsIffIsExternal(
+      Update command, HostResource existingResource, HostResource newResource) throws EppException {
     boolean wasExternal = existingResource.getSuperordinateDomain() == null;
     boolean wasSubordinate = !wasExternal;
-    boolean willBeExternal = superordinateDomain == null;
+    boolean willBeExternal = newResource.getSuperordinateDomain() == null;
     boolean willBeSubordinate = !willBeExternal;
     boolean newResourceHasIps = !isNullOrEmpty(newResource.getInetAddresses());
     boolean commandAddsIps = !isNullOrEmpty(command.getInnerAdd().getInetAddresses());
@@ -114,82 +215,48 @@ public class HostUpdateFlow extends ResourceUpdateFlow<HostResource, Builder, Up
     }
   }
 
-  @Override
-  protected Builder setUpdateProperties(Builder builder) {
-    // The superordinateDomain can be null if the new name is external.
-    // Note that the value of superordinateDomain is projected to the current time inside of
-    // the lookupSuperordinateDomain(...) call above, so that it will never be stale.
-    builder.setSuperordinateDomain(superordinateDomain);
-    builder.setLastSuperordinateChange(superordinateDomain == null ? null : now);
-    // Rely on the host's cloneProjectedAtTime() method to handle setting of transfer data.
-    return builder.build().cloneProjectedAtTime(now).asBuilder();
-  }
-
-  /** Keep the {@link ForeignKeyIndex} for this host up to date. */
-  @Override
-  protected void modifyRelatedResources() {
-    if (isHostRename) {
-      // Update the foreign key for the old host name.
-      ofy().save().entity(ForeignKeyIndex.create(existingResource, now));
-      // Save the foreign key for the new host name.
-      ofy().save().entity(ForeignKeyIndex.create(newResource, newResource.getDeletionTime()));
-      updateSuperordinateDomains();
-    }
-  }
-
-  @Override
-  public void enqueueTasks() throws EppException {
-    DnsQueue dnsQueue = DnsQueue.create();
+  private void enqueueTasks(HostResource existingResource, HostResource newResource) {
     // Only update DNS for subordinate hosts. External hosts have no glue to write, so they
     // are only written as NS records from the referencing domain.
     if (existingResource.getSuperordinateDomain() != null) {
-      dnsQueue.addHostRefreshTask(oldHostName);
+      DnsQueue.create().addHostRefreshTask(existingResource.getFullyQualifiedHostName());
     }
     // In case of a rename, there are many updates we need to queue up.
-    if (isHostRename) {
+    if (((Update) resourceCommand).getInnerChange().getFullyQualifiedHostName() != null) {
       // If the renamed host is also subordinate, then we must enqueue an update to write the new
       // glue.
       if (newResource.getSuperordinateDomain() != null) {
-        dnsQueue.addHostRefreshTask(newHostName);
+        DnsQueue.create().addHostRefreshTask(newResource.getFullyQualifiedHostName());
       }
       // We must also enqueue updates for all domains that use this host as their nameserver so
       // that their NS records can be updated to point at the new name.
-      AsyncFlowUtils.enqueueMapreduceAction(
-          DnsRefreshForHostRenameAction.class,
-          ImmutableMap.of(
-              DnsRefreshForHostRenameAction.PARAM_HOST_KEY,
-              Key.create(existingResource).getString()),
-          Duration.ZERO);
+      asyncFlowEnqueuer.enqueueAsyncDnsRefresh(existingResource);
     }
   }
 
-  @Override
-  protected final HistoryEntry.Type getHistoryEntryType() {
-    return HistoryEntry.Type.HOST_UPDATE;
-  }
-
-  private void updateSuperordinateDomains() {
+  private void updateSuperordinateDomains(HostResource existingResource, HostResource newResource) {
     Key<DomainResource> oldSuperordinateDomain = existingResource.getSuperordinateDomain();
-    if (oldSuperordinateDomain != null || superordinateDomain != null) {
-      if (Objects.equals(oldSuperordinateDomain, superordinateDomain)) {
+    Key<DomainResource> newSuperordinateDomain = newResource.getSuperordinateDomain();
+    if (oldSuperordinateDomain != null || newSuperordinateDomain != null) {
+      if (Objects.equals(oldSuperordinateDomain, newSuperordinateDomain)) {
         ofy().save().entity(
             ofy().load().key(oldSuperordinateDomain).now().asBuilder()
-                .removeSubordinateHost(oldHostName)
-                .addSubordinateHost(newHostName)
+                .removeSubordinateHost(existingResource.getFullyQualifiedHostName())
+                .addSubordinateHost(newResource.getFullyQualifiedHostName())
                 .build());
       } else {
         if (oldSuperordinateDomain != null) {
           ofy().save().entity(
               ofy().load().key(oldSuperordinateDomain).now()
                   .asBuilder()
-                  .removeSubordinateHost(oldHostName)
+                  .removeSubordinateHost(existingResource.getFullyQualifiedHostName())
                   .build());
         }
-        if (superordinateDomain != null) {
+        if (newSuperordinateDomain != null) {
           ofy().save().entity(
-              ofy().load().key(superordinateDomain).now()
+              ofy().load().key(newSuperordinateDomain).now()
                   .asBuilder()
-                  .addSubordinateHost(newHostName)
+                  .addSubordinateHost(newResource.getFullyQualifiedHostName())
                   .build());
         }
       }
@@ -203,33 +270,33 @@ public class HostUpdateFlow extends ResourceUpdateFlow<HostResource, Builder, Up
     }
   }
 
-  /** Cannot add ip addresses to an external host. */
+  /** Cannot add IP addresses to an external host. */
   static class CannotAddIpToExternalHostException extends ParameterValueRangeErrorException {
     public CannotAddIpToExternalHostException() {
-      super("Cannot add ip addresses to external hosts");
+      super("Cannot add IP addresses to external hosts");
     }
   }
 
-  /** Cannot remove all ip addresses from a subordinate host. */
+  /** Cannot remove all IP addresses from a subordinate host. */
   static class CannotRemoveSubordinateHostLastIpException
       extends StatusProhibitsOperationException {
     public CannotRemoveSubordinateHostLastIpException() {
-      super("Cannot remove all ip addresses from a subordinate host");
+      super("Cannot remove all IP addresses from a subordinate host");
     }
   }
 
-  /** Host rename from external to subordinate must also add an ip addresses. */
+  /** Host rename from external to subordinate must also add an IP addresses. */
   static class RenameHostToSubordinateRequiresIpException
       extends RequiredParameterMissingException {
     public RenameHostToSubordinateRequiresIpException() {
-      super("Host rename from external to subordinate must also add an ip address");
+      super("Host rename from external to subordinate must also add an IP address");
     }
   }
 
-  /** Host rename from subordinate to external must also remove all ip addresses. */
+  /** Host rename from subordinate to external must also remove all IP addresses. */
   static class RenameHostToExternalRemoveIpException extends ParameterValueRangeErrorException {
     public RenameHostToExternalRemoveIpException() {
-      super("Host rename from subordinate to external must also remove all ip addresses");
+      super("Host rename from subordinate to external must also remove all IP addresses");
     }
   }
 }

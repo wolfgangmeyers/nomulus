@@ -14,16 +14,16 @@
 
 package google.registry.tools;
 
+import static google.registry.model.EppResourceUtils.loadByForeignKey;
+
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import google.registry.model.host.HostResource;
-import google.registry.tools.Command.GtechCommand;
 import java.util.List;
 
 /** Command to show one or more host resources. */
-@Parameters(separators = " =", commandDescription = "Show host record(s)")
-final class GetHostCommand extends GetEppResourceCommand<HostResource>
-    implements GtechCommand {
+@Parameters(separators = " =", commandDescription = "Show host resource(s)")
+final class GetHostCommand extends GetEppResourceCommand {
 
   @Parameter(
       description = "Fully qualified host name(s)",
@@ -31,9 +31,10 @@ final class GetHostCommand extends GetEppResourceCommand<HostResource>
   private List<String> mainParameters;
 
   @Override
-  public void processParameters() {
+  public void runAndPrint() {
     for (String hostName : mainParameters) {
-      printResource(hostName);
+      printResource(
+          "Host", hostName, loadByForeignKey(HostResource.class, hostName, readTimestamp));
     }
   }
 }

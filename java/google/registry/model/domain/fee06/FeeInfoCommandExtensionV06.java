@@ -14,29 +14,31 @@
 
 package google.registry.model.domain.fee06;
 
+import com.google.common.base.Optional;
 import google.registry.model.domain.fee.FeeQueryCommandExtensionItemImpl;
 import google.registry.model.eppinput.EppInput.CommandExtension;
 import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 import org.joda.money.CurrencyUnit;
+import org.joda.time.DateTime;
 
 /** A fee extension that may be present on domain info commands. */
 @XmlRootElement(name = "info")
 @XmlType(propOrder = {"currency", "command", "period"})
 public class FeeInfoCommandExtensionV06
     extends FeeQueryCommandExtensionItemImpl implements CommandExtension {
-  
+
   /** A three-character ISO4217 currency code. */
   CurrencyUnit currency;
 
   @Override
-  public boolean isCurrencySupported() {
-    return true;
+  public CurrencyUnit getCurrency() {
+    return currency;
   }
 
   @Override
-  public CurrencyUnit getCurrency() {
-    return currency;
+  public Optional<DateTime> getEffectiveDate() {
+    return Optional.absent();
   }
 }
 

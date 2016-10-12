@@ -17,18 +17,17 @@ package google.registry.tools;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.template.soy.data.SoyMapData;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.soy.DeleteDomainSoyInfo;
 
 /** A command to delete a domain via EPP. */
 @Parameters(separators = " =", commandDescription = "Delete domain")
-final class DeleteDomainCommand extends MutatingEppToolCommand implements GtechCommand {
+final class DeleteDomainCommand extends MutatingEppToolCommand {
 
   @Parameter(
       names = {"-c", "--client"},
       description = "Client identifier of the registrar to execute the command as",
       required = true)
-  String clientIdentifier;
+  String clientId;
 
   @Parameter(
       names = {"-n", "--domain_name"},
@@ -51,7 +50,7 @@ final class DeleteDomainCommand extends MutatingEppToolCommand implements GtechC
   @Override
   protected void initMutatingEppToolCommand() {
     setSoyTemplate(DeleteDomainSoyInfo.getInstance(), DeleteDomainSoyInfo.DELETEDOMAIN);
-    addSoyRecord(clientIdentifier, new SoyMapData(
+    addSoyRecord(clientId, new SoyMapData(
         "domainName", domainName,
         "reason", reason,
         "requestedByRegistrar", requestedByRegistrar));

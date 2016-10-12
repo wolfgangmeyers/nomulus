@@ -81,7 +81,7 @@ abstract class EppToolCommand extends ConfirmingCommand implements ServerSideCom
    * EPP calls when invoking commands (i.e. domain check) with sets of domains across multiple TLDs.
    */
   protected static Multimap<String, String> validateAndGroupDomainNamesByTld(List<String> names) {
-    ImmutableMultimap.Builder<String, String> builder = ImmutableMultimap.builder();
+    ImmutableMultimap.Builder<String, String> builder = new ImmutableMultimap.Builder<>();
     for (String name : names) {
       InternetDomainName tld = findTldForNameOrThrow(InternetDomainName.from(name));
       builder.put(tld.toString(), name);
@@ -141,11 +141,11 @@ abstract class EppToolCommand extends ConfirmingCommand implements ServerSideCom
     for (XmlEppParameters command : commands) {
       Map<String, Object> params = new HashMap<>();
       params.put("dryRun", dryRun);
-      params.put("clientIdentifier", command.clientId);
+      params.put("clientId", command.clientId);
       params.put("superuser", superuser);
       params.put("xml", URLEncoder.encode(command.xml, UTF_8.toString()));
-      String requestBody = Joiner.on('&').withKeyValueSeparator("=")
-          .join(filterValues(params, notNull()));
+      String requestBody =
+          Joiner.on('&').withKeyValueSeparator("=").join(filterValues(params, notNull()));
       responses.add(nullToEmpty(connection.send(
           "/_dr/epptool",
           ImmutableMap.<String, String>of(),

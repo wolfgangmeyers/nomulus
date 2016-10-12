@@ -20,6 +20,7 @@ import static com.google.common.base.Predicates.equalTo;
 import static com.google.common.collect.Iterables.any;
 import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Sets.difference;
+import static com.google.common.collect.Sets.union;
 import static google.registry.flows.EppXmlTransformer.unmarshal;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.registry.Registries.findTldForName;
@@ -27,6 +28,7 @@ import static google.registry.model.registry.label.ReservedList.getReservation;
 import static google.registry.pricing.PricingEngineProxy.getPricesForDomainName;
 import static google.registry.tldconfig.idn.IdnLabelValidator.findValidIdnTableForTld;
 import static google.registry.util.CollectionUtils.nullToEmpty;
+import static google.registry.util.DateTimeUtils.END_OF_TIME;
 import static google.registry.util.DateTimeUtils.isAtOrAfter;
 import static google.registry.util.DomainNameUtils.ACE_PREFIX;
 
@@ -42,6 +44,7 @@ import com.google.common.net.InternetDomainName;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.AuthorizationErrorException;
+import google.registry.flows.EppException.CommandUseErrorException;
 import google.registry.flows.EppException.ObjectDoesNotExistException;
 import google.registry.flows.EppException.ParameterValuePolicyErrorException;
 import google.registry.flows.EppException.ParameterValueRangeErrorException;
@@ -49,6 +52,8 @@ import google.registry.flows.EppException.ParameterValueSyntaxErrorException;
 import google.registry.flows.EppException.RequiredParameterMissingException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
 import google.registry.flows.EppException.UnimplementedOptionException;
+import google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException;
+import google.registry.flows.exceptions.StatusNotClientSettableException;
 import google.registry.model.EppResource;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Flag;
@@ -56,26 +61,33 @@ import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.DesignatedContact.Type;
+import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.DomainCommand.CreateOrUpdate;
 import google.registry.model.domain.DomainCommand.InvalidReferencesException;
+import google.registry.model.domain.DomainCommand.Update;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.Period;
+import google.registry.model.domain.fee.Credit;
 import google.registry.model.domain.fee.Fee;
-import google.registry.model.domain.fee.FeeCheckCommandExtensionItem;
-import google.registry.model.domain.fee.FeeCheckResponseExtensionItem;
 import google.registry.model.domain.fee.FeeQueryCommandExtensionItem;
 import google.registry.model.domain.fee.FeeQueryResponseExtensionItem;
 import google.registry.model.domain.fee.FeeTransformCommandExtension;
 import google.registry.model.domain.launch.LaunchExtension;
 import google.registry.model.domain.launch.LaunchPhase;
 import google.registry.model.domain.secdns.DelegationSignerData;
+import google.registry.model.domain.secdns.SecDnsInfoExtension;
+import google.registry.model.domain.secdns.SecDnsUpdateExtension;
+import google.registry.model.domain.secdns.SecDnsUpdateExtension.Add;
+import google.registry.model.domain.secdns.SecDnsUpdateExtension.Remove;
 import google.registry.model.eppcommon.StatusValue;
-import google.registry.model.eppinput.ResourceCommand.SingleResourceCommand;
+import google.registry.model.eppinput.EppInput;
+import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.host.HostResource;
 import google.registry.model.mark.Mark;
 import google.registry.model.mark.ProtectedMark;
 import google.registry.model.mark.Trademark;
+import google.registry.model.poll.PendingActionNotificationResponse.DomainPendingActionNotificationResponse;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
@@ -86,7 +98,8 @@ import google.registry.model.smd.AbstractSignedMark;
 import google.registry.model.smd.EncodedSignedMark;
 import google.registry.model.smd.SignedMark;
 import google.registry.model.smd.SignedMarkRevocationList;
-import google.registry.pricing.TldSpecificLogicProxy;
+import google.registry.model.transfer.TransferData;
+import google.registry.model.transfer.TransferResponse.DomainTransferResponse;
 import google.registry.tmch.TmchXmlSignature;
 import google.registry.tmch.TmchXmlSignature.CertificateSignatureException;
 import google.registry.util.Idn;
@@ -122,19 +135,19 @@ public class DomainFlowUtils {
           LaunchPhase.CLAIMS, TldState.GENERAL_AVAILABILITY,
           LaunchPhase.OPEN, TldState.GENERAL_AVAILABILITY);
 
-  /** Non-sunrise tld states. */
-  public static final ImmutableSet<TldState> DISALLOWED_TLD_STATES_FOR_LAUNCH_FLOWS =
-      Sets.immutableEnumSet(
-          TldState.PREDELEGATION,
-          TldState.QUIET_PERIOD,
-          TldState.GENERAL_AVAILABILITY);
-
   /** Reservation types that are allowed in sunrise by policy. */
   public static final ImmutableSet<ReservationType> TYPES_ALLOWED_FOR_CREATE_ONLY_IN_SUNRISE =
       Sets.immutableEnumSet(
           ReservationType.ALLOWED_IN_SUNRISE,
           ReservationType.NAME_COLLISION,
           ReservationType.MISTAKEN_PREMIUM);
+
+  /** Non-sunrise tld states. */
+  private static final ImmutableSet<TldState> DISALLOWED_TLD_STATES_FOR_LAUNCH_FLOWS =
+      Sets.immutableEnumSet(
+          TldState.PREDELEGATION,
+          TldState.QUIET_PERIOD,
+          TldState.GENERAL_AVAILABILITY);
 
   /** Strict validator for ascii lowercase letters, digits, and "-", allowing "." as a separator */
   private static final CharMatcher ALLOWED_CHARS =
@@ -282,12 +295,10 @@ public class DomainFlowUtils {
     if (!whitelist.isEmpty() && count == 0) {
       throw new NameserversNotSpecifiedException();
     }
-
     if (count > MAX_NAMESERVERS_PER_DOMAIN) {
       throw new TooManyNameserversException(String.format(
           "Only %d nameservers are allowed per domain", MAX_NAMESERVERS_PER_DOMAIN));
     }
-
   }
 
   static void validateNoDuplicateContacts(Set<DesignatedContact> contacts)
@@ -367,18 +378,14 @@ public class DomainFlowUtils {
     if (!Objects.equals(
         Registry.get(tld).getTldState(now),
         LAUNCH_PHASE_TO_TLD_STATE.get(launchExtension.getPhase()))) {
-      // No launch operations are allowed during the quiet period or predelegation.
       throw new LaunchPhaseMismatchException();
     }
   }
 
-  /**
-   * Verifies that a launch extension's application id refers to an application with the same
-   * domain name as the one specified in the launch command.
-   */
-  static void verifyLaunchApplicationIdMatchesDomain(
-      SingleResourceCommand command, DomainBase existingResource) throws EppException {
-    if (!Objects.equals(command.getTargetId(), existingResource.getFullyQualifiedDomainName())) {
+  /** Verifies that an application's domain name matches the target id (from a command). */
+  static void verifyApplicationDomainMatchesTargetId(
+      DomainApplication application, String targetId) throws EppException {
+    if (!application.getFullyQualifiedDomainName().equals(targetId)) {
       throw new ApplicationDomainNameMismatchException();
     }
   }
@@ -389,11 +396,11 @@ public class DomainFlowUtils {
    * this registrar.
    */
   static void verifyPremiumNameIsNotBlocked(
-      String domainName, DateTime priceTime, String clientIdentifier) throws EppException {
+      String domainName, DateTime priceTime, String clientId) throws EppException {
     if (getPricesForDomainName(domainName, priceTime).isPremium()) {
       // NB: The load of the Registar object is transactionless, which means that it should hit
       // memcache most of the time.
-      if (Registrar.loadByClientId(clientIdentifier).getBlockPremiumNames()) {
+      if (Registrar.loadByClientId(clientId).getBlockPremiumNames()) {
         throw new PremiumNameBlockedException();
       }
     }
@@ -476,7 +483,7 @@ public class DomainFlowUtils {
         .build());
   }
 
-  public static SignedMark verifySignedMarks(
+  static SignedMark verifySignedMarks(
       ImmutableList<AbstractSignedMark> signedMarks, String domainLabel, DateTime now)
           throws EppException {
     if (signedMarks.size() > 1) {
@@ -557,18 +564,25 @@ public class DomainFlowUtils {
   }
 
   /**
-   * Validates a {@link FeeCheckCommandExtensionItem} and sets the appropriate fields on a
-   * {@link FeeCheckResponseExtensionItem} builder.
+   * Validates a {@link FeeQueryCommandExtensionItem} and sets the appropriate fields on a {@link
+   * FeeQueryResponseExtensionItem} builder.
    */
   static void handleFeeRequest(
       FeeQueryCommandExtensionItem feeRequest,
       FeeQueryResponseExtensionItem.Builder builder,
-      String domainName,
-      String tld,
+      InternetDomainName domain,
+      String clientId,
       @Nullable CurrencyUnit topLevelCurrency,
-      DateTime now) throws EppException {
-    InternetDomainName domain = InternetDomainName.from(domainName);
-    Registry registry = Registry.get(tld);
+      DateTime currentDate,
+      EppInput eppInput) throws EppException {
+    DateTime now = currentDate;
+    // Use the custom effective date specified in the fee check request, if there is one.
+    if (feeRequest.getEffectiveDate().isPresent()) {
+      now = feeRequest.getEffectiveDate().get();
+      builder.setEffectiveDateIfSupported(now);
+    }
+    String domainNameString = domain.toString();
+    Registry registry = Registry.get(domain.parent().toString());
     int years = verifyUnitIsYears(feeRequest.getPeriod()).getValue();
     boolean isSunrise = registry.getTldState(now).equals(TldState.SUNRISE);
 
@@ -577,7 +591,7 @@ public class DomainFlowUtils {
     }
 
     CurrencyUnit currency =
-        feeRequest.isCurrencySupported() ? feeRequest.getCurrency() : topLevelCurrency;
+        feeRequest.getCurrency() != null ? feeRequest.getCurrency() : topLevelCurrency;
     if ((currency != null) && !currency.equals(registry.getCurrency())) {
       throw new CurrencyUnitMismatchException();
     }
@@ -586,11 +600,10 @@ public class DomainFlowUtils {
         .setCommand(feeRequest.getCommandName(), feeRequest.getPhase(), feeRequest.getSubphase())
         .setCurrencyIfSupported(registry.getCurrency())
         .setPeriod(feeRequest.getPeriod())
-        .setClass(TldSpecificLogicProxy.getFeeClass(domainName, now).orNull());
+        .setClass(TldSpecificLogicProxy.getFeeClass(domainNameString, now).orNull());
 
+    List<Fee> fees = ImmutableList.of();
     switch (feeRequest.getCommandName()) {
-      case UNKNOWN:
-        throw new UnknownFeeCommandException(feeRequest.getUnparsedCommandName());
       case CREATE:
         if (isReserved(domain, isSunrise)) {  // Don't return a create price for reserved names.
           builder.setClass("reserved");  // Override whatever class we've set above.
@@ -598,24 +611,52 @@ public class DomainFlowUtils {
           builder.setReasonIfSupported("reserved");
         } else {
           builder.setAvailIfSupported(true);
-          builder.setFees(
-              TldSpecificLogicProxy.getCreatePrice(registry, domainName, now, years).getFees());
+          fees = TldSpecificLogicProxy.getCreatePrice(
+              registry, domainNameString, clientId, now, years, eppInput).getFees();
         }
+        break;
+      case RENEW:
+        builder.setAvailIfSupported(true);
+        fees = TldSpecificLogicProxy.getRenewPrice(
+            registry, domainNameString, clientId, now, years, eppInput).getFees();
         break;
       case RESTORE:
         if (years != 1) {
           throw new RestoresAreAlwaysForOneYearException();
         }
         builder.setAvailIfSupported(true);
-        builder.setFees(
-            TldSpecificLogicProxy.getRestorePrice(registry, domainName, now, years).getFees());
+        fees = TldSpecificLogicProxy.getRestorePrice(
+            registry, domainNameString, clientId, now, eppInput).getFees();
         break;
-      // TODO(mountford): handle UPDATE
-      default:
-        // Anything else (transfer|renew) will have a "renew" fee.
+      case TRANSFER:
         builder.setAvailIfSupported(true);
-        builder.setFees(
-            TldSpecificLogicProxy.getRenewPrice(registry, domainName, now, years).getFees());
+        fees = TldSpecificLogicProxy.getTransferPrice(
+            registry, domainNameString, clientId, now, years, eppInput).getFees();
+        break;
+      case UPDATE:
+        builder.setAvailIfSupported(true);
+        fees = TldSpecificLogicProxy.getUpdatePrice(
+            registry, domainNameString, clientId, now, eppInput).getFees();
+        break;
+      default:
+        throw new UnknownFeeCommandException(feeRequest.getUnparsedCommandName());
+    }
+
+    // Set the fees, and based on the validDateRange of the fees, set the notAfterDate.
+    if (!fees.isEmpty()) {
+      builder.setFees(fees);
+      DateTime notAfterDate = null;
+      for (Fee fee : fees) {
+        if (fee.hasValidDateRange()) {
+          DateTime endDate = fee.getValidDateRange().upperEndpoint();
+          if (notAfterDate == null || notAfterDate.isAfter(endDate)) {
+            notAfterDate = endDate;
+          }
+        }
+      }
+      if (notAfterDate != null && !notAfterDate.equals(END_OF_TIME)) {
+        builder.setNotAfterDateIfSupported(notAfterDate);
+      }
     }
   }
 
@@ -646,6 +687,12 @@ public class DomainFlowUtils {
       }
       total = total.add(fee.getCost());
     }
+    for (Credit credit : feeCommand.getCredits()) {
+      if (!credit.hasDefaultAttributes()) {
+        throw new UnsupportedFeeAttributeException();
+      }
+      total = total.add(credit.getCost());
+    }
 
     Money feeTotal = null;
     try {
@@ -664,6 +711,141 @@ public class DomainFlowUtils {
     }
     if (!feeTotal.equals(costTotal)) {
       throw new FeesMismatchException(costTotal);
+    }
+  }
+
+  /** Create a poll message for the gaining client in a transfer. */
+  static PollMessage createGainingTransferPollMessage(
+      String targetId,
+      TransferData transferData,
+      @Nullable DateTime extendedRegistrationExpirationTime,
+      HistoryEntry historyEntry) {
+    return new PollMessage.OneTime.Builder()
+        .setClientId(transferData.getGainingClientId())
+        .setEventTime(transferData.getPendingTransferExpirationTime())
+        .setMsg(transferData.getTransferStatus().getMessage())
+        .setResponseData(ImmutableList.of(
+            createTransferResponse(targetId, transferData, extendedRegistrationExpirationTime),
+            DomainPendingActionNotificationResponse.create(
+                  targetId,
+                  transferData.getTransferStatus().isApproved(),
+                  transferData.getTransferRequestTrid(),
+                  historyEntry.getModificationTime())))
+        .setParent(historyEntry)
+        .build();
+  }
+
+  /** Create a poll message for the losing client in a transfer. */
+  static PollMessage createLosingTransferPollMessage(
+      String targetId,
+      TransferData transferData,
+      @Nullable DateTime extendedRegistrationExpirationTime,
+      HistoryEntry historyEntry) {
+    return new PollMessage.OneTime.Builder()
+        .setClientId(transferData.getLosingClientId())
+        .setEventTime(transferData.getPendingTransferExpirationTime())
+        .setMsg(transferData.getTransferStatus().getMessage())
+        .setResponseData(ImmutableList.of(
+            createTransferResponse(targetId, transferData, extendedRegistrationExpirationTime)))
+        .setParent(historyEntry)
+        .build();
+  }
+
+  /** Create a {@link DomainTransferResponse} off of the info in a {@link TransferData}. */
+  static DomainTransferResponse createTransferResponse(
+      String targetId,
+      TransferData transferData,
+      @Nullable DateTime extendedRegistrationExpirationTime) {
+    return new DomainTransferResponse.Builder()
+        .setFullyQualifiedDomainNameName(targetId)
+        .setGainingClientId(transferData.getGainingClientId())
+        .setLosingClientId(transferData.getLosingClientId())
+        .setPendingTransferExpirationTime(transferData.getPendingTransferExpirationTime())
+        .setTransferRequestTime(transferData.getTransferRequestTime())
+        .setTransferStatus(transferData.getTransferStatus())
+        .setExtendedRegistrationExpirationTime(extendedRegistrationExpirationTime)
+        .build();
+  }
+
+  /**
+   * Adds a secDns extension to a list if the given set of dsData is non-empty.
+   *
+   * <p>According to RFC 5910 section 2, we should only return this if the client specified the
+   * "urn:ietf:params:xml:ns:secDNS-1.1" when logging in. However, this is a "SHOULD" not a "MUST"
+   * and we are going to ignore it; clients who don't care about secDNS can just ignore it.
+   */
+  static void addSecDnsExtensionIfPresent(
+      ImmutableList.Builder<ResponseExtension> extensions,
+      ImmutableSet<DelegationSignerData> dsData) {
+    if (!dsData.isEmpty()) {
+      extensions.add(SecDnsInfoExtension.create(dsData));
+    }
+  }
+
+  /** Update {@link DelegationSignerData} based on an update extension command. */
+  static ImmutableSet<DelegationSignerData> updateDsData(
+      ImmutableSet<DelegationSignerData> oldDsData, SecDnsUpdateExtension secDnsUpdate)
+          throws EppException {
+    // We don't support 'urgent' because we do everything as fast as we can anyways.
+    if (Boolean.TRUE.equals(secDnsUpdate.getUrgent())) {  // We allow both false and null.
+      throw new UrgentAttributeNotSupportedException();
+    }
+    // There must be at least one of add/rem/chg, and chg isn't actually supported.
+    if (secDnsUpdate.getChange() != null) {
+      // The only thing you can change is maxSigLife, and we don't support that at all.
+      throw new MaxSigLifeChangeNotSupportedException();
+    }
+    Add add = secDnsUpdate.getAdd();
+    Remove remove = secDnsUpdate.getRemove();
+    if (add == null && remove == null) {
+      throw new EmptySecDnsUpdateException();
+    }
+    if (remove != null && Boolean.FALSE.equals(remove.getAll())) {
+      throw new SecDnsAllUsageException();  // Explicit all=false is meaningless.
+    }
+    Set<DelegationSignerData> toAdd = (add == null)
+        ? ImmutableSet.<DelegationSignerData>of()
+        : add.getDsData();
+    Set<DelegationSignerData> toRemove = (remove == null)
+        ? ImmutableSet.<DelegationSignerData>of()
+        : (remove.getAll() == null) ? remove.getDsData() : oldDsData;
+    // RFC 5910 specifies that removes are processed before adds.
+    return ImmutableSet.copyOf(union(difference(oldDsData, toRemove), toAdd));
+  }
+
+  /** Check that all of the status values added or removed in an update are client-settable. */
+  static void verifyStatusChangesAreClientSettable(Update command)
+      throws StatusNotClientSettableException {
+    for (StatusValue statusValue : union(
+        command.getInnerAdd().getStatusValues(),
+        command.getInnerRemove().getStatusValues())) {
+      if (!statusValue.isClientSettable()) {
+        throw new StatusNotClientSettableException(statusValue.getXmlName());
+      }
+    }
+  }
+
+  /** If a domain or application has "clientUpdateProhibited" set, updates must clear it or fail. */
+  static void verifyClientUpdateNotProhibited(Update command, DomainBase existingResource)
+      throws ResourceHasClientUpdateProhibitedException {
+    if (existingResource.getStatusValues().contains(StatusValue.CLIENT_UPDATE_PROHIBITED)
+        && !command.getInnerRemove().getStatusValues()
+            .contains(StatusValue.CLIENT_UPDATE_PROHIBITED)) {
+      throw new ResourceHasClientUpdateProhibitedException();
+    }
+  }
+
+  static void verifyRegistryStateAllowsLaunchFlows(Registry registry, DateTime now)
+      throws BadCommandForRegistryPhaseException {
+    if (DISALLOWED_TLD_STATES_FOR_LAUNCH_FLOWS.contains(registry.getTldState(now))) {
+      throw new BadCommandForRegistryPhaseException();
+    }
+  }
+
+  static void verifyNotInPredelegation(Registry registry, DateTime now)
+      throws BadCommandForRegistryPhaseException {
+    if (registry.getTldState(now) == TldState.PREDELEGATION) {
+      throw new BadCommandForRegistryPhaseException();
     }
   }
 
@@ -953,6 +1135,13 @@ public class DomainFlowUtils {
     }
   }
 
+  /** Fees must be explicitly acknowledged when performing an update which is not free. */
+  static class FeesRequiredForNonFreeUpdateException extends RequiredParameterMissingException {
+    FeesRequiredForNonFreeUpdateException() {
+      super("Fees must be explicitly acknowledged when performing an update which is not free.");
+    }
+  }
+
   /** The 'grace-period', 'applied' and 'refundable' fields are disallowed by server policy. */
   static class UnsupportedFeeAttributeException extends UnimplementedOptionException {
     UnsupportedFeeAttributeException() {
@@ -1029,5 +1218,38 @@ public class DomainFlowUtils {
     }
   }
 
-}
+  /** Command is not allowed in the current registry phase. */
+  public static class BadCommandForRegistryPhaseException extends CommandUseErrorException {
+    public BadCommandForRegistryPhaseException() {
+      super("Command is not allowed in the current registry phase");
+    }
+  }
 
+  /** The secDNS:all element must have value 'true' if present. */
+  static class SecDnsAllUsageException extends ParameterValuePolicyErrorException {
+    public SecDnsAllUsageException() {
+      super("The secDNS:all element must have value 'true' if present");
+    }
+  }
+
+  /** At least one of 'add' or 'rem' is required on a secDNS update. */
+  static class EmptySecDnsUpdateException extends RequiredParameterMissingException {
+    public EmptySecDnsUpdateException() {
+      super("At least one of 'add' or 'rem' is required on a secDNS update");
+    }
+  }
+
+  /** The 'urgent' attribute is not supported. */
+  static class UrgentAttributeNotSupportedException extends UnimplementedOptionException {
+    public UrgentAttributeNotSupportedException() {
+      super("The 'urgent' attribute is not supported");
+    }
+  }
+
+  /** Changing 'maxSigLife' is not supported. */
+  static class MaxSigLifeChangeNotSupportedException extends UnimplementedOptionException {
+    public MaxSigLifeChangeNotSupportedException() {
+      super("Changing 'maxSigLife' is not supported");
+    }
+  }
+}

@@ -18,6 +18,7 @@ import static google.registry.flows.domain.DomainTransferFlowTestCase.persistWit
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.testing.DatastoreHelper.assertBillingEvents;
 import static google.registry.testing.DatastoreHelper.createTld;
+import static google.registry.testing.DatastoreHelper.createTlds;
 import static google.registry.testing.DatastoreHelper.getOnlyHistoryEntryOfType;
 import static google.registry.testing.DatastoreHelper.newDomainResource;
 import static google.registry.testing.DatastoreHelper.persistActiveDomain;
@@ -35,9 +36,8 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.googlecode.objectify.Key;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
-import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
-import google.registry.flows.SingleResourceFlow.ResourceStatusProhibitsOperationException;
 import google.registry.flows.domain.DomainFlowUtils.BadPeriodUnitException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyUnitMismatchException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyValueScaleException;
@@ -48,11 +48,14 @@ import google.registry.flows.domain.DomainFlowUtils.UnsupportedFeeAttributeExcep
 import google.registry.flows.domain.DomainRenewFlow.DomainHasPendingTransferException;
 import google.registry.flows.domain.DomainRenewFlow.ExceedsMaxRegistrationYearsException;
 import google.registry.flows.domain.DomainRenewFlow.IncorrectCurrentExpirationDateException;
+import google.registry.flows.exceptions.ResourceStatusProhibitsOperationException;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Flag;
 import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
+import google.registry.model.domain.TestExtraLogicManager;
+import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.poll.PollMessage;
@@ -85,7 +88,9 @@ public class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, D
 
   @Before
   public void initDomainTest() {
-    createTld("tld");
+    createTlds("tld", "flags");
+    // For flags extension tests.
+    RegistryExtraFlowLogicProxy.setOverride("flags", TestExtraLogicManager.class);
   }
 
   private void persistDomain(StatusValue... statusValues) throws Exception {
@@ -131,10 +136,10 @@ public class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, D
       int renewalYears,
       Map<String, String> substitutions) throws Exception {
     assertTransactionalFlow(true);
-    DateTime currentExpiration = reloadResourceByUniqueId().getRegistrationExpirationTime();
+    DateTime currentExpiration = reloadResourceByForeignKey().getRegistrationExpirationTime();
     DateTime newExpiration = currentExpiration.plusYears(renewalYears);
     runFlowAssertResponse(readFile(responseFilename, substitutions));
-    DomainResource domain = reloadResourceByUniqueId();
+    DomainResource domain = reloadResourceByForeignKey();
     HistoryEntry historyEntryDomainRenew =
         getOnlyHistoryEntryOfType(domain, HistoryEntry.Type.DOMAIN_RENEW);
     assertThat(ofy().load().key(domain.getAutorenewBillingEvent()).now().getEventTime())
@@ -347,12 +352,12 @@ public class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, D
     persistDomain();
     // Modify the autorenew poll message so that it has an undelivered message in the past.
     persistResource(
-        ofy().load().key(reloadResourceByUniqueId().getAutorenewPollMessage()).now().asBuilder()
+        ofy().load().key(reloadResourceByForeignKey().getAutorenewPollMessage()).now().asBuilder()
             .setEventTime(expirationTime.minusYears(1))
             .build());
     runFlowAssertResponse(readFile("domain_renew_response.xml"));
     HistoryEntry historyEntryDomainRenew =
-        getOnlyHistoryEntryOfType(reloadResourceByUniqueId(), HistoryEntry.Type.DOMAIN_RENEW);
+        getOnlyHistoryEntryOfType(reloadResourceByForeignKey(), HistoryEntry.Type.DOMAIN_RENEW);
     assertPollMessages(
         new PollMessage.Autorenew.Builder()
             .setTargetId(getUniqueIdFromCommand())
@@ -361,12 +366,12 @@ public class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, D
             .setAutorenewEndTime(clock.nowUtc())
             .setMsg("Domain was auto-renewed.")
             .setParent(getOnlyHistoryEntryOfType(
-                reloadResourceByUniqueId(), HistoryEntry.Type.DOMAIN_CREATE))
+                reloadResourceByForeignKey(), HistoryEntry.Type.DOMAIN_CREATE))
             .build(),
         new PollMessage.Autorenew.Builder()
             .setTargetId(getUniqueIdFromCommand())
             .setClientId("TheRegistrar")
-            .setEventTime(reloadResourceByUniqueId().getRegistrationExpirationTime())
+            .setEventTime(reloadResourceByForeignKey().getRegistrationExpirationTime())
             .setAutorenewEndTime(END_OF_TIME)
             .setMsg("Domain was auto-renewed.")
             .setParent(historyEntryDomainRenew)
@@ -376,7 +381,7 @@ public class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, D
   @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -384,9 +389,9 @@ public class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, D
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
-    persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc());
+    persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc().minusDays(1));
     runFlow();
   }
 
@@ -525,7 +530,7 @@ public class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, D
   public void testFailure_pendingTransfer() throws Exception {
     thrown.expect(DomainHasPendingTransferException.class);
     persistDomain();
-    persistWithPendingTransfer(reloadResourceByUniqueId()
+    persistWithPendingTransfer(reloadResourceByForeignKey()
         .asBuilder()
         .setRegistrationExpirationTime(DateTime.parse("2001-09-08T22:00:00.0Z"))
         .build());
@@ -564,7 +569,7 @@ public class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, D
     thrown.expect(IncorrectCurrentExpirationDateException.class);
     persistDomain();
     // Note expiration time is off by one day.
-    persistResource(reloadResourceByUniqueId().asBuilder()
+    persistResource(reloadResourceByForeignKey().asBuilder()
         .setRegistrationExpirationTime(DateTime.parse("2000-04-04T22:00:00.0Z"))
         .build());
     runFlow();
@@ -605,6 +610,14 @@ public class DomainRenewFlowTest extends ResourceFlowTestCase<DomainRenewFlow, D
     persistResource(Registry.get("example").asBuilder().setPremiumPriceAckRequired(true).build());
     setEppInput("domain_renew_premium.xml");
     persistDomain();
+    runFlow();
+  }
+
+  @Test
+  public void testSuccess_flags() throws Exception {
+    setEppInput("domain_renew_flags.xml");
+    persistDomain();
+    thrown.expect(TestExtraLogicManagerSuccessException.class, "renewed");
     runFlow();
   }
 }

@@ -101,7 +101,7 @@ public abstract class DomainCreateOrAllocateFlow
   @Override
   protected final EppOutput getOutput() {
     return createOutput(
-        Result.Code.Success,
+        Result.Code.SUCCESS,
         DomainCreateData.create(
             newResource.getFullyQualifiedDomainName(),
             now,
@@ -110,6 +110,7 @@ public abstract class DomainCreateOrAllocateFlow
             feeCreate.createResponseBuilder()
                 .setCurrency(commandOperations.getCurrency())
                 .setFees(commandOperations.getFees())
+                .setCredits(commandOperations.getCredits())
                 .build()));
   }
 }

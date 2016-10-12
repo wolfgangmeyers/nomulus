@@ -18,30 +18,31 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Strings.isNullOrEmpty;
 import static google.registry.model.registry.Registries.findTldForNameOrThrow;
 import static google.registry.pricing.PricingEngineProxy.getDomainCreateCost;
+import static google.registry.util.TokenUtils.TokenType.ANCHOR_TENANT;
+import static google.registry.util.TokenUtils.createToken;
 import static org.joda.time.DateTimeZone.UTC;
 
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.net.InternetDomainName;
 import com.google.template.soy.data.SoyMapData;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.soy.CreateAnchorTenantSoyInfo;
+import google.registry.util.StringGenerator;
 import javax.inject.Inject;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 
 /** A command to create a new anchor tenant domain. */
 @Parameters(separators = " =", commandDescription = "Provision a domain for an anchor tenant.")
-final class CreateAnchorTenantCommand extends MutatingEppToolCommand implements GtechCommand {
+final class CreateAnchorTenantCommand extends MutatingEppToolCommand {
 
-  private static final int PASSWORD_LENGTH = 16;
   private static final int DEFAULT_ANCHOR_TENANT_PERIOD_YEARS = 2;
 
   @Parameter(
       names = {"-c", "--client"},
       description = "Client identifier of the registrar to execute the command as",
       required = true)
-  String clientIdentifier;
+  String clientId;
 
   @Parameter(
       names = {"-n", "--domain_name"},
@@ -79,7 +80,7 @@ final class CreateAnchorTenantCommand extends MutatingEppToolCommand implements 
     checkArgument(superuser, "This command must be run as a superuser.");
     findTldForNameOrThrow(InternetDomainName.from(domainName)); // Check that the tld exists.
     if (isNullOrEmpty(password)) {
-      password = passwordGenerator.createString(PASSWORD_LENGTH);
+      password = createToken(ANCHOR_TENANT, passwordGenerator);
     }
 
     Money cost = null;
@@ -89,7 +90,7 @@ final class CreateAnchorTenantCommand extends MutatingEppToolCommand implements 
 
     setSoyTemplate(CreateAnchorTenantSoyInfo.getInstance(),
         CreateAnchorTenantSoyInfo.CREATEANCHORTENANT);
-    addSoyRecord(clientIdentifier, new SoyMapData(
+    addSoyRecord(clientId, new SoyMapData(
         "domainName", domainName,
         "contactId", contact,
         "reason", reason,

@@ -29,10 +29,11 @@ import static google.registry.flows.domain.DomainFlowUtils.verifyLaunchPhase;
 import static google.registry.flows.domain.DomainFlowUtils.verifyNotInPendingDelete;
 import static google.registry.flows.domain.DomainFlowUtils.verifyNotReserved;
 import static google.registry.flows.domain.DomainFlowUtils.verifyPremiumNameIsNotBlocked;
+import static google.registry.flows.domain.DomainFlowUtils.verifyRegistryStateAllowsLaunchFlows;
 import static google.registry.flows.domain.DomainFlowUtils.verifySignedMarks;
 import static google.registry.flows.domain.DomainFlowUtils.verifyUnitIsYears;
 import static google.registry.model.EppResourceUtils.createDomainRoid;
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
+import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.model.domain.fee.Fee.FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.registry.Registries.findTldForName;
@@ -51,12 +52,14 @@ import google.registry.flows.EppException.StatusProhibitsOperationException;
 import google.registry.flows.EppException.UnimplementedOptionException;
 import google.registry.flows.ResourceCreateFlow;
 import google.registry.flows.ResourceFlowUtils.BadAuthInfoForResourceException;
+import google.registry.flows.domain.TldSpecificLogicProxy.EppCommandOperations;
 import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.DomainBase.Builder;
 import google.registry.model.domain.DomainCommand.Create;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.LrpToken;
 import google.registry.model.domain.fee.FeeTransformCommandExtension;
+import google.registry.model.domain.flags.FlagsCreateCommandExtension;
 import google.registry.model.domain.launch.LaunchCreateExtension;
 import google.registry.model.domain.launch.LaunchNotice;
 import google.registry.model.domain.launch.LaunchNotice.InvalidChecksumException;
@@ -67,8 +70,6 @@ import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.smd.SignedMark;
 import google.registry.model.tmch.ClaimsListShard;
-import google.registry.pricing.TldSpecificLogicProxy;
-import google.registry.pricing.TldSpecificLogicProxy.EppCommandOperations;
 import java.util.Set;
 import javax.annotation.Nullable;
 
@@ -95,16 +96,20 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
   protected TldState tldState;
   protected Optional<LrpToken> lrpToken;
 
+  protected Optional<RegistryExtraFlowLogic> extraFlowLogic;
+
   @Override
   public final void initResourceCreateOrMutateFlow() throws EppException {
     command = cloneAndLinkReferences(command, now);
-    registerExtensions(SecDnsCreateExtension.class);
+    registerExtensions(SecDnsCreateExtension.class, FlagsCreateCommandExtension.class);
+    registerExtensions(FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
     secDnsCreate = eppInput.getSingleExtension(SecDnsCreateExtension.class);
     launchCreate = eppInput.getSingleExtension(LaunchCreateExtension.class);
     feeCreate =
         eppInput.getFirstExtensionOfClasses(FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
     hasSignedMarks = launchCreate != null && !launchCreate.getSignedMarks().isEmpty();
     initDomainCreateFlow();
+    // We can't initialize extraFlowLogic here, because the TLD has not been checked yet.
   }
 
   @Override
@@ -160,7 +165,7 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
       @Override
       public DomainResource run() {
         // This is cacheable because we are outside of a transaction.
-        return loadByUniqueId(DomainResource.class, targetId, now);
+        return loadByForeignKey(DomainResource.class, targetId, now);
       }});
     // If the domain exists already and isn't in the ADD grace period then there is no way it will
     // be suddenly deleted and therefore the create must fail.
@@ -180,10 +185,19 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
     checkAllowedAccessToTld(getAllowedTlds(), tld);
     Registry registry = Registry.get(tld);
     tldState = registry.getTldState(now);
-    checkRegistryStateForTld(tld);
+    // Now that the TLD has been verified, we can go ahead and initialize extraFlowLogic. The
+    // initialization and matching commit are done at the topmost possible level in the flow
+    // hierarchy, but the actual processing takes place only when needed in the children, e.g.
+    // DomainCreateFlow.
+    extraFlowLogic = RegistryExtraFlowLogicProxy.newInstanceForTld(tld);
     domainLabel = domainName.parts().get(0);
     commandOperations = TldSpecificLogicProxy.getCreatePrice(
-        registry, domainName.toString(), now, command.getPeriod().getValue());
+        registry,
+        domainName.toString(),
+        getClientId(),
+        now,
+        command.getPeriod().getValue(),
+        eppInput);
     // The TLD should always be the parent of the requested domain name.
     isAnchorTenantViaReservation = matchesAnchorTenantReservation(
         domainLabel, tld, command.getAuthInfo().getPw().getValue());
@@ -233,6 +247,11 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
         nullToEmpty(command.getNameserverFullyQualifiedHostNames());
     validateNameserversCountForTld(tld, fullyQualifiedHostNames.size());
     validateNameserversAllowedOnTld(tld, fullyQualifiedHostNames);
+    // This check is a vile hack that will survive for only a day or so, as I work to flatten the
+    // domain and application create flows. Without it, the ordering of checks fails lots of tests.
+    if (!isSuperuser && this instanceof DomainApplicationCreateFlow) {
+      verifyRegistryStateAllowsLaunchFlows(Registry.get(getTld()), now);
+    }
     validateLaunchCreateExtension();
     // If a signed mark was provided, then it must match the desired domain label.
     // We do this after validating the launch create extension so that flows which don't allow any
@@ -251,6 +270,9 @@ public abstract class BaseDomainCreateFlow<R extends DomainBase, B extends Build
       ofy().save().entity(lrpToken.get().asBuilder()
           .setRedemptionHistoryEntry(Key.create(historyEntry))
           .build());
+    }
+    if (extraFlowLogic.isPresent()) {
+      extraFlowLogic.get().commitAdditionalLogicChanges();
     }
   }
 

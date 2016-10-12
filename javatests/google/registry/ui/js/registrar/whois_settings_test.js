@@ -49,7 +49,9 @@ function setUp() {
     logoutUrl: 'omg',
     isAdmin: true,
     clientId: test.testClientId,
-    showPaymentLink: false
+    showPaymentLink: false,
+    logoFilename: 'logo.png',
+    productName: 'Domain Registry'
   });
   stubs.setPath('goog.net.XhrIo', goog.testing.net.XhrIo);
   registry.registrar.ConsoleTestUtil.setup(test);
@@ -64,7 +66,10 @@ function tearDown() {
 }
 
 
-/** Creates a test registrar. */
+/**
+ * Creates test registrar.
+ * @return {Object}
+ */
 function createTestRegistrar() {
   return {
     emailAddress: 'test2.ui@example.com',

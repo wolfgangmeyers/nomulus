@@ -15,6 +15,7 @@
 package google.registry.rdap;
 
 import static google.registry.model.ofy.ObjectifyService.ofy;
+import static google.registry.rdap.RdapIcannStandardInformation.TRUNCATION_NOTICES;
 import static google.registry.request.Action.Method.GET;
 import static google.registry.request.Action.Method.HEAD;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
@@ -29,13 +30,15 @@ import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DesignatedContact;
 import google.registry.model.registrar.Registrar;
 import google.registry.rdap.RdapJsonFormatter.BoilerplateType;
+import google.registry.rdap.RdapJsonFormatter.OutputDataType;
 import google.registry.request.Action;
-import google.registry.request.HttpException;
 import google.registry.request.HttpException.BadRequestException;
 import google.registry.request.HttpException.NotFoundException;
 import google.registry.request.HttpException.UnprocessableEntityException;
 import google.registry.request.Parameter;
 import google.registry.util.Clock;
+import java.util.ArrayList;
+import java.util.List;
 import javax.inject.Inject;
 import org.joda.time.DateTime;
 
@@ -73,7 +76,7 @@ public class RdapEntitySearchAction extends RdapActionBase {
   /** Parses the parameters and calls the appropriate search function. */
   @Override
   public ImmutableMap<String, Object> getJsonObjectForResource(
-      String pathSearchString, boolean isHeadRequest, String linkBase) throws HttpException {
+      String pathSearchString, boolean isHeadRequest, String linkBase) {
     DateTime now = clock.nowUtc();
     // RDAP syntax example: /rdap/entities?fn=Bobby%20Joe*.
     // The pathSearchString is not used by search commands.
@@ -83,7 +86,7 @@ public class RdapEntitySearchAction extends RdapActionBase {
     if (Booleans.countTrue(fnParam.isPresent(), handleParam.isPresent()) != 1) {
       throw new BadRequestException("You must specify either fn=XXXX or handle=YYYY");
     }
-    ImmutableList<ImmutableMap<String, Object>> results;
+    RdapSearchResults results;
     if (fnParam.isPresent()) {
       // syntax: /rdap/entities?fn=Bobby%20Joe*
       // The name is the contact name or registrar name (not registrar contact name).
@@ -93,13 +96,19 @@ public class RdapEntitySearchAction extends RdapActionBase {
       // The handle is either the contact roid or the registrar clientId.
       results = searchByHandle(RdapSearchPattern.create(handleParam.get(), false), now);
     }
-    if (results.isEmpty()) {
+    if (results.jsonList().isEmpty()) {
       throw new NotFoundException("No entities found");
     }
-    ImmutableMap.Builder<String, Object> builder = new ImmutableMap.Builder<>();
-    builder.put("entitySearchResults", results);
-    RdapJsonFormatter.addTopLevelEntries(builder, BoilerplateType.ENTITY, null, rdapLinkBase);
-    return builder.build();
+    ImmutableMap.Builder<String, Object> jsonBuilder = new ImmutableMap.Builder<>();
+    jsonBuilder.put("entitySearchResults", results.jsonList());
+    RdapJsonFormatter.addTopLevelEntries(
+        jsonBuilder,
+        BoilerplateType.ENTITY,
+        results.isTruncated()
+            ? TRUNCATION_NOTICES : ImmutableList.<ImmutableMap<String, Object>>of(),
+        ImmutableList.<ImmutableMap<String, Object>>of(),
+        rdapLinkBase);
+    return jsonBuilder.build();
   }
 
   /**
@@ -116,46 +125,37 @@ public class RdapEntitySearchAction extends RdapActionBase {
    * <p>According to RFC 7482 section 6.1, punycode is only used for domain name labels, so we can
    * assume that entity names are regular unicode.
    */
-  private ImmutableList<ImmutableMap<String, Object>>
-      searchByName(final RdapSearchPattern partialStringQuery, DateTime now) throws HttpException {
-    // Handle queries without a wildcard -- load by name, which may not be unique.
-    if (!partialStringQuery.getHasWildcard()) {
-      Registrar registrar = Registrar.loadByName(partialStringQuery.getInitialString());
-      return makeSearchResults(
-          ofy().load()
-              .type(ContactResource.class)
-              .filter("searchName", partialStringQuery.getInitialString())
-              .filter("deletionTime", END_OF_TIME)
-              .limit(rdapResultSetMaxSize),
-          (registrar == null)
-              ? ImmutableList.<Registrar>of() : ImmutableList.of(registrar),
-          now);
-    // Handle queries with a wildcard, but no suffix. For contact resources, the deletion time will
-    // always be END_OF_TIME for non-deleted records; unlike domain resources, we don't need to
-    // worry about deletion times in the future. That allows us to use an equality query for the
-    // deletion time.
-    } else if (partialStringQuery.getSuffix() == null) {
-      return makeSearchResults(
-          ofy().load()
-              .type(ContactResource.class)
-              .filter("searchName >=", partialStringQuery.getInitialString())
-              .filter("searchName <", partialStringQuery.getNextInitialString())
-              .filter("deletionTime", END_OF_TIME)
-              .limit(rdapResultSetMaxSize),
-          Registrar.loadByNameRange(
-              partialStringQuery.getInitialString(),
-              partialStringQuery.getNextInitialString(),
-              rdapResultSetMaxSize),
-          now);
+  private RdapSearchResults searchByName(final RdapSearchPattern partialStringQuery, DateTime now) {
     // Don't allow suffixes in entity name search queries.
-    } else {
+    if (!partialStringQuery.getHasWildcard() && (partialStringQuery.getSuffix() != null)) {
       throw new UnprocessableEntityException("Suffixes not allowed in entity name searches");
     }
+    // Get the registrar matches, depending on whether there's a wildcard.
+    ImmutableList<Registrar> registrarMatches;
+    if (!partialStringQuery.getHasWildcard()) {
+      Registrar registrar = Registrar.loadByName(partialStringQuery.getInitialString());
+      registrarMatches = (registrar == null)
+          ? ImmutableList.<Registrar>of()
+          : ImmutableList.of(registrar);
+    } else {
+      // Fetch an additional registrar, so we can detect result set truncation.
+      registrarMatches = ImmutableList.copyOf(Registrar.loadByNameRange(
+          partialStringQuery.getInitialString(),
+          partialStringQuery.getNextInitialString(),
+          rdapResultSetMaxSize + 1));
+    }
+    // Get the contact matches and return the results, fetching an additional contact to detect
+    // truncation.
+    return makeSearchResults(
+      queryUndeleted(
+          ContactResource.class, "searchName", partialStringQuery, rdapResultSetMaxSize + 1).list(),
+      registrarMatches,
+      now);
   }
 
   /** Searches for entities by handle, returning a JSON array of entity info maps. */
-  private ImmutableList<ImmutableMap<String, Object>> searchByHandle(
-      final RdapSearchPattern partialStringQuery, DateTime now) throws HttpException {
+  private RdapSearchResults searchByHandle(
+      final RdapSearchPattern partialStringQuery, DateTime now) {
     // Handle queries without a wildcard -- load by ID.
     if (!partialStringQuery.getHasWildcard()) {
       ContactResource contactResource = ofy().load()
@@ -173,7 +173,7 @@ public class RdapEntitySearchAction extends RdapActionBase {
     // worry about deletion times in the future. That allows us to use an equality query for the
     // deletion time. Because the handle for registrars is the IANA identifier number, don't allow
     // wildcard searches for registrars, by simply not searching for registrars if a wildcard is
-    // present.
+    // present. Fetch an extra contact to detect result set truncation.
     } else if (partialStringQuery.getSuffix() == null) {
       return makeSearchResults(
           ofy().load()
@@ -183,7 +183,8 @@ public class RdapEntitySearchAction extends RdapActionBase {
               .filterKey(
                   "<", Key.create(ContactResource.class, partialStringQuery.getNextInitialString()))
               .filter("deletionTime", END_OF_TIME)
-              .limit(rdapResultSetMaxSize),
+              .limit(rdapResultSetMaxSize + 1)
+              .list(),
           ImmutableList.<Registrar>of(),
           now);
     // Don't allow suffixes in entity handle search queries.
@@ -201,35 +202,65 @@ public class RdapEntitySearchAction extends RdapActionBase {
     } catch (NumberFormatException e) {
       return ImmutableList.of();
     }
+    // Fetch an additional registrar to detect result set truncation.
     return ImmutableList.copyOf(Registrar.loadByIanaIdentifierRange(
-        ianaIdentifier, ianaIdentifier + 1, rdapResultSetMaxSize));
+        ianaIdentifier, ianaIdentifier + 1, rdapResultSetMaxSize + 1));
   }
 
   /** Builds a JSON array of entity info maps based on the specified contacts and registrars. */
-  private ImmutableList<ImmutableMap<String, Object>> makeSearchResults(
-      Iterable<ContactResource> contactResources, Iterable<Registrar> registrars, DateTime now)
-      throws HttpException {
-    ImmutableList.Builder<ImmutableMap<String, Object>> builder = new ImmutableList.Builder<>();
-    for (ContactResource contact : contactResources) {
+  private RdapSearchResults makeSearchResults(
+      List<ContactResource> contacts, List<Registrar> registrars, DateTime now) {
+
+    // Determine what output data type to use, depending on whether more than one entity will be
+    // returned.
+    int numEntities = contacts.size();
+    OutputDataType outputDataType;
+    // If there's more than one contact, then we know already we need SUMMARY mode.
+    if (numEntities > 1) {
+      outputDataType = OutputDataType.SUMMARY;
+    // If there are fewer than two contacts, loop through and compute the total number of contacts
+    // and registrars, stopping as soon as we find two.
+    } else {
+      outputDataType = OutputDataType.FULL;
+      for (Registrar registrar : registrars) {
+        if (registrar.isActiveAndPubliclyVisible()) {
+          numEntities++;
+          if (numEntities > 1) {
+            outputDataType = OutputDataType.SUMMARY;
+            break;
+          }
+        }
+      }
+    }
+
+    // There can be more results than our max size, partially because we have two pools to draw from
+    // (contacts and registrars), and partially because we try to fetch one more than the max size,
+    // so we can tell whether to display the truncation notification.
+    List<ImmutableMap<String, Object>> jsonOutputList = new ArrayList<>();
+    for (ContactResource contact : contacts) {
+      if (jsonOutputList.size() >= rdapResultSetMaxSize) {
+        return RdapSearchResults.create(ImmutableList.copyOf(jsonOutputList), true);
+      }
       // As per Andy Newton on the regext mailing list, contacts by themselves have no role, since
       // they are global, and might have different roles for different domains.
-      builder.add(RdapJsonFormatter.makeRdapJsonForContact(
+      jsonOutputList.add(RdapJsonFormatter.makeRdapJsonForContact(
           contact,
           false,
           Optional.<DesignatedContact.Type>absent(),
           rdapLinkBase,
-          rdapWhoisServer, now));
+          rdapWhoisServer,
+          now,
+          outputDataType));
     }
     for (Registrar registrar : registrars) {
       if (registrar.isActiveAndPubliclyVisible()) {
-        builder.add(RdapJsonFormatter.makeRdapJsonForRegistrar(
-            registrar, false, rdapLinkBase, rdapWhoisServer, now));
+        if (jsonOutputList.size() >= rdapResultSetMaxSize) {
+          return RdapSearchResults.create(ImmutableList.copyOf(jsonOutputList), true);
+        }
+        jsonOutputList.add(RdapJsonFormatter.makeRdapJsonForRegistrar(
+            registrar, false, rdapLinkBase, rdapWhoisServer, now, outputDataType));
       }
     }
-    // In theory, there could be more results than our max size, so limit the size.
-    ImmutableList<ImmutableMap<String, Object>> resultSet = builder.build();
-    return (resultSet.size() <= rdapResultSetMaxSize)
-        ? resultSet
-        : resultSet.subList(0, rdapResultSetMaxSize);
+    return RdapSearchResults.create(ImmutableList.copyOf(jsonOutputList));
   }
 }

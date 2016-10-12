@@ -25,9 +25,9 @@ import static google.registry.testing.DatastoreHelper.persistResource;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.Iterables;
 import google.registry.flows.ResourceFlowUtils.BadAuthInfoForResourceException;
-import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
-import google.registry.flows.ResourceMutatePendingTransferFlow.NotPendingTransferException;
-import google.registry.flows.ResourceTransferCancelFlow.NotTransferInitiatorException;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
+import google.registry.flows.exceptions.NotPendingTransferException;
+import google.registry.flows.exceptions.NotTransferInitiatorException;
 import google.registry.model.contact.ContactAuthInfo;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.eppcommon.AuthInfo.PasswordAuth;
@@ -62,7 +62,7 @@ public class ContactTransferCancelFlowTest
     runFlowAssertResponse(readFile(expectedXmlFilename));
 
     // Transfer should have been cancelled. Verify correct fields were set.
-    contact = reloadResourceByUniqueId();
+    contact = reloadResourceByForeignKey();
     assertAboutContacts().that(contact)
         .hasCurrentSponsorClientId("TheRegistrar").and()
         .hasLastTransferTimeNotEqualTo(clock.nowUtc()).and()
@@ -180,7 +180,7 @@ public class ContactTransferCancelFlowTest
   @Test
   public void testFailure_deletedContact() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     contact = persistResource(
         contact.asBuilder().setDeletionTime(clock.nowUtc().minusDays(1)).build());
@@ -190,7 +190,7 @@ public class ContactTransferCancelFlowTest
   @Test
   public void testFailure_nonexistentContact() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     deleteResource(contact);
     doFailingTest("contact_transfer_cancel.xml");

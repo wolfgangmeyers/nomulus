@@ -18,20 +18,19 @@ import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.common.collect.Multimap;
 import com.google.template.soy.data.SoyMapData;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.soy.DomainCheckFeeSoyInfo;
 import java.util.Collection;
 import java.util.List;
 
 /** A command to execute a domain check fees epp command. */
 @Parameters(separators = " =", commandDescription = "Check domain fees (for a 1-year create)")
-final class DomainCheckFeeCommand extends EppToolCommand implements GtechCommand {
+final class DomainCheckFeeCommand extends EppToolCommand {
 
   @Parameter(
       names = {"-c", "--client"},
       description = "Client identifier of the registrar to execute the command as",
       required = true)
-  String clientIdentifier;
+  String clientId;
 
   @Parameter(
       description = "Domain(s) to check.",
@@ -43,7 +42,7 @@ final class DomainCheckFeeCommand extends EppToolCommand implements GtechCommand
     Multimap<String, String> domainNameMap = validateAndGroupDomainNamesByTld(mainParameters);
     for (Collection<String> values : domainNameMap.asMap().values()) {
       setSoyTemplate(DomainCheckFeeSoyInfo.getInstance(), DomainCheckFeeSoyInfo.DOMAINCHECKFEE);
-      addSoyRecord(clientIdentifier, new SoyMapData("domainNames", values));
+      addSoyRecord(clientId, new SoyMapData("domainNames", values));
     }
   }
 }

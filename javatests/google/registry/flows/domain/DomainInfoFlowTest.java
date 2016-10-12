@@ -29,7 +29,7 @@ import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.ResourceFlowUtils.BadAuthInfoForResourceException;
-import google.registry.flows.ResourceQueryFlow.ResourceToQueryDoesNotExistException;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.domain.DomainFlowUtils.BadPeriodUnitException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyUnitMismatchException;
 import google.registry.flows.domain.DomainFlowUtils.FeeChecksDontSupportPhasesException;
@@ -70,7 +70,7 @@ public class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Dom
     clock.setTo(DateTime.parse("2005-03-03T22:00:00.000Z"));
     createTlds("tld", "flags");
     persistResource(
-        AppEngineRule.makeRegistrar1().asBuilder().setClientIdentifier("ClientZ").build());
+        AppEngineRule.makeRegistrar1().asBuilder().setClientId("ClientZ").build());
     // For flags extension tests.
     RegistryExtraFlowLogicProxy.setOverride("flags", TestExtraLogicManager.class);
   }
@@ -375,7 +375,7 @@ public class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Dom
   @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToQueryDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -383,7 +383,7 @@ public class DomainInfoFlowTest extends ResourceFlowTestCase<DomainInfoFlow, Dom
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToQueryDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     persistResource(newDomainResource("example.tld").asBuilder()
         .setDeletionTime(clock.nowUtc().minusDays(1))

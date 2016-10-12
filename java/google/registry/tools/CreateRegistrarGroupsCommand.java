@@ -24,7 +24,6 @@ import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.net.MediaType;
 import google.registry.model.registrar.Registrar;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.server.CreateGroupsAction;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -35,7 +34,7 @@ import java.util.List;
  */
 @Parameters(separators = " =", commandDescription = "Create groups for a registrar.")
 public class CreateRegistrarGroupsCommand extends ConfirmingCommand
-    implements ServerSideCommand, GtechCommand {
+    implements ServerSideCommand {
 
   @Parameter(
       description = "Client identifier(s) of the registrar(s) to create groups for",
@@ -72,10 +71,10 @@ public class CreateRegistrarGroupsCommand extends ConfirmingCommand
   }
 
   /** Calls the server endpoint to create groups for the specified registrar client id. */
-  static void executeOnServer(Connection connection, String clientIdentifier) throws IOException {
+  static void executeOnServer(Connection connection, String clientId) throws IOException {
     connection.send(
         CreateGroupsAction.PATH,
-        ImmutableMap.of(CreateGroupsAction.CLIENT_ID_PARAM, clientIdentifier),
+        ImmutableMap.of(CreateGroupsAction.CLIENT_ID_PARAM, clientId),
         MediaType.PLAIN_TEXT_UTF_8,
         new byte[0]);
   }
@@ -85,7 +84,7 @@ public class CreateRegistrarGroupsCommand extends ConfirmingCommand
     for (Registrar registrar : registrars) {
       connection.send(
           CreateGroupsAction.PATH,
-          ImmutableMap.of(CreateGroupsAction.CLIENT_ID_PARAM, registrar.getClientIdentifier()),
+          ImmutableMap.of(CreateGroupsAction.CLIENT_ID_PARAM, registrar.getClientId()),
           MediaType.PLAIN_TEXT_UTF_8,
           new byte[0]);
     }

@@ -15,7 +15,7 @@
 package google.registry.flows.domain;
 
 import static com.google.common.truth.Truth.assertThat;
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
+import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.testing.DatastoreHelper.assertNoBillingEvents;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.newDomainApplication;
@@ -28,12 +28,12 @@ import static google.registry.testing.GenericEppResourceSubject.assertAboutEppRe
 import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException.UnimplementedExtensionException;
-import google.registry.flows.ResourceFlow.BadCommandForRegistryPhaseException;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
-import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
 import google.registry.flows.domain.DomainApplicationDeleteFlow.SunriseApplicationCannotBeDeletedInLandrushException;
 import google.registry.flows.domain.DomainFlowUtils.ApplicationDomainNameMismatchException;
+import google.registry.flows.domain.DomainFlowUtils.BadCommandForRegistryPhaseException;
 import google.registry.flows.domain.DomainFlowUtils.LaunchPhaseMismatchException;
 import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
 import google.registry.model.EppResource;
@@ -65,7 +65,7 @@ public class DomainApplicationDeleteFlowTest
     clock.advanceOneMilli();
     runFlowAssertResponse(readFile("domain_delete_response.xml"));
     // Check that the domain is fully deleted.
-    assertThat(reloadResourceByUniqueId()).isNull();
+    assertThat(reloadDomainApplication()).isNull();
     assertNoBillingEvents();
   }
 
@@ -86,15 +86,15 @@ public class DomainApplicationDeleteFlowTest
         .setRepoId("1-TLD")
         .setRegistrant(
             Key.create(
-                loadByUniqueId(ContactResource.class, "sh8013", clock.nowUtc())))
+                loadByForeignKey(ContactResource.class, "sh8013", clock.nowUtc())))
         .setNameservers(ImmutableSet.of(
             Key.create(
-                loadByUniqueId(HostResource.class, "ns1.example.net", clock.nowUtc()))))
+                loadByForeignKey(HostResource.class, "ns1.example.net", clock.nowUtc()))))
         .build());
     doSuccessfulTest();
     for (EppResource resource : new EppResource[]{
-        loadByUniqueId(ContactResource.class, "sh8013", clock.nowUtc()),
-        loadByUniqueId(HostResource.class, "ns1.example.net", clock.nowUtc()) }) {
+        loadByForeignKey(ContactResource.class, "sh8013", clock.nowUtc()),
+        loadByForeignKey(HostResource.class, "ns1.example.net", clock.nowUtc()) }) {
       assertAboutEppResources().that(resource).doesNotHaveStatusValue(StatusValue.LINKED);
     }
   }
@@ -120,7 +120,7 @@ public class DomainApplicationDeleteFlowTest
   @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -128,7 +128,7 @@ public class DomainApplicationDeleteFlowTest
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     persistResource(newDomainApplication("example.tld").asBuilder()
         .setRepoId("1-TLD")
@@ -262,6 +262,36 @@ public class DomainApplicationDeleteFlowTest
     persistResource(
         newDomainApplication("example.tld").asBuilder().setRepoId("1-TLD").build());
     runFlow();
+  }
+
+  @Test
+  public void testSuccess_superuserQuietPeriod() throws Exception {
+    createTld("tld", TldState.QUIET_PERIOD);
+    persistResource(
+        newDomainApplication("example.tld").asBuilder().setRepoId("1-TLD").build());
+    clock.advanceOneMilli();
+    runFlowAssertResponse(
+        CommitMode.LIVE, UserPrivileges.SUPERUSER, readFile("domain_delete_response.xml"));
+  }
+
+  @Test
+  public void testSuccess_superuserPredelegation() throws Exception {
+    createTld("tld", TldState.PREDELEGATION);
+    persistResource(
+        newDomainApplication("example.tld").asBuilder().setRepoId("1-TLD").build());
+    clock.advanceOneMilli();
+    runFlowAssertResponse(
+        CommitMode.LIVE, UserPrivileges.SUPERUSER, readFile("domain_delete_response.xml"));
+  }
+
+  @Test
+  public void testSuccess_superuserGeneralAvailability() throws Exception {
+    createTld("tld", TldState.GENERAL_AVAILABILITY);
+    persistResource(
+        newDomainApplication("example.tld").asBuilder().setRepoId("1-TLD").build());
+    clock.advanceOneMilli();
+    runFlowAssertResponse(
+        CommitMode.LIVE, UserPrivileges.SUPERUSER, readFile("domain_delete_response.xml"));
   }
 
   @Test

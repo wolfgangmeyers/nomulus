@@ -44,6 +44,7 @@ import com.google.common.base.Splitter;
 import com.google.common.base.Supplier;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Iterables;
@@ -77,10 +78,12 @@ import google.registry.model.index.EppResourceIndex;
 import google.registry.model.index.ForeignKeyIndex;
 import google.registry.model.ofy.ObjectifyService;
 import google.registry.model.poll.PollMessage;
+import google.registry.model.pricing.PricingCategory;
 import google.registry.model.pricing.StaticPremiumListPricingEngine;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
+import google.registry.model.registry.label.CategorizedPremiumList;
 import google.registry.model.registry.label.PremiumList;
 import google.registry.model.registry.label.ReservedList;
 import google.registry.model.reporting.HistoryEntry;
@@ -90,9 +93,10 @@ import google.registry.model.transfer.TransferData.Builder;
 import google.registry.model.transfer.TransferData.TransferServerApproveEntity;
 import google.registry.model.transfer.TransferStatus;
 import google.registry.tmch.LordnTask;
-import java.util.List;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
+
+import java.util.List;
 
 /** Static utils for setting up test resources. */
 public class DatastoreHelper {
@@ -124,6 +128,13 @@ public class DatastoreHelper {
   public static DomainResource newDomainResource(String domainName, ContactResource contact) {
     return newDomainResource(
         domainName, generateNewDomainRoid(getTldFromDomainName(domainName)), contact);
+  }
+
+  public static DomainResource newDomainResource(String domainName, HostResource host) {
+    return newDomainResource(domainName)
+        .asBuilder()
+        .setNameservers(ImmutableSet.of(Key.create(host)))
+        .build();
   }
 
   public static DomainResource newDomainResource(
@@ -211,6 +222,7 @@ public class DatastoreHelper {
         .setContactId(contactId)
         .setCurrentSponsorClientId("TheRegistrar")
         .setAuthInfo(ContactAuthInfo.create(PasswordAuth.create("2fooBAR")))
+        .setCreationTimeForTest(START_OF_TIME)
         .build();
   }
 
@@ -242,12 +254,10 @@ public class DatastoreHelper {
     return persistResource(newContactResource(contactId));
   }
 
-  public static ContactResource persistDeletedContact(String contactId, DateTime now) {
+  /** Persists a contact resource with the given contact id deleted at the specified time. */
+  public static ContactResource persistDeletedContact(String contactId, DateTime deletionTime) {
     return persistResource(
-        newContactResource(contactId)
-            .asBuilder()
-            .setDeletionTime(now.minusDays(1))
-            .build());
+        newContactResource(contactId).asBuilder().setDeletionTime(deletionTime).build());
   }
 
   public static HostResource persistActiveHost(String hostName) {
@@ -264,9 +274,10 @@ public class DatastoreHelper {
             .build());
   }
 
-  public static HostResource persistDeletedHost(String hostName, DateTime now) {
+  /** Persists a host resource with the given hostname deleted at the specified time. */
+  public static HostResource persistDeletedHost(String hostName, DateTime deletionTime) {
     return persistResource(
-        newHostResource(hostName).asBuilder().setDeletionTime(now.minusDays(1)).build());
+        newHostResource(hostName).asBuilder().setDeletionTime(deletionTime).build());
   }
 
   public static DomainResource persistActiveDomain(String domainName) {
@@ -282,17 +293,28 @@ public class DatastoreHelper {
     return persistResource(newDomainApplication(domainName, contact, phase));
   }
 
-  public static DomainApplication persistDeletedDomainApplication(String domainName, DateTime now) {
-    return persistResource(newDomainApplication(domainName).asBuilder()
-        .setDeletionTime(now.minusDays(1)).build());
+  /**
+   * Persists a domain application resource with the given domain name deleted at the specified
+   * time.
+   */
+  public static DomainApplication persistDeletedDomainApplication(
+      String domainName, DateTime deletionTime) {
+    return persistResource(
+        newDomainApplication(domainName).asBuilder().setDeletionTime(deletionTime).build());
   }
 
-  public static DomainResource persistDeletedDomain(String domainName, DateTime now) {
-    return persistDomainAsDeleted(newDomainResource(domainName), now);
+  /** Persists a domain resource with the given domain name deleted at the specified time. */
+  public static DomainResource persistDeletedDomain(String domainName, DateTime deletionTime) {
+    return persistDomainAsDeleted(newDomainResource(domainName), deletionTime);
   }
 
-  public static DomainResource persistDomainAsDeleted(DomainResource domain, DateTime now) {
-    return persistResource(domain.asBuilder().setDeletionTime(now.minusDays(1)).build());
+  /**
+   * Returns a persisted domain that is the passed-in domain modified to be deleted at the specified
+   * time.
+   */
+  public static DomainResource persistDomainAsDeleted(
+      DomainResource domain, DateTime deletionTime) {
+    return persistResource(domain.asBuilder().setDeletionTime(deletionTime).build());
   }
 
   /** Persists a domain and enqueues a LORDN task of the appropriate type for it. */
@@ -339,6 +361,64 @@ public class DatastoreHelper {
     ofy().saveWithoutBackup().entity(premiumList).now();
     ofy().saveWithoutBackup().entities(premiumList.getPremiumListEntries().values()).now();
     return premiumList;
+  }
+
+  public static CategorizedPremiumList persistCategorizedPremiumList(
+      CategorizedPremiumList categorizedPremiumList) {
+    // Persist the list and its child entities directly, rather than using its helper method, so
+    // that we can avoid writing commit logs. This would cause issues since many tests replace the
+    // clock in Ofy with a non-advancing FakeClock, and commit logs currently require
+    // monotonically increasing timestamps.
+    ofy().saveWithoutBackup().entity(categorizedPremiumList).now();
+    ofy()
+        .saveWithoutBackup()
+        .entities(categorizedPremiumList.getPremiumListEntries().values())
+        .now();
+    return categorizedPremiumList;
+  }
+
+  /**
+   * Method returns a CategorizedPremiumList to allow for multiple to be built out for testing
+   * purposes
+   *
+   * @param map An ImmutableSortedMap that represents a DateTime value and associated
+   *     PricingCategory
+   * @param tld A string value representing a top level domain
+   * @param label A string value representing a key for the map
+   * @return A CategorizedPremiumList object
+   */
+  public static CategorizedPremiumList persistCategorizedPremiumList(
+      ImmutableSortedMap<DateTime, String> map, String tld, String label) {
+
+    CategorizedPremiumList list = new CategorizedPremiumList.Builder()
+               .setName(tld)
+               .setPremiumListMap(
+                   ImmutableMap.of(
+                       label,
+                       new CategorizedPremiumList.CategorizedListEntry.Builder()
+                           .setLabel(label)
+                           .setPricingCategoryTransitions(map)
+                           .build()))
+               .build().saveAndUpdateEntries();
+    createTld(tld);
+    persistResource(list);
+    persistResource(Registry.get(tld).asBuilder().setPremiumList(list).build());
+
+    return list;
+  }
+
+  /**
+   * Method returns a PricingCategory object
+   *
+   * @param category A string value representing the category
+   * @param money A sting value representing the money "USD 5.00"
+   * @return A PricingCategory object
+   */
+  public static PricingCategory persistPricingCategory(String category, String money) {
+    PricingCategory pc =
+        new PricingCategory.Builder().setName(category).setPrice(Money.parse(money)).build();
+    persistResource(pc);
+    return pc;
   }
 
   /** Creates and persists a tld. */
@@ -580,7 +660,7 @@ public class DatastoreHelper {
   public static Registrar persistNewRegistrar(String clientId, long ianaIdentifier) {
     return persistSimpleResource(
         new Registrar.Builder()
-          .setClientIdentifier(clientId)
+          .setClientId(clientId)
           .setType(Registrar.Type.REAL)
           .setIanaIdentifier(ianaIdentifier)
           .build());
@@ -732,6 +812,25 @@ public class DatastoreHelper {
     return persistResource(resource, true);
   }
 
+  private static <R> void saveResource(final R resource, final boolean wantBackup) {
+    Saver saver = wantBackup ? ofy().save() : ofy().saveWithoutBackup();
+    saver.entity(resource);
+    if (resource instanceof EppResource) {
+      EppResource eppResource = (EppResource) resource;
+      assertWithMessage("Cannot persist an EppResource with a missing repoId in tests")
+          .that(eppResource.getRepoId()).isNotEmpty();
+      Key<EppResource> eppResourceKey = Key.create(eppResource);
+      saver.entity(EppResourceIndex.create(eppResourceKey));
+      if (resource instanceof ForeignKeyedEppResource) {
+        saver.entity(ForeignKeyIndex.create(eppResource, eppResource.getDeletionTime()));
+      }
+      if (resource instanceof DomainApplication) {
+        saver.entity(
+            DomainApplicationIndex.createUpdatedInstance((DomainApplication) resource));
+      }
+    }
+  }
+
   private static <R> R persistResource(final R resource, final boolean wantBackup) {
     assertWithMessage("Attempting to persist a Builder is almost certainly an error in test code")
         .that(resource)
@@ -739,27 +838,40 @@ public class DatastoreHelper {
     ofy().transact(new VoidWork() {
       @Override
       public void vrun() {
-        Saver saver = wantBackup ? ofy().save() : ofy().saveWithoutBackup();
-        saver.entity(resource);
-        if (resource instanceof EppResource) {
-          EppResource eppResource = (EppResource) resource;
-          assertWithMessage("Cannot persist an EppResource with a missing repoId in tests")
-              .that(eppResource.getRepoId()).isNotEmpty();
-          Key<EppResource> eppResourceKey = Key.create(eppResource);
-          saver.entity(EppResourceIndex.create(eppResourceKey));
-          if (resource instanceof ForeignKeyedEppResource) {
-            saver.entity(ForeignKeyIndex.create(eppResource, eppResource.getDeletionTime()));
-          }
-          if (resource instanceof DomainApplication) {
-            saver.entity(
-                DomainApplicationIndex.createUpdatedInstance((DomainApplication) resource));
-          }
-        }
+        saveResource(resource, wantBackup);
       }});
     // Force the session to be cleared so that when we read it back, we read from the datastore
     // and not from the transaction cache or memcache.
     ofy().clearSessionCache();
     return ofy().load().entity(resource).now();
+  }
+
+  public static <R> void persistResources(final Iterable<R> resources) {
+    persistResources(resources, false);
+  }
+
+  private static <R> void persistResources(final Iterable<R> resources, final boolean wantBackup) {
+    for (R resource : resources) {
+      assertWithMessage("Attempting to persist a Builder is almost certainly an error in test code")
+          .that(resource)
+          .isNotInstanceOf(Buildable.Builder.class);
+    }
+    // Persist domains ten at a time, to avoid exceeding the entity group limit.
+    for (final List<R> chunk : Iterables.partition(resources, 10)) {
+      ofy().transact(new VoidWork() {
+        @Override
+        public void vrun() {
+          for (R resource : chunk) {
+            saveResource(resource, wantBackup);
+          }
+        }});
+    }
+    // Force the session to be cleared so that when we read it back, we read from the datastore
+    // and not from the transaction cache or memcache.
+    ofy().clearSessionCache();
+    for (R resource : resources) {
+      ofy().load().entity(resource).now();
+    }
   }
 
   /**

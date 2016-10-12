@@ -20,20 +20,20 @@ import static com.google.common.base.Strings.isNullOrEmpty;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import com.google.template.soy.data.SoyMapData;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.soy.DomainCreateSoyInfo;
+import google.registry.util.StringGenerator;
 import java.util.List;
 import javax.inject.Inject;
 
 /** A command to create a new domain via EPP. */
 @Parameters(separators = " =", commandDescription = "Create a new domain via EPP.")
-final class CreateDomainCommand extends MutatingEppToolCommand implements GtechCommand {
+final class CreateDomainCommand extends MutatingEppToolCommand {
 
   @Parameter(
       names = {"-c", "--client"},
       description = "Client identifier of the registrar to execute the command as",
       required = true)
-  String clientIdentifier;
+  String clientId;
 
   @Parameter(
       names = "--domain",
@@ -88,7 +88,7 @@ final class CreateDomainCommand extends MutatingEppToolCommand implements GtechC
     checkArgument(ns == null || ns.size() <= 13, "There can be at most 13 nameservers.");
 
     setSoyTemplate(DomainCreateSoyInfo.getInstance(), DomainCreateSoyInfo.DOMAINCREATE);
-    addSoyRecord(clientIdentifier, new SoyMapData(
+    addSoyRecord(clientId, new SoyMapData(
         "domain", domain,
         "period", period == null ? null : period.toString(),
         "ns", ns,

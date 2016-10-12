@@ -28,8 +28,8 @@ import static google.registry.testing.TaskQueueHelper.assertNoDnsTasksEnqueued;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import google.registry.flows.EppXmlTransformer.IpAddressVersionMismatchException;
-import google.registry.flows.ResourceCreateFlow.ResourceAlreadyExistsException;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.exceptions.ResourceAlreadyExistsException;
 import google.registry.flows.host.HostCreateFlow.SubordinateHostMustHaveIpException;
 import google.registry.flows.host.HostCreateFlow.UnexpectedExternalHostIpException;
 import google.registry.flows.host.HostFlowUtils.HostNameTooLongException;
@@ -76,11 +76,11 @@ public class HostCreateFlowTest extends ResourceFlowTestCase<HostCreateFlow, Hos
     assertTransactionalFlow(true);
     runFlowAssertResponse(readFile("host_create_response.xml"));
     // Check that the host was created and persisted with a history entry.
-    assertAboutHosts().that(reloadResourceByUniqueId())
+    assertAboutHosts().that(reloadResourceByForeignKey())
         .hasOnlyOneHistoryEntryWhich()
         .hasType(HistoryEntry.Type.HOST_CREATE);
     assertNoBillingEvents();
-    assertEppResourceIndexEntityFor(reloadResourceByUniqueId());
+    assertEppResourceIndexEntityFor(reloadResourceByForeignKey());
   }
 
   private void doSuccessfulInternalTest(String tld) throws Exception {
@@ -104,29 +104,29 @@ public class HostCreateFlowTest extends ResourceFlowTestCase<HostCreateFlow, Hos
   @Test
   public void testSuccess_internalNeverExisted() throws Exception {
     doSuccessfulInternalTest("tld");
-    assertThat(ofy().load().key(reloadResourceByUniqueId().getSuperordinateDomain())
+    assertThat(ofy().load().key(reloadResourceByForeignKey().getSuperordinateDomain())
         .now().getFullyQualifiedDomainName())
             .isEqualTo("example.tld");
-    assertThat(ofy().load().key(reloadResourceByUniqueId().getSuperordinateDomain())
+    assertThat(ofy().load().key(reloadResourceByForeignKey().getSuperordinateDomain())
         .now().getSubordinateHosts()).containsExactly("ns1.example.tld");
     assertDnsTasksEnqueued("ns1.example.tld");
   }
 
   @Test
   public void testSuccess_externalExistedButWasDeleted() throws Exception {
-    persistDeletedHost(getUniqueIdFromCommand(), clock.nowUtc());
+    persistDeletedHost(getUniqueIdFromCommand(), clock.nowUtc().minusDays(1));
     doSuccessfulTest();
     assertNoDnsTasksEnqueued();
   }
 
   @Test
   public void testSuccess_internalExistedButWasDeleted() throws Exception {
-    persistDeletedHost(getUniqueIdFromCommand(), clock.nowUtc());
+    persistDeletedHost(getUniqueIdFromCommand(), clock.nowUtc().minusDays(1));
     doSuccessfulInternalTest("tld");
-    assertThat(ofy().load().key(reloadResourceByUniqueId().getSuperordinateDomain())
+    assertThat(ofy().load().key(reloadResourceByForeignKey().getSuperordinateDomain())
         .now().getFullyQualifiedDomainName())
             .isEqualTo("example.tld");
-    assertThat(ofy().load().key(reloadResourceByUniqueId().getSuperordinateDomain())
+    assertThat(ofy().load().key(reloadResourceByForeignKey().getSuperordinateDomain())
         .now().getSubordinateHosts()).containsExactly("ns1.example.tld");
     assertDnsTasksEnqueued("ns1.example.tld");
   }

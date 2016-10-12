@@ -24,7 +24,6 @@ enum google.registry.model.billing.BillingEvent$Flag {
   ALLOCATION;
   ANCHOR_TENANT;
   AUTO_RENEW;
-  EAP;
   LANDRUSH;
   SUNRISE;
   SYNTHETIC;
@@ -59,6 +58,7 @@ enum google.registry.model.billing.BillingEvent$Reason {
   AUTO_RENEW;
   CREATE;
   ERROR;
+  FEE_EARLY_ACCESS;
   RENEW;
   RESTORE;
   SERVER_STATUS;
@@ -291,6 +291,7 @@ class google.registry.model.domain.LrpToken {
   com.googlecode.objectify.Key<google.registry.model.reporting.HistoryEntry> redemptionHistoryEntry;
   google.registry.model.UpdateAutoTimestamp updateTimestamp;
   java.lang.String assignee;
+  java.util.Map<java.lang.String, java.lang.String> metadata;
   java.util.Set<java.lang.String> validTlds;
 }
 class google.registry.model.domain.Period {
@@ -400,6 +401,21 @@ class google.registry.model.host.HostResource {
   org.joda.time.DateTime lastEppUpdateTime;
   org.joda.time.DateTime lastSuperordinateChange;
   org.joda.time.DateTime lastTransferTime;
+}
+class google.registry.model.icann.IcannReportField {
+  @Id java.lang.String id;
+  @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
+  google.registry.model.icann.IcannReportField$Type type;
+  java.lang.Integer count;
+  java.lang.String month;
+  java.lang.String name;
+  java.lang.String tld;
+  java.lang.String year;
+}
+enum google.registry.model.icann.IcannReportField$Type {
+  DNS;
+  REGISTRAR;
+  TLD;
 }
 class google.registry.model.index.DomainApplicationIndex {
   @Id java.lang.String fullyQualifiedDomainName;
@@ -701,7 +717,7 @@ class google.registry.model.registry.Registry {
   boolean dnsPaused;
   boolean escrowEnabled;
   boolean premiumPriceAckRequired;
-  com.googlecode.objectify.Key<google.registry.model.registry.label.PremiumList> premiumList;
+  com.googlecode.objectify.Key<google.registry.model.registry.label.BasePremiumList> premiumList;
   google.registry.model.CreateAutoTimestamp creationTime;
   google.registry.model.common.TimedTransitionProperty<google.registry.model.registry.Registry$TldState, google.registry.model.registry.Registry$TldStateTransition> tldStateTransitions;
   google.registry.model.common.TimedTransitionProperty<org.joda.money.Money, google.registry.model.registry.Registry$BillingCostTransition> eapFeeSchedule;
@@ -754,23 +770,49 @@ enum google.registry.model.registry.Registry$TldType {
   REAL;
   TEST;
 }
+class google.registry.model.registry.label.BasePremiumList {
+  @Id java.lang.String name;
+  @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
+  com.googlecode.objectify.Key<google.registry.model.registry.label.BasePremiumList$PremiumListRevision> revisionKey;
+  java.lang.String description;
+  org.joda.time.DateTime creationTime;
+  org.joda.time.DateTime lastUpdateTime;
+}
+class google.registry.model.registry.label.BasePremiumList$PremiumListRevision {
+  @Id long revisionId;
+  @Parent com.googlecode.objectify.Key<google.registry.model.registry.label.BasePremiumList> parent;
+}
+class google.registry.model.registry.label.CategorizedPremiumList {
+  @Id java.lang.String name;
+  @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
+  com.googlecode.objectify.Key<google.registry.model.registry.label.BasePremiumList$PremiumListRevision> revisionKey;
+  java.lang.String description;
+  org.joda.time.DateTime creationTime;
+  org.joda.time.DateTime lastUpdateTime;
+}
+class google.registry.model.registry.label.CategorizedPremiumList$CategorizedListEntry {
+  @Id java.lang.String label;
+  @Parent com.googlecode.objectify.Key<google.registry.model.registry.label.BasePremiumList$PremiumListRevision> parent;
+  google.registry.model.common.TimedTransitionProperty<java.lang.String, google.registry.model.registry.label.CategorizedPremiumList$CategorizedListEntry$PricingCategoryTransition> categoryTransitions;
+  java.lang.String comment;
+}
+class google.registry.model.registry.label.CategorizedPremiumList$CategorizedListEntry$PricingCategoryTransition {
+  java.lang.String pricingCategory;
+  org.joda.time.DateTime transitionTime;
+}
 class google.registry.model.registry.label.PremiumList {
   @Id java.lang.String name;
   @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
-  com.googlecode.objectify.Key<google.registry.model.registry.label.PremiumList$PremiumListRevision> revisionKey;
+  com.googlecode.objectify.Key<google.registry.model.registry.label.BasePremiumList$PremiumListRevision> revisionKey;
   java.lang.String description;
   org.joda.time.DateTime creationTime;
   org.joda.time.DateTime lastUpdateTime;
 }
 class google.registry.model.registry.label.PremiumList$PremiumListEntry {
   @Id java.lang.String label;
-  @Parent com.googlecode.objectify.Key<google.registry.model.registry.label.PremiumList$PremiumListRevision> parent;
+  @Parent com.googlecode.objectify.Key<google.registry.model.registry.label.BasePremiumList$PremiumListRevision> parent;
   java.lang.String comment;
   org.joda.money.Money price;
-}
-class google.registry.model.registry.label.PremiumList$PremiumListRevision {
-  @Id long revisionId;
-  @Parent com.googlecode.objectify.Key<google.registry.model.registry.label.PremiumList> parent;
 }
 enum google.registry.model.registry.label.ReservationType {
   ALLOWED_IN_SUNRISE;

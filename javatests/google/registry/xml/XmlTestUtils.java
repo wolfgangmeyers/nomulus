@@ -16,7 +16,7 @@ package google.registry.xml;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.truth.Truth.assert_;
-import static google.registry.util.DiffUtils.prettyPrintDeepDiff;
+import static google.registry.util.DiffUtils.prettyPrintXmlDeepDiff;
 import static org.joda.time.DateTimeZone.UTC;
 
 import com.google.common.base.Splitter;
@@ -59,7 +59,7 @@ public class XmlTestUtils {
           message,
           expected,
           actual,
-          prettyPrintDeepDiff(expectedMap, actualMap, null)));
+          prettyPrintXmlDeepDiff(expectedMap, actualMap, null)));
     }
   }
 
@@ -109,7 +109,7 @@ public class XmlTestUtils {
    * key. We may have to update the key as well, to get the namespaces correct. A returned key of
    * null indicates that we should use the existing key. A non-null key indicates that we should
    * replace the existing key.
-   * 
+   *
    * @param elementName the name under which the current subtree was found, or null if the current
    *     subtree's name is nonexistent or irrelevant
    * @param obj the current subtree

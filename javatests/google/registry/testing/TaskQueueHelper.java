@@ -23,7 +23,7 @@ import static com.google.common.collect.Iterables.transform;
 import static com.google.common.collect.Multisets.containsOccurrences;
 import static com.google.common.truth.Truth.assertThat;
 import static com.google.common.truth.Truth.assert_;
-import static google.registry.util.DiffUtils.prettyPrintDeepDiff;
+import static google.registry.util.DiffUtils.prettyPrintEntityDeepDiff;
 import static java.nio.charset.StandardCharsets.UTF_8;
 import static java.util.Arrays.asList;
 
@@ -44,6 +44,7 @@ import com.google.common.collect.Multimap;
 import com.google.common.net.HttpHeaders;
 import com.google.common.net.MediaType;
 import google.registry.dns.DnsConstants;
+import google.registry.model.ImmutableObject;
 import java.net.URI;
 import java.util.Arrays;
 import java.util.Collections;
@@ -227,7 +228,7 @@ public class TaskQueueHelper {
                 .transform(new Function<TaskStateInfo, String>() {
                     @Override
                     public String apply(TaskStateInfo input) {
-                      return prettyPrintDeepDiff(
+                      return prettyPrintEntityDeepDiff(
                           taskMatcherMap,
                           Maps.filterKeys(
                               new MatchableTaskInfo(input).toMap(),
@@ -277,7 +278,7 @@ public class TaskQueueHelper {
   }
 
   /** An adapter to clean up a {@link TaskStateInfo} for ease of matching. */
-  private static class MatchableTaskInfo {
+  private static class MatchableTaskInfo extends ImmutableObject {
 
     String taskName;
     String method;
@@ -307,7 +308,7 @@ public class TaskQueueHelper {
       if (info.getTagAsBytes() != null) {
         this.tag = new String(info.getTagAsBytes(), UTF_8);
       }
-      ImmutableMultimap.Builder<String, String> headerBuilder = ImmutableMultimap.builder();
+      ImmutableMultimap.Builder<String, String> headerBuilder = new ImmutableMultimap.Builder<>();
       for (HeaderWrapper header : info.getHeaders()) {
         // Lowercase header name for comparison since HTTP
         // header names are case-insensitive.

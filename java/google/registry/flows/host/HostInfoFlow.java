@@ -14,16 +14,38 @@
 
 package google.registry.flows.host;
 
-import google.registry.flows.ResourceInfoFlow;
-import google.registry.model.host.HostCommand;
+import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
+import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
+import static google.registry.model.EppResourceUtils.cloneResourceWithLinkedStatus;
+import static google.registry.model.eppoutput.Result.Code.SUCCESS;
+
+import com.google.common.base.Optional;
+import google.registry.flows.EppException;
+import google.registry.flows.FlowModule.TargetId;
+import google.registry.flows.LoggedInFlow;
+import google.registry.model.eppcommon.AuthInfo;
+import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.host.HostResource;
 import javax.inject.Inject;
 
 /**
- * An EPP flow that reads a host.
+ * An EPP flow that returns information about a host.
  *
- * @error {@link google.registry.flows.ResourceQueryFlow.ResourceToQueryDoesNotExistException}
+ * <p>The returned information included IP addresses, if any, and details of the host's most recent
+ * transfer if it has ever been transferred. Any registrar can see the information for any host.
+ *
+ * @error {@link google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException}
  */
-public class HostInfoFlow extends ResourceInfoFlow<HostResource, HostCommand.Info> {
+public final class HostInfoFlow extends LoggedInFlow {
+
+  @Inject @TargetId String targetId;
+  @Inject Optional<AuthInfo> authInfo;
   @Inject HostInfoFlow() {}
+
+  @Override
+  public EppOutput run() throws EppException {
+    HostResource host = loadAndVerifyExistence(HostResource.class, targetId, now);
+    verifyOptionalAuthInfoForResource(authInfo, host);
+    return createOutput(SUCCESS, cloneResourceWithLinkedStatus(host, now));
+  }
 }

@@ -14,7 +14,6 @@
 
 package google.registry.model.domain.fee;
 
-import com.google.common.collect.ImmutableList;
 import google.registry.model.Buildable.GenericBuilder;
 import google.registry.model.ImmutableObject;
 import java.util.List;
@@ -41,12 +40,12 @@ public class FeeTransformResponseExtensionImplNoCredits extends ImmutableObject
    */
   @XmlElement(name = "fee")
   List<Fee> fees;
-  
+
   /** Abstract builder for {@link FeeTransformResponseExtensionImplNoCredits}. */
   public abstract static class
       Builder<T extends FeeTransformResponseExtensionImplNoCredits, B extends Builder<?, ?>>
           extends GenericBuilder<T, B> implements FeeTransformResponseExtension.Builder {
-    
+
     @Override
     public B setCurrency(CurrencyUnit currency) {
       getInstance().currency = currency;
@@ -54,13 +53,13 @@ public class FeeTransformResponseExtensionImplNoCredits extends ImmutableObject
     }
 
     @Override
-    public B setFees(ImmutableList<Fee> fees) {
+    public B setFees(List<Fee> fees) {
       getInstance().fees = fees;
       return thisCastToDerived();
     }
 
     @Override
-    public B setCredits(ImmutableList<Credit> credits) {
+    public B setCredits(List<Credit> credits) {
       return thisCastToDerived();
     }
   }

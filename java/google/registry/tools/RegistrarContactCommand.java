@@ -34,7 +34,6 @@ import google.registry.model.common.GaeUserIdConverter;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarContact;
 import google.registry.model.registrar.RegistrarContact.Builder;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.params.OptionalPhoneNumberParameter;
 import google.registry.tools.params.PathParameter;
 import java.io.IOException;
@@ -53,7 +52,7 @@ import javax.annotation.Nullable;
 @Parameters(
     separators = " =",
     commandDescription = "Create/read/update/delete the various contact lists for a Registrar.")
-final class RegistrarContactCommand extends MutatingCommand implements GtechCommand {
+final class RegistrarContactCommand extends MutatingCommand {
 
   private enum Mode { LIST, CREATE, UPDATE, DELETE }
 
@@ -139,9 +138,9 @@ final class RegistrarContactCommand extends MutatingCommand implements GtechComm
   protected void init() throws Exception {
     checkArgument(mainParameters.size() == 1,
         "Must specify exactly one client identifier: %s", ImmutableList.copyOf(mainParameters));
-    String clientIdentifier = mainParameters.get(0);
-    Registrar registrar = checkNotNull(
-        Registrar.loadByClientId(clientIdentifier), "Registrar %s not found", clientIdentifier);
+    String clientId = mainParameters.get(0);
+    Registrar registrar =
+        checkNotNull(Registrar.loadByClientId(clientId), "Registrar %s not found", clientId);
     contactTypes =
         newHashSet(
             transform(

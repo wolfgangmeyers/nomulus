@@ -22,9 +22,9 @@ import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.testing.DomainResourceSubject.assertAboutDomains;
 
 import google.registry.flows.ResourceFlowUtils.BadAuthInfoForResourceException;
-import google.registry.flows.ResourceQueryFlow.ResourceToQueryDoesNotExistException;
-import google.registry.flows.ResourceTransferQueryFlow.NoTransferHistoryToQueryException;
-import google.registry.flows.ResourceTransferQueryFlow.NotAuthorizedToViewTransferException;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
+import google.registry.flows.exceptions.NoTransferHistoryToQueryException;
+import google.registry.flows.exceptions.NotAuthorizedToViewTransferException;
 import google.registry.model.contact.ContactAuthInfo;
 import google.registry.model.domain.DomainAuthInfo;
 import google.registry.model.domain.DomainResource;
@@ -45,8 +45,9 @@ public class DomainTransferQueryFlowTest
     setupDomainWithPendingTransfer();
   }
 
-  private void doSuccessfulTest(String commandFilename, String expectedXmlFilename)
-      throws Exception {
+  private void doSuccessfulTest(
+      String commandFilename,
+      String expectedXmlFilename) throws Exception {
     setEppInput(commandFilename);
     // Replace the ROID in the xml file with the one generated in our test.
     eppLoader.replaceAll("JD1234-REP", contact.getRepoId());
@@ -61,10 +62,8 @@ public class DomainTransferQueryFlowTest
         getGainingClientAutorenewEvent(),
         getLosingClientAutorenewEvent());
     // Look in the future and make sure the poll messages for implicit ack are there.
-    assertThat(getPollMessages("NewRegistrar", clock.nowUtc().plusYears(1)))
-        .hasSize(1);
-    assertThat(getPollMessages("TheRegistrar", clock.nowUtc().plusYears(1)))
-        .hasSize(1);
+    assertThat(getPollMessages("NewRegistrar", clock.nowUtc().plusYears(1))).hasSize(1);
+    assertThat(getPollMessages("TheRegistrar", clock.nowUtc().plusYears(1))).hasSize(1);
   }
 
   private void doFailingTest(String commandFilename) throws Exception {
@@ -78,61 +77,85 @@ public class DomainTransferQueryFlowTest
 
   @Test
   public void testSuccess() throws Exception {
-    doSuccessfulTest("domain_transfer_query.xml", "domain_transfer_query_response.xml");
+    doSuccessfulTest(
+        "domain_transfer_query.xml",
+        "domain_transfer_query_response.xml");
   }
 
   @Test
   public void testSuccess_sponsoringClient() throws Exception {
     setClientIdForFlow("TheRegistrar");
-    doSuccessfulTest("domain_transfer_query.xml", "domain_transfer_query_response.xml");
+    doSuccessfulTest(
+        "domain_transfer_query.xml",
+        "domain_transfer_query_response.xml");
   }
 
   @Test
   public void testSuccess_domainAuthInfo() throws Exception {
     setClientIdForFlow("ClientZ");
-    doSuccessfulTest("domain_transfer_query_domain_authinfo.xml",
+    doSuccessfulTest(
+        "domain_transfer_query_domain_authinfo.xml",
         "domain_transfer_query_response.xml");
   }
 
   @Test
   public void testSuccess_contactAuthInfo() throws Exception {
     setClientIdForFlow("ClientZ");
-    doSuccessfulTest("domain_transfer_query_contact_authinfo.xml",
+    doSuccessfulTest(
+        "domain_transfer_query_contact_authinfo.xml",
         "domain_transfer_query_response.xml");
   }
+
   @Test
   public void testSuccess_clientApproved() throws Exception {
     changeTransferStatus(TransferStatus.CLIENT_APPROVED);
-    doSuccessfulTest("domain_transfer_query.xml",
+    doSuccessfulTest(
+        "domain_transfer_query.xml",
         "domain_transfer_query_response_client_approved.xml");
   }
 
  @Test
   public void testSuccess_clientRejected() throws Exception {
     changeTransferStatus(TransferStatus.CLIENT_REJECTED);
-    doSuccessfulTest("domain_transfer_query.xml",
+    doSuccessfulTest(
+        "domain_transfer_query.xml",
         "domain_transfer_query_response_client_rejected.xml");
   }
 
  @Test
   public void testSuccess_clientCancelled() throws Exception {
     changeTransferStatus(TransferStatus.CLIENT_CANCELLED);
-    doSuccessfulTest("domain_transfer_query.xml",
+    doSuccessfulTest(
+        "domain_transfer_query.xml",
         "domain_transfer_query_response_client_cancelled.xml");
   }
 
   @Test
   public void testSuccess_serverApproved() throws Exception {
     changeTransferStatus(TransferStatus.SERVER_APPROVED);
-    doSuccessfulTest("domain_transfer_query.xml",
+    doSuccessfulTest(
+        "domain_transfer_query.xml",
         "domain_transfer_query_response_server_approved.xml");
   }
 
   @Test
   public void testSuccess_serverCancelled() throws Exception {
     changeTransferStatus(TransferStatus.SERVER_CANCELLED);
-    doSuccessfulTest("domain_transfer_query.xml",
+    doSuccessfulTest(
+        "domain_transfer_query.xml",
         "domain_transfer_query_response_server_cancelled.xml");
+  }
+
+  @Test
+  public void testSuccess_tenYears() throws Exception {
+    domain = persistResource(domain.asBuilder()
+        .setTransferData(domain.getTransferData().asBuilder()
+            .setExtendedRegistrationYears(10)
+            .build())
+        .build());
+    doSuccessfulTest(
+        "domain_transfer_query.xml",
+        "domain_transfer_query_response_10_years.xml");
   }
 
   @Test
@@ -140,7 +163,8 @@ public class DomainTransferQueryFlowTest
     changeTransferStatus(TransferStatus.SERVER_CANCELLED);
     domain = persistResource(
         domain.asBuilder().setDeletionTime(clock.nowUtc().plusDays(1)).build());
-    doSuccessfulTest("domain_transfer_query.xml",
+    doSuccessfulTest(
+        "domain_transfer_query.xml",
         "domain_transfer_query_response_server_cancelled.xml");
   }
 
@@ -182,7 +206,7 @@ public class DomainTransferQueryFlowTest
   @Test
   public void testFailure_deletedDomain() throws Exception {
     thrown.expect(
-        ResourceToQueryDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     domain = persistResource(
             domain.asBuilder().setDeletionTime(clock.nowUtc().minusDays(1)).build());
@@ -192,7 +216,7 @@ public class DomainTransferQueryFlowTest
   @Test
   public void testFailure_nonexistentDomain() throws Exception {
     thrown.expect(
-        ResourceToQueryDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     deleteResource(domain);
     doFailingTest("domain_transfer_query.xml");

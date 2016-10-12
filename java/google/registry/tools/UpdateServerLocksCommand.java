@@ -25,7 +25,6 @@ import com.beust.jcommander.Parameters;
 import com.google.common.collect.ImmutableSet;
 import com.google.template.soy.data.SoyMapData;
 import google.registry.model.eppcommon.StatusValue;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.soy.UpdateServerLocksSoyInfo;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,13 +33,13 @@ import java.util.Set;
 /** A command to execute a domain check claims epp command. */
 @Parameters(separators = " =",
     commandDescription = "Toggle server locks on a domain.")
-final class UpdateServerLocksCommand extends MutatingEppToolCommand implements GtechCommand {
+final class UpdateServerLocksCommand extends MutatingEppToolCommand {
 
   @Parameter(
       names = {"-c", "--client"},
       description = "Client identifier of the registrar to execute the command as",
       required = true)
-  String clientIdentifier;
+  String clientId;
 
   @Parameter(
       names = {"-n", "--domain_name"},
@@ -105,7 +104,7 @@ final class UpdateServerLocksCommand extends MutatingEppToolCommand implements G
         "Add and remove actions are both empty");
     setSoyTemplate(
         UpdateServerLocksSoyInfo.getInstance(), UpdateServerLocksSoyInfo.UPDATESERVERLOCKS);
-    addSoyRecord(clientIdentifier, new SoyMapData(
+    addSoyRecord(clientId, new SoyMapData(
         "domainName", domainName,
         "locksToApply", valuesToApply,
         "locksToRemove", valuesToRemove,

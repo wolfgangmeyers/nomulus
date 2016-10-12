@@ -17,6 +17,7 @@ package google.registry.model.domain.fee;
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static com.google.common.base.Preconditions.checkState;
 
+import com.google.common.collect.Range;
 import google.registry.model.ImmutableObject;
 import google.registry.xml.PeriodAdapter;
 import java.math.BigDecimal;
@@ -25,6 +26,7 @@ import javax.xml.bind.annotation.XmlEnumValue;
 import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.bind.annotation.XmlValue;
 import javax.xml.bind.annotation.adapters.XmlJavaTypeAdapter;
+import org.joda.time.DateTime;
 import org.joda.time.Period;
 
 /** Base class for the fee and credit types. */
@@ -39,13 +41,15 @@ public abstract class BaseFee extends ImmutableObject {
     @XmlEnumValue("delayed")
     DELAYED
   }
-  
+
   /** Enum for the type of the fee. */
   public enum FeeType {
     CREATE("create"),
     EAP("Early Access Period, fee expires: %s"),
     RENEW("renew"),
-    RESTORE("restore");
+    RESTORE("restore"),
+    UPDATE("update"),
+    CREDIT("%s credit");
 
     private final String formatString;
 
@@ -73,9 +77,12 @@ public abstract class BaseFee extends ImmutableObject {
 
   @XmlValue
   BigDecimal cost;
-  
+
   @XmlTransient
   FeeType type;
+
+  @XmlTransient
+  Range<DateTime> validDateRange;
 
   public String getDescription() {
     return description;
@@ -97,20 +104,33 @@ public abstract class BaseFee extends ImmutableObject {
    * According to the fee extension specification, a fee must always be non-negative, while a credit
    * must always be negative. Essentially, they are the same thing, just with different sign.
    * However, we need them to be separate classes for proper JAXB handling.
-   * 
+   *
    * @see "https://tools.ietf.org/html/draft-brown-epp-fees-03#section-2.4"
    */
   public BigDecimal getCost() {
     return cost;
   }
-  
+
   public FeeType getType() {
     return type;
+  }
+
+  public boolean hasValidDateRange() {
+    return validDateRange != null;
+  }
+
+  public Range<DateTime> getValidDateRange() {
+    checkState(hasValidDateRange());
+    return validDateRange;
   }
 
   protected void generateDescription(Object... args) {
     checkState(type != null);
     description = type.renderDescription(args);
+  }
+
+  public boolean hasZeroCost() {
+    return cost.signum() == 0;
   }
 
   public boolean hasDefaultAttributes() {

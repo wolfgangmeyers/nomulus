@@ -25,6 +25,7 @@ FIELD_EXPOSERS = [
     "eppoutput/FieldExposer.java",
     "export/FieldExposer.java",
     "host/FieldExposer.java",
+    "icann/FieldExposer.java",
     "index/FieldExposer.java",
     "mark/FieldExposer.java",
     "ofy/FieldExposer.java",

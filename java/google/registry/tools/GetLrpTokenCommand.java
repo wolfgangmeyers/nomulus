@@ -22,7 +22,6 @@ import com.beust.jcommander.Parameters;
 import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
 import google.registry.model.domain.LrpToken;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.Command.RemoteApiCommand;
 
 /** Command to show token information for LRP participants. */
@@ -30,7 +29,7 @@ import google.registry.tools.Command.RemoteApiCommand;
     separators = " =",
     commandDescription = "Show token information for LRP participants by matching on a "
         + "known token or a unique ID (assignee).")
-public final class GetLrpTokenCommand implements RemoteApiCommand, GtechCommand {
+public final class GetLrpTokenCommand implements RemoteApiCommand {
 
   @Parameter(
       names = {"-t", "--token"},
@@ -46,13 +45,13 @@ public final class GetLrpTokenCommand implements RemoteApiCommand, GtechCommand 
       names = {"-h", "--history"},
       description = "Return expanded history entry (including domain application)")
   private boolean includeHistory = false;
-  
+
   @Override
   public void run() throws Exception {
     checkArgument(
         (tokenString == null) == (assignee != null),
         "Exactly one of either token or assignee must be specified.");
-    ImmutableSet.Builder<LrpToken> tokensBuilder = ImmutableSet.builder();
+    ImmutableSet.Builder<LrpToken> tokensBuilder = new ImmutableSet.Builder<>();
     if (tokenString != null) {
       LrpToken token = ofy().load().key(Key.create(LrpToken.class, tokenString)).now();
       if (token != null) {
@@ -70,7 +69,7 @@ public final class GetLrpTokenCommand implements RemoteApiCommand, GtechCommand 
           System.out.println(
               ofy().load().key(token.getRedemptionHistoryEntry()).now().toHydratedString());
         }
-      } 
+      }
     } else {
       System.out.println("Token not found.");
     }

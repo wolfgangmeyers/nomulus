@@ -18,6 +18,7 @@ import google.registry.model.domain.fee.FeeCheckResponseExtensionItem;
 import google.registry.model.domain.fee.FeeQueryResponseExtensionItemImpl;
 import javax.xml.bind.annotation.XmlType;
 import org.joda.money.CurrencyUnit;
+import org.joda.time.DateTime;
 
 /** The version 0.6 response for a domain check on a single resource. */
 @XmlType(propOrder = {"name", "currency", "command", "period", "fee", "feeClass"})
@@ -25,34 +26,45 @@ public class FeeCheckResponseExtensionItemV06
     extends FeeQueryResponseExtensionItemImpl implements FeeCheckResponseExtensionItem {
   /** The name of the domain that was checked, with an attribute indicating if it is premium. */
   String name;
-  
+
   CurrencyUnit currency;
 
   /** Builder for {@link FeeCheckResponseExtensionItemV06}. */
   public static class Builder
       extends FeeQueryResponseExtensionItemImpl.Builder<FeeCheckResponseExtensionItemV06, Builder>
       implements FeeCheckResponseExtensionItem.Builder {
-    
+
     @Override
     public Builder setDomainNameIfSupported(String name) {
       getInstance().name = name;
       return this;
     }
-    
+
     @Override
     public Builder setCurrencyIfSupported(CurrencyUnit currency) {
       getInstance().currency = currency;
       return this;
     }
-    
+
     @Override
     public Builder setAvailIfSupported(boolean avail) {
       return this;
     }
-    
+
     @Override
     public Builder setReasonIfSupported(String reason) {
       return this;
     }
+
+    @Override
+    public Builder setEffectiveDateIfSupported(DateTime effectiveDate) {
+      return this;
+    }
+
+    @Override
+    public Builder setNotAfterDateIfSupported(DateTime notAfterDate) {
+      return this;
+    }
+
   }
 }

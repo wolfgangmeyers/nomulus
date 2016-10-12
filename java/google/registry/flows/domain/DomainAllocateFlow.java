@@ -16,7 +16,7 @@ package google.registry.flows.domain;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 import static google.registry.flows.domain.DomainFlowUtils.getReservationType;
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
+import static google.registry.model.EppResourceUtils.loadDomainApplication;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.pricing.PricingEngineProxy.getDomainCreateCost;
 import static google.registry.util.CollectionUtils.isNullOrEmpty;
@@ -75,7 +75,7 @@ public class DomainAllocateFlow extends DomainCreateOrAllocateFlow {
       throw new OnlySuperuserCanAllocateException();
     }
     String applicationRoid = allocateCreate.getApplicationRoid();
-    application = loadByUniqueId(DomainApplication.class, applicationRoid, now);
+    application = loadDomainApplication(applicationRoid, now);
     if (application == null) {
       throw new MissingApplicationException(applicationRoid);
     }
@@ -88,7 +88,7 @@ public class DomainAllocateFlow extends DomainCreateOrAllocateFlow {
   protected final void setDomainCreateOrAllocateProperties(Builder builder) {
     boolean sunrushAddGracePeriod = isNullOrEmpty(command.getNameservers());
     Registry registry = Registry.get(getTld());
-    ImmutableSet.Builder<Flag> billingFlagsBuilder = ImmutableSet.builder();
+    ImmutableSet.Builder<Flag> billingFlagsBuilder = new ImmutableSet.Builder<>();
     if (!application.getEncodedSignedMarks().isEmpty()) {
       billingFlagsBuilder.add(Flag.SUNRISE);
     } else {

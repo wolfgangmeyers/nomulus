@@ -16,25 +16,29 @@ package google.registry.model.pricing;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static google.registry.model.common.EntityGroupRoot.getCrossTldKey;
+import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
-import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.base.Optional;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.googlecode.objectify.Key;
+import com.googlecode.objectify.Work;
 import com.googlecode.objectify.annotation.Cache;
-import com.googlecode.objectify.annotation.Embed;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Id;
-import com.googlecode.objectify.annotation.Mapify;
+import com.googlecode.objectify.annotation.Ignore;
 import com.googlecode.objectify.annotation.Parent;
+import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.ImmutableObject;
 import google.registry.model.common.EntityGroupRoot;
-import google.registry.model.common.TimedTransitionProperty;
-import google.registry.model.common.TimedTransitionProperty.TimedTransition;
 import org.joda.money.Money;
-import org.joda.time.DateTime;
 
-import java.util.Map;
+import java.util.concurrent.ExecutionException;
 
 /**
  * A Pricing Category for a premium domain if premiumListEntry lists a domain as in a specific price
@@ -42,14 +46,49 @@ import java.util.Map;
  */
 @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
 @Entity
-public class PricingCategory extends ImmutableObject implements Buildable {
+public class PricingCategory extends ImmutableObject
+    implements Buildable, Comparable<PricingCategory> {
+
+  @Ignore
+  public static final String UNINITIALIZED = "UNINITIALIZED";
 
   @Parent Key<EntityGroupRoot> parent = getCrossTldKey();
 
   /** Universally unique name for this price category. */
   @Id String name;
+
   Money price;
   String comment;
+
+  public static Optional<PricingCategory> get(String name) {
+    try {
+      return Optional.of(cache.get(name));
+    } catch (CacheLoader.InvalidCacheLoadException e) {
+      return Optional.absent();
+    } catch (ExecutionException e) {
+      throw new UncheckedExecutionException("Could not retrieve pricing category named " + name, e);
+    }
+  }
+
+  private static LoadingCache<String, PricingCategory> cache =
+    CacheBuilder.newBuilder()
+      .expireAfterWrite(
+        RegistryEnvironment.get().config().getDomainLabelListCacheDuration().getMillis(),
+        MILLISECONDS)
+      .build(new CacheLoader<String, PricingCategory>() {
+        @Override
+        public PricingCategory load(final String name) throws Exception {
+          return ofy().doTransactionless(new Work<PricingCategory>() {
+            @Override
+            public PricingCategory run() {
+              return ofy()
+                .load()
+                .type(PricingCategory.class)
+                .parent(getCrossTldKey())
+                .id(name)
+                .now();
+            }});
+        }});
 
   public String getName() {
     return name;
@@ -66,6 +105,11 @@ public class PricingCategory extends ImmutableObject implements Buildable {
   @Override
   public Builder asBuilder() {
     return new Builder(clone(this));
+  }
+
+  @Override
+  public int compareTo(PricingCategory o) {
+    return o.getName().compareTo(this.getName());
   }
 
   public static class Builder extends Buildable.Builder<PricingCategory> {
@@ -99,5 +143,4 @@ public class PricingCategory extends ImmutableObject implements Buildable {
       return super.build();
     }
   }
-
 }

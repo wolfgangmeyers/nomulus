@@ -14,6 +14,7 @@
 
 """External dependencies for Domain Registry."""
 
+
 def domain_registry_repositories():
 
   native.maven_jar(
@@ -78,8 +79,8 @@ def domain_registry_repositories():
 
   native.maven_jar(
       name = "auto_common",
-      artifact = "com.google.auto:auto-common:0.5",
-      sha1 = "27185563ca9551183fa5379807c3034c0012c8c4",
+      artifact = "com.google.auto:auto-common:0.7",
+      sha1 = "910d8b3ff71063135ae743d43d3dde3435c8648c",
   )
 
   native.maven_jar(
@@ -96,8 +97,8 @@ def domain_registry_repositories():
 
   native.maven_jar(
       name = "auto_value",
-      artifact = "com.google.auto.value:auto-value:1.1",
-      sha1 = "f6951c141ea3e89c0f8b01da16834880a1ebf162",
+      artifact = "com.google.auto.value:auto-value:1.3",
+      sha1 = "4961194f62915eb45e21940537d60ac53912c57d",
   )
 
   native.maven_jar(
@@ -168,8 +169,8 @@ def domain_registry_repositories():
 
   native.maven_jar(
       name = "fastutil",
-      artifact = "it.unimi.dsi:fastutil:6.4.3",
-      sha1 = "634ae8b497f0326136fd4995618207e48989623b",
+      artifact = "it.unimi.dsi:fastutil:6.5.16",
+      sha1 = "cc0df01620c4bef9e89123e0a5c3c226bdb36ea0",
   )
 
   native.maven_jar(
@@ -431,12 +432,6 @@ def domain_registry_repositories():
   )
 
   native.maven_jar(
-      name = "protobuf_java",
-      artifact = "com.google.protobuf:protobuf-java:3.0.0-beta-3",
-      sha1 = "ed8c2f9a63cfa770292f8173fd0172bdaa014fe3",
-  )
-
-  native.maven_jar(
       name = "qdox",
       artifact = "com.thoughtworks.qdox:qdox:1.12.1",
       sha1 = "f7122f6ab1f64bdf9f5970b0e89bfb355e036897",
@@ -468,8 +463,8 @@ def domain_registry_repositories():
 
   native.maven_jar(
       name = "truth",
-      artifact = "com.google.truth:truth:0.28",
-      sha1 = "0a388c7877c845ff4b8e19689dda5ac9d34622c4",
+      artifact = "com.google.truth:truth:0.30",
+      sha1 = "9d591b5a66eda81f0b88cf1c748ab8853d99b18b",
   )
 
   native.maven_jar(

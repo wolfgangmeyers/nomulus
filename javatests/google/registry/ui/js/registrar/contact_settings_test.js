@@ -50,7 +50,9 @@ function setUp() {
     logoutUrl: 'omg',
     isAdmin: true,
     clientId: test.testClientId,
-    showPaymentLink: false
+    showPaymentLink: false,
+    logoFilename: 'logo.png',
+    productName: 'Domain Registry'
   });
   stubs.setPath('goog.net.XhrIo', goog.testing.net.XhrIo);
   registry.registrar.ConsoleTestUtil.setup(test);
@@ -284,6 +286,7 @@ function testDelete() {
 
 /**
  * @param {string=} opt_email
+ * @return {Object}
  */
 function createTestContact(opt_email) {
   var nameMail = opt_email || 'test@example.com';
@@ -302,6 +305,7 @@ function createTestContact(opt_email) {
 /**
  * Convert parsed formContact to simulated wire form.
  * @param {!Element} contact
+ * @return {Object}
  */
 function simulateJsonForContact(contact) {
   contact.visibleInWhoisAsAdmin = contact.visibleInWhoisAsAdmin == 'true';

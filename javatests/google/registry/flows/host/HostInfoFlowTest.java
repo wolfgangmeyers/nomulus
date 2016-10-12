@@ -25,7 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InetAddresses;
 import com.googlecode.objectify.Key;
 import google.registry.flows.ResourceFlowTestCase;
-import google.registry.flows.ResourceQueryFlow.ResourceToQueryDoesNotExistException;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.host.HostResource;
@@ -51,7 +51,7 @@ public class HostInfoFlowTest extends ResourceFlowTestCase<HostInfoFlow, HostRes
         new HostResource.Builder()
             .setFullyQualifiedHostName(getUniqueIdFromCommand())
             .setRepoId("1FF-FOOBAR")
-            .setDeletionTime(active ? null : DateTime.now().minusDays(1))
+            .setDeletionTime(active ? null : clock.nowUtc().minusDays(1))
             .setCurrentSponsorClientId("my sponsor")
             .setStatusValues(
                 ImmutableSet.of(StatusValue.CLIENT_UPDATE_PROHIBITED))
@@ -66,7 +66,7 @@ public class HostInfoFlowTest extends ResourceFlowTestCase<HostInfoFlow, HostRes
             .setLastEppUpdateTime(DateTime.parse("1999-12-03T09:00:00.0Z"))
             .setLastTransferTime(DateTime.parse("2000-04-08T09:00:00.0Z"))
             .build());
-    assertThat(isDeleted(host, DateTime.now())).isNotEqualTo(active);
+    assertThat(isDeleted(host, clock.nowUtc())).isNotEqualTo(active);
     return host;
   }
 
@@ -145,7 +145,7 @@ public class HostInfoFlowTest extends ResourceFlowTestCase<HostInfoFlow, HostRes
   @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToQueryDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -153,7 +153,7 @@ public class HostInfoFlowTest extends ResourceFlowTestCase<HostInfoFlow, HostRes
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToQueryDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     persistHostResource(false);
     runFlow();

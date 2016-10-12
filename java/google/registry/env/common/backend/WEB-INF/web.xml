@@ -240,16 +240,19 @@
     <url-pattern>/_dr/task/exportDomainLists</url-pattern>
   </servlet-mapping>
 
-  <!-- Deletes the specified contact resource if it is not referenced by any domains. -->
+  <!--  Mapreduce to delete all prober data. -->
   <servlet-mapping>
     <servlet-name>backend-servlet</servlet-name>
-    <url-pattern>/_dr/task/deleteContactResource</url-pattern>
+    <url-pattern>/_dr/task/deleteProberData</url-pattern>
   </servlet-mapping>
 
-  <!-- Deletes the specified host resource if it is not referenced by any domains. -->
+  <!--
+    Deletes contacts and hosts enqueued for asynchronous deletion if they are
+    not referenced by any domain.
+  -->
   <servlet-mapping>
     <servlet-name>backend-servlet</servlet-name>
-    <url-pattern>/_dr/task/deleteHostResource</url-pattern>
+    <url-pattern>/_dr/task/deleteContactsAndHosts</url-pattern>
   </servlet-mapping>
 
   <!-- Enqueues DNS update tasks following a host rename. -->
@@ -258,10 +261,22 @@
     <url-pattern>/_dr/task/dnsRefreshForHostRename</url-pattern>
   </servlet-mapping>
 
+  <!-- Enqueues DNS update tasks following a host rename. -->
+  <servlet-mapping>
+    <servlet-name>backend-servlet</servlet-name>
+    <url-pattern>/_dr/task/refreshDnsOnHostRename</url-pattern>
+  </servlet-mapping>
+
   <!--  Mapreduce to expand recurring billing events into OneTimes. -->
   <servlet-mapping>
     <servlet-name>backend-servlet</servlet-name>
     <url-pattern>/_dr/task/expandRecurringBillingEvents</url-pattern>
+  </servlet-mapping>
+
+  <!-- Mapreduce to import contacts from escrow file -->
+  <servlet-mapping>
+    <servlet-name>backend-servlet</servlet-name>
+    <url-pattern>/_dr/task/importRdeContacts</url-pattern>
   </servlet-mapping>
 
   <!-- Security config -->

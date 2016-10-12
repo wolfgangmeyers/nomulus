@@ -24,7 +24,7 @@ import static google.registry.testing.DatastoreHelper.persistResource;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import google.registry.flows.ResourceFlowTestCase;
-import google.registry.flows.ResourceQueryFlow.ResourceToQueryDoesNotExistException;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.model.contact.ContactAddress;
 import google.registry.model.contact.ContactAuthInfo;
 import google.registry.model.contact.ContactPhoneNumber;
@@ -50,7 +50,7 @@ public class ContactInfoFlowTest extends ResourceFlowTestCase<ContactInfoFlow, C
         new ContactResource.Builder()
             .setContactId("sh8013")
             .setRepoId("2FF-ROID")
-            .setDeletionTime(active ? null : DateTime.now().minusDays(1))
+            .setDeletionTime(active ? null : clock.nowUtc().minusDays(1))
             .setStatusValues(ImmutableSet.of(StatusValue.CLIENT_DELETE_PROHIBITED))
             .setInternationalizedPostalInfo(new PostalInfo.Builder()
                 .setType(Type.INTERNATIONALIZED)
@@ -87,7 +87,7 @@ public class ContactInfoFlowTest extends ResourceFlowTestCase<ContactInfoFlow, C
                 .setEmail(new PresenceMarker())
                 .build())
             .build());
-    assertThat(isDeleted(contact, DateTime.now())).isNotEqualTo(active);
+    assertThat(isDeleted(contact, clock.nowUtc())).isNotEqualTo(active);
     return contact;
   }
 
@@ -119,9 +119,52 @@ public class ContactInfoFlowTest extends ResourceFlowTestCase<ContactInfoFlow, C
   }
 
   @Test
+  public void testSuccess_owningRegistrarWithoutAuthInfo_seesAuthInfo() throws Exception {
+    setEppInput("contact_info_no_authinfo.xml");
+    persistContactResource(true);
+    // Check that the persisted contact info was returned.
+    assertTransactionalFlow(false);
+    runFlowAssertResponse(
+        readFile("contact_info_response.xml"),
+        // We use a different roid scheme than the samples so ignore it.
+        "epp.response.resData.infData.roid");
+    assertNoHistory();
+    assertNoBillingEvents();
+  }
+
+  @Test
+  public void testSuccess_otherRegistrarWithoutAuthInfio_doesNotSeeAuthInfo() throws Exception {
+    setClientIdForFlow("NewRegistrar");
+    setEppInput("contact_info_no_authinfo.xml");
+    persistContactResource(true);
+    // Check that the persisted contact info was returned.
+    assertTransactionalFlow(false);
+    runFlowAssertResponse(
+        readFile("contact_info_response_no_authinfo.xml"),
+        // We use a different roid scheme than the samples so ignore it.
+        "epp.response.resData.infData.roid");
+    assertNoHistory();
+    assertNoBillingEvents();
+  }
+
+  @Test
+  public void testSuccess_otherRegistrarWithAuthInfo_seesAuthInfo() throws Exception {
+    setClientIdForFlow("NewRegistrar");
+    persistContactResource(true);
+    // Check that the persisted contact info was returned.
+    assertTransactionalFlow(false);
+    runFlowAssertResponse(
+        readFile("contact_info_response.xml"),
+        // We use a different roid scheme than the samples so ignore it.
+        "epp.response.resData.infData.roid");
+    assertNoHistory();
+    assertNoBillingEvents();
+  }
+
+  @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToQueryDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -129,7 +172,7 @@ public class ContactInfoFlowTest extends ResourceFlowTestCase<ContactInfoFlow, C
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToQueryDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     persistContactResource(false);
     runFlow();

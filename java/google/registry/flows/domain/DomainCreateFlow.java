@@ -14,12 +14,9 @@
 
 package google.registry.flows.domain;
 
-import static com.google.common.collect.Sets.union;
 import static google.registry.flows.domain.DomainFlowUtils.validateFeeChallenge;
-import static google.registry.model.domain.fee.Fee.FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
 import static google.registry.model.index.DomainApplicationIndex.loadActiveApplicationsByDomainName;
 import static google.registry.model.ofy.ObjectifyService.ofy;
-
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -47,7 +44,6 @@ import javax.inject.Inject;
  * @error {@link google.registry.flows.LoggedInFlow.UndeclaredServiceExtensionException}
  * @error {@link google.registry.flows.ResourceCreateFlow.ResourceAlreadyExistsException}
  * @error {@link google.registry.flows.ResourceCreateOrMutateFlow.OnlyToolCanPassMetadataException}
- * @error {@link google.registry.flows.ResourceFlow.BadCommandForRegistryPhaseException}
  * @error {@link google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException}
  * @error {@link BaseDomainCreateFlow.AcceptedTooLongAgoException}
  * @error {@link BaseDomainCreateFlow.ClaimsPeriodEndedException}
@@ -127,7 +123,6 @@ public class DomainCreateFlow extends DomainCreateOrAllocateFlow {
   @Override
   protected final void initDomainCreateOrAllocateFlow() {
     registerExtensions(LaunchCreateExtension.class);
-    registerExtensions(FEE_CREATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
   }
 
   @Override
@@ -165,20 +160,18 @@ public class DomainCreateFlow extends DomainCreateOrAllocateFlow {
             .setParent(historyEntry)
             .build();
     ofy().save().entity(createEvent);
-    
+
     // Bill for EAP cost, if any.
     if (!commandOperations.getEapCost().isZero()) {
       BillingEvent.OneTime eapEvent =
           new BillingEvent.OneTime.Builder()
-              .setReason(createEvent.getReason())
+              .setReason(Reason.FEE_EARLY_ACCESS)
               .setTargetId(createEvent.getTargetId())
               .setClientId(createEvent.getClientId())
-              .setPeriodYears(createEvent.getPeriodYears())
               .setCost(commandOperations.getEapCost())
               .setEventTime(createEvent.getEventTime())
               .setBillingTime(createEvent.getBillingTime())
-              .setFlags(union(createEvent.getFlags(),
-                  ImmutableSet.of(BillingEvent.Flag.EAP)).immutableCopy())
+              .setFlags(createEvent.getFlags())
               .setParent(createEvent.getParentKey())
               .build();
       ofy().save().entity(eapEvent);
@@ -189,6 +182,17 @@ public class DomainCreateFlow extends DomainCreateOrAllocateFlow {
       builder
           .setLaunchNotice(launchCreate.getNotice())
           .setSmdId(signedMark == null ? null : signedMark.getId());
+    }
+    // Handle extra flow logic, if any. The initialization and commit are performed higher up in the
+    // flow hierarchy, in BaseDomainCreateFlow.
+    if (extraFlowLogic.isPresent()) {
+      extraFlowLogic.get().performAdditionalDomainCreateLogic(
+          existingResource,
+          getClientId(),
+          now,
+          command.getPeriod().getValue(),
+          eppInput,
+          historyEntry);
     }
   }
 

@@ -18,7 +18,7 @@ import static com.google.appengine.tools.development.testing.LocalMemcacheServic
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.collect.Iterables.skip;
 import static com.google.common.truth.Truth.assertThat;
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
+import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.testing.DatastoreHelper.cloneAndSetAutoTimestamps;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.newDomainResource;
@@ -157,7 +157,7 @@ public class DomainResourceTest extends EntityTestCase {
 
   @Test
   public void testPersistence() throws Exception {
-    assertThat(loadByUniqueId(DomainResource.class, domain.getForeignKey(), clock.nowUtc()))
+    assertThat(loadByForeignKey(DomainResource.class, domain.getForeignKey(), clock.nowUtc()))
         .isEqualTo(domain);
   }
 
@@ -431,7 +431,7 @@ public class DomainResourceTest extends EntityTestCase {
     int numPreviousReads = RequestCapturingAsyncDatastoreService.getReads().size();
     EppXmlTransformer.marshal(
         EppOutput.create(new EppResponse.Builder()
-            .setResult(Result.create(Code.Success))
+            .setResult(Result.create(Code.SUCCESS))
             .setResData(ImmutableList.of(domain))
             .setTrid(Trid.create(null, "abc"))
             .build()),

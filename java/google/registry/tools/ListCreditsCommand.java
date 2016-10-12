@@ -25,13 +25,12 @@ import com.googlecode.objectify.Work;
 import google.registry.model.billing.RegistrarCredit;
 import google.registry.model.billing.RegistrarCreditBalance.BalanceMap;
 import google.registry.model.registrar.Registrar;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.Command.RemoteApiCommand;
 import org.joda.money.Money;
 
 /** Command to list registrar credits and balances. */
 @Parameters(commandDescription = "List registrar credits and balances")
-final class ListCreditsCommand implements RemoteApiCommand, GtechCommand {
+final class ListCreditsCommand implements RemoteApiCommand {
 
   @Parameter(
       names = {"-a", "--all"},
@@ -43,7 +42,7 @@ final class ListCreditsCommand implements RemoteApiCommand, GtechCommand {
     for (Registrar registrar : Registrar.loadAll()) {
       ImmutableList<String> creditStrings = createCreditStrings(registrar);
       if (!creditStrings.isEmpty()) {
-        System.out.println(registrar.getClientIdentifier());
+        System.out.println(registrar.getClientId());
         System.out.print(Joiner.on("").join(creditStrings));
         System.out.println();
       }

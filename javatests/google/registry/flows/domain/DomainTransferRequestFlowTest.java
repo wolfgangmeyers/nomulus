@@ -17,6 +17,7 @@ package google.registry.flows.domain;
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.testing.DatastoreHelper.assertBillingEvents;
+import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.deleteResource;
 import static google.registry.testing.DatastoreHelper.getOnlyHistoryEntryOfType;
 import static google.registry.testing.DatastoreHelper.getOnlyPollMessage;
@@ -39,11 +40,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Iterables;
 import google.registry.flows.ResourceFlowUtils.BadAuthInfoForResourceException;
-import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
-import google.registry.flows.ResourceTransferRequestFlow.AlreadyPendingTransferException;
-import google.registry.flows.ResourceTransferRequestFlow.MissingTransferRequestAuthInfoException;
-import google.registry.flows.ResourceTransferRequestFlow.ObjectAlreadySponsoredException;
-import google.registry.flows.SingleResourceFlow.ResourceStatusProhibitsOperationException;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.domain.DomainFlowUtils.BadPeriodUnitException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyUnitMismatchException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyValueScaleException;
@@ -52,6 +49,10 @@ import google.registry.flows.domain.DomainFlowUtils.FeesRequiredForPremiumNameEx
 import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
 import google.registry.flows.domain.DomainFlowUtils.PremiumNameBlockedException;
 import google.registry.flows.domain.DomainFlowUtils.UnsupportedFeeAttributeException;
+import google.registry.flows.exceptions.AlreadyPendingTransferException;
+import google.registry.flows.exceptions.MissingTransferRequestAuthInfoException;
+import google.registry.flows.exceptions.ObjectAlreadySponsoredException;
+import google.registry.flows.exceptions.ResourceStatusProhibitsOperationException;
 import google.registry.model.EppResource;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Cancellation.Builder;
@@ -61,6 +62,8 @@ import google.registry.model.contact.ContactAuthInfo;
 import google.registry.model.domain.DomainAuthInfo;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
+import google.registry.model.domain.TestExtraLogicManager;
+import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.eppcommon.AuthInfo.PasswordAuth;
 import google.registry.model.eppcommon.StatusValue;
@@ -95,6 +98,8 @@ public class DomainTransferRequestFlowTest
     setEppInput("domain_transfer_request.xml");
     setClientIdForFlow("NewRegistrar");
     setupDomain("tld");
+    createTld("flags");
+    RegistryExtraFlowLogicProxy.setOverride("flags", TestExtraLogicManager.class);
   }
 
   private void assertTransferRequested(EppResource resource) throws Exception {
@@ -143,7 +148,7 @@ public class DomainTransferRequestFlowTest
     assertTransactionalFlow(true);
     runFlowAssertResponse(readFile(expectedXmlFilename, substitutions));
     // Transfer should have been requested. Verify correct fields were set.
-    domain = reloadResourceByUniqueId();
+    domain = reloadResourceByForeignKey();
     final HistoryEntry historyEntryTransferRequest =
         getOnlyHistoryEntryOfType(domain, HistoryEntry.Type.DOMAIN_TRANSFER_REQUEST);
     int registrationYears = domain.getTransferData().getExtendedRegistrationYears();
@@ -220,8 +225,7 @@ public class DomainTransferRequestFlowTest
 
     // Two poll messages on the gaining registrar's side at the expected expiration time: a
     // (OneTime) transfer approved message, and an Autorenew poll message.
-    assertThat(getPollMessages("NewRegistrar", expectedExpirationTime))
-        .hasSize(2);
+    assertThat(getPollMessages("NewRegistrar", expectedExpirationTime)).hasSize(2);
     PollMessage transferApprovedPollMessage = getOnlyPollMessage(
         "NewRegistrar", implicitTransferTime, PollMessage.OneTime.class);
     PollMessage autorenewPollMessage = getOnlyPollMessage(
@@ -500,7 +504,7 @@ public class DomainTransferRequestFlowTest
 
   @Test
   public void testSuccess_autorenewBeforeAutomaticTransfer() throws Exception {
-    DomainResource oldResource = persistResource(reloadResourceByUniqueId().asBuilder()
+    DomainResource oldResource = persistResource(reloadResourceByForeignKey().asBuilder()
         .setRegistrationExpirationTime(clock.nowUtc().plusDays(1).plus(1))
         .build());
     clock.advanceOneMilli();
@@ -722,7 +726,7 @@ public class DomainTransferRequestFlowTest
   @Test
   public void testFailure_deletedDomain() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     domain = persistResource(
         domain.asBuilder().setDeletionTime(clock.nowUtc().minusDays(1)).build());
@@ -734,14 +738,14 @@ public class DomainTransferRequestFlowTest
     setEppInput("domain_transfer_request_wildcard.xml", ImmutableMap.of("DOMAIN", "--invalid"));
     eppLoader.replaceAll("JD1234-REP", contact.getRepoId());
     assertTransactionalFlow(true);
-    thrown.expect(ResourceToMutateDoesNotExistException.class, "(--invalid)");
+    thrown.expect(ResourceDoesNotExistException.class, "(--invalid)");
     runFlow(CommitMode.LIVE, UserPrivileges.NORMAL);
   }
 
   @Test
   public void testFailure_nonexistentDomain() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     deleteResource(domain);
     doFailingTest("domain_transfer_request.xml");
@@ -759,5 +763,15 @@ public class DomainTransferRequestFlowTest
     domain = persistResource(
         domain.asBuilder().addStatusValue(StatusValue.PENDING_DELETE).build());
     doFailingTest("domain_transfer_request.xml");
+  }
+
+  @Test
+  public void testSuccess_flags() throws Exception {
+    setEppInput("domain_transfer_request_flags.xml");
+    setupDomain("example", "flags");
+    eppLoader.replaceAll("JD1234-REP", contact.getRepoId());
+    thrown.expect(
+        TestExtraLogicManagerSuccessException.class, "add:flag1,flag2;remove:flag3,flag4");
+    runFlow();
   }
 }

@@ -14,78 +14,96 @@
 
 package google.registry.flows.domain;
 
-import static google.registry.flows.domain.DomainFlowUtils.DISALLOWED_TLD_STATES_FOR_LAUNCH_FLOWS;
+import static google.registry.flows.ResourceFlowUtils.handlePendingTransferOnDelete;
+import static google.registry.flows.ResourceFlowUtils.prepareDeletedResourceAsBuilder;
+import static google.registry.flows.ResourceFlowUtils.updateForeignKeyIndexDeletionTime;
+import static google.registry.flows.ResourceFlowUtils.verifyExistence;
+import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
+import static google.registry.flows.ResourceFlowUtils.verifyResourceOwnership;
 import static google.registry.flows.domain.DomainFlowUtils.checkAllowedAccessToTld;
-import static google.registry.flows.domain.DomainFlowUtils.verifyLaunchApplicationIdMatchesDomain;
+import static google.registry.flows.domain.DomainFlowUtils.verifyApplicationDomainMatchesTargetId;
 import static google.registry.flows.domain.DomainFlowUtils.verifyLaunchPhase;
+import static google.registry.flows.domain.DomainFlowUtils.verifyRegistryStateAllowsLaunchFlows;
+import static google.registry.model.EppResourceUtils.loadDomainApplication;
+import static google.registry.model.eppoutput.Result.Code.SUCCESS;
+import static google.registry.model.ofy.ObjectifyService.ofy;
 
-import com.google.common.collect.ImmutableSet;
+import com.google.common.base.Optional;
+import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
-import google.registry.flows.ResourceSyncDeleteFlow;
+import google.registry.flows.FlowModule.ApplicationId;
+import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.FlowModule.TargetId;
+import google.registry.flows.LoggedInFlow;
+import google.registry.flows.TransactionalFlow;
 import google.registry.model.domain.DomainApplication;
-import google.registry.model.domain.DomainApplication.Builder;
-import google.registry.model.domain.DomainCommand.Delete;
 import google.registry.model.domain.launch.LaunchDeleteExtension;
 import google.registry.model.domain.launch.LaunchPhase;
-import google.registry.model.eppcommon.StatusValue;
+import google.registry.model.domain.metadata.MetadataExtension;
+import google.registry.model.eppcommon.AuthInfo;
+import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.reporting.HistoryEntry;
-import java.util.Set;
 import javax.inject.Inject;
 
 /**
  * An EPP flow that deletes a domain application.
  *
  * @error {@link google.registry.flows.EppException.UnimplementedExtensionException}
- * @error {@link google.registry.flows.ResourceFlow.BadCommandForRegistryPhaseException}
- * @error {@link google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException}
+ * @error {@link google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException}
  * @error {@link google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException}
- * @error {@link google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException}
  * @error {@link DomainApplicationDeleteFlow.SunriseApplicationCannotBeDeletedInLandrushException}
  * @error {@link DomainFlowUtils.ApplicationDomainNameMismatchException}
+ * @error {@link DomainFlowUtils.BadCommandForRegistryPhaseException}
  * @error {@link DomainFlowUtils.LaunchPhaseMismatchException}
+ * @error {@link DomainFlowUtils.NotAuthorizedForTldException}
  */
-public class DomainApplicationDeleteFlow
-    extends ResourceSyncDeleteFlow<DomainApplication, Builder, Delete> {
+public final class DomainApplicationDeleteFlow extends LoggedInFlow implements TransactionalFlow {
 
+  @Inject Optional<AuthInfo> authInfo;
+  @Inject @ClientId String clientId;
+  @Inject @TargetId String targetId;
+  @Inject @ApplicationId String applicationId;
+  @Inject HistoryEntry.Builder historyBuilder;
   @Inject DomainApplicationDeleteFlow() {}
 
   @Override
-  protected void initResourceCreateOrMutateFlow() throws EppException {
+  protected final void initLoggedInFlow() throws EppException {
+    registerExtensions(MetadataExtension.class);
     registerExtensions(LaunchDeleteExtension.class);
   }
 
   @Override
-  protected void verifyMutationOnOwnedResourceAllowed() throws EppException {
-    String tld = existingResource.getTld();
-    checkRegistryStateForTld(tld);
+  public final EppOutput run() throws EppException {
+    DomainApplication existingApplication = verifyExistence(
+        DomainApplication.class, applicationId, loadDomainApplication(applicationId, now));
+    verifyApplicationDomainMatchesTargetId(existingApplication, targetId);
+    verifyOptionalAuthInfoForResource(authInfo, existingApplication);
+    String tld = existingApplication.getTld();
     checkAllowedAccessToTld(getAllowedTlds(), tld);
-    verifyLaunchPhase(tld, eppInput.getSingleExtension(LaunchDeleteExtension.class), now);
-    verifyLaunchApplicationIdMatchesDomain(command, existingResource);
-    // Don't allow deleting a sunrise application during landrush.
-    if (existingResource.getPhase().equals(LaunchPhase.SUNRISE)
-        && Registry.get(existingResource.getTld()).getTldState(now).equals(TldState.LANDRUSH)
-        && !isSuperuser) {
-      throw new SunriseApplicationCannotBeDeletedInLandrushException();
+    if (!isSuperuser) {
+      verifyRegistryStateAllowsLaunchFlows(Registry.get(tld), now);
+      verifyLaunchPhase(tld, eppInput.getSingleExtension(LaunchDeleteExtension.class), now);
+      verifyResourceOwnership(clientId, existingApplication);
+      // Don't allow deleting a sunrise application during landrush.
+      if (existingApplication.getPhase().equals(LaunchPhase.SUNRISE)
+          && Registry.get(tld).getTldState(now).equals(TldState.LANDRUSH)) {
+        throw new SunriseApplicationCannotBeDeletedInLandrushException();
+      }
     }
-  }
-
-  @Override
-  protected final ImmutableSet<TldState> getDisallowedTldStates() {
-    return DISALLOWED_TLD_STATES_FOR_LAUNCH_FLOWS;
-  }
-
-  /** Domain applications do not respect status values that prohibit various operations. */
-  @Override
-  protected Set<StatusValue> getDisallowedStatuses() {
-    return ImmutableSet.of();
-  }
-
-  @Override
-  protected final HistoryEntry.Type getHistoryEntryType() {
-    return HistoryEntry.Type.DOMAIN_APPLICATION_DELETE;
+    DomainApplication newApplication =
+        prepareDeletedResourceAsBuilder(existingApplication, now).build();
+    HistoryEntry historyEntry = historyBuilder
+        .setType(HistoryEntry.Type.DOMAIN_APPLICATION_DELETE)
+        .setModificationTime(now)
+        .setParent(Key.create(existingApplication))
+        .build();
+    updateForeignKeyIndexDeletionTime(newApplication);
+    handlePendingTransferOnDelete(existingApplication, newApplication, now, historyEntry);
+    ofy().save().<Object>entities(newApplication, historyEntry);
+    return createOutput(SUCCESS);
   }
 
   /** A sunrise application cannot be deleted during landrush. */

@@ -19,10 +19,10 @@ import static google.registry.testing.DatastoreHelper.assertNoBillingEvents;
 import static google.registry.testing.DatastoreHelper.persistActiveContact;
 import static google.registry.testing.DatastoreHelper.persistDeletedContact;
 
-import google.registry.flows.ResourceCreateFlow.ResourceAlreadyExistsException;
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.contact.ContactFlowUtils.BadInternationalizedPostalInfoException;
 import google.registry.flows.contact.ContactFlowUtils.DeclineContactDisclosureFieldDisallowedPolicyException;
+import google.registry.flows.exceptions.ResourceAlreadyExistsException;
 import google.registry.model.contact.ContactResource;
 import org.joda.time.DateTime;
 import org.junit.Test;
@@ -40,10 +40,10 @@ public class ContactCreateFlowTest
     assertTransactionalFlow(true);
     runFlowAssertResponse(readFile("contact_create_response.xml"));
     // Check that the contact was created and persisted with a history entry.
-    assertAboutContacts().that(reloadResourceByUniqueId())
+    assertAboutContacts().that(reloadResourceByForeignKey())
         .hasOnlyOneHistoryEntryWhich().hasNoXml();
     assertNoBillingEvents();
-    assertEppResourceIndexEntityFor(reloadResourceByUniqueId());
+    assertEppResourceIndexEntityFor(reloadResourceByForeignKey());
   }
 
   @Test
@@ -58,7 +58,7 @@ public class ContactCreateFlowTest
 
   @Test
   public void testSuccess_existedButWasDeleted() throws Exception {
-    persistDeletedContact(getUniqueIdFromCommand(), clock.nowUtc());
+    persistDeletedContact(getUniqueIdFromCommand(), clock.nowUtc().minusDays(1));
     clock.advanceOneMilli();
     doSuccessfulTest();
   }

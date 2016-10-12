@@ -14,53 +14,59 @@
 
 package google.registry.flows.poll;
 
-import static google.registry.model.eppoutput.Result.Code.SuccessWithAckMessage;
-import static google.registry.model.eppoutput.Result.Code.SuccessWithNoMessages;
-import static google.registry.model.ofy.ObjectifyService.ofy;
+import static google.registry.flows.poll.PollFlowUtils.getPollMessagesQuery;
+import static google.registry.model.eppoutput.Result.Code.SUCCESS_WITH_ACK_MESSAGE;
+import static google.registry.model.eppoutput.Result.Code.SUCCESS_WITH_NO_MESSAGES;
 import static google.registry.util.CollectionUtils.forceEmptyToNull;
 
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ParameterValueSyntaxErrorException;
+import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.FlowModule.PollMessageId;
+import google.registry.flows.LoggedInFlow;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.poll.MessageQueueInfo;
 import google.registry.model.poll.PollMessage;
-import java.util.List;
+import google.registry.model.poll.PollMessageExternalKeyConverter;
 import javax.inject.Inject;
 
 /**
- * An EPP flow for requesting poll messages.
+ * An EPP flow for requesting {@link PollMessage}s.
+ *
+ * <p>This flow uses an eventually consistent Datastore query to return the oldest poll message for
+ * the registrar, as well as the total number of pending messages. Note that poll messages whose
+ * event time is in the future (i.e. they are speculative and could still be changed or rescinded)
+ * are ignored. The externally visible id for the poll message that the registrar sees is generated
+ * by {@link PollMessageExternalKeyConverter}.
  *
  * @error {@link PollRequestFlow.UnexpectedMessageIdException}
  */
-public class PollRequestFlow extends PollFlow {
+public class PollRequestFlow extends LoggedInFlow {
 
+  @Inject @ClientId String clientId;
+  @Inject @PollMessageId String messageId;
   @Inject PollRequestFlow() {}
 
   @Override
   public final EppOutput run() throws EppException {
-    if (command.getMessageId() != null) {
+    if (!messageId.isEmpty()) {
       throw new UnexpectedMessageIdException();
     }
-
-    List<Key<PollMessage>> pollMessageKeys = getMessageQueueKeysInOrder();
-    // Retrieve the oldest message from the queue that still exists -- since the query is eventually
-    // consistent, it may return keys to some entities that no longer exist.
-    for (Key<PollMessage> key : pollMessageKeys) {
-      PollMessage pollMessage = ofy().load().key(key).now();
-      if (pollMessage != null) {
-        return createOutput(
-            SuccessWithAckMessage,
-            MessageQueueInfo.create(
-                pollMessage.getEventTime(),
-                pollMessage.getMsg(),
-                pollMessageKeys.size(),
-                PollMessage.EXTERNAL_KEY_CONVERTER.convert(key)),
-            forceEmptyToNull(pollMessage.getResponseData()),
-            forceEmptyToNull(pollMessage.getResponseExtensions()));
-      }
+    // Return the oldest message from the queue.
+    PollMessage pollMessage = getPollMessagesQuery(clientId, now).first().now();
+    if (pollMessage == null) {
+      return createOutput(SUCCESS_WITH_NO_MESSAGES);
     }
-    return createOutput(SuccessWithNoMessages);
+    return createOutput(
+        SUCCESS_WITH_ACK_MESSAGE,
+        forceEmptyToNull(pollMessage.getResponseData()),
+        forceEmptyToNull(pollMessage.getResponseExtensions()),
+        MessageQueueInfo.create(
+            pollMessage.getEventTime(),
+            pollMessage.getMsg(),
+            getPollMessagesQuery(clientId, now).count(),
+            PollMessage.EXTERNAL_KEY_CONVERTER.convert(Key.create(pollMessage))));
   }
 
   /** Unexpected message id. */

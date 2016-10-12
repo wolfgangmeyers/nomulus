@@ -26,9 +26,9 @@ import com.google.re2j.Pattern;
 import google.registry.config.RegistryEnvironment;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry.TldState;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.Command.RemoteApiCommand;
 import google.registry.tools.params.PathParameter;
+import google.registry.util.StringGenerator;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
@@ -39,7 +39,7 @@ import org.joda.time.Duration;
 @Parameters(
     separators = " =",
     commandDescription = "Set up OT&E TLDs and registrars")
-final class SetupOteCommand extends ConfirmingCommand implements RemoteApiCommand, GtechCommand {
+final class SetupOteCommand extends ConfirmingCommand implements RemoteApiCommand {
 
   // Regex: 3-14 alphanumeric characters or hyphens, the first of which must be a letter.
   private static final Pattern REGISTRAR_PATTERN = Pattern.compile("^[a-z][-a-z0-9]{2,13}$");

@@ -17,11 +17,12 @@ package google.registry.tools;
 import dagger.Binds;
 import dagger.Module;
 import dagger.Provides;
+import google.registry.util.RandomStringGenerator;
+import google.registry.util.StringGenerator;
 import java.security.NoSuchAlgorithmException;
 import java.security.ProviderException;
 import java.security.SecureRandom;
 import java.util.Random;
-
 import javax.inject.Named;
 
 /** Dagger module for Registry Tool. */

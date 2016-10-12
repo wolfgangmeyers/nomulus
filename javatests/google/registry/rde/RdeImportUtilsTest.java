@@ -19,6 +19,7 @@ import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistNewRegistrar;
 import static google.registry.testing.DatastoreHelper.persistResource;
+import static org.joda.time.DateTimeZone.UTC;
 import static org.mockito.Matchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -79,7 +80,7 @@ public class RdeImportUtilsTest extends ShardableTestCase {
   @Before
   public void before() {
     clock = new FakeClock();
-    clock.setTo(DateTime.now());
+    clock.setTo(DateTime.now(UTC));
     rdeImportUtils = new RdeImportUtils(ofy(), clock, "import-bucket", gcsUtils);
     createTld("test", TldState.PREDELEGATION);
     createTld("getld", TldState.GENERAL_AVAILABILITY);
@@ -140,6 +141,7 @@ public class RdeImportUtilsTest extends ShardableTestCase {
 
   /** Verifies that no errors are thrown when a valid escrow file is validated */
   @Test
+  @SuppressWarnings("CheckReturnValue")
   public void testValidateEscrowFile_valid() throws Exception {
     xmlInput = DEPOSIT_XML.openBufferedStream();
     when(gcsUtils.openInputStream(any(GcsFilename.class))).thenReturn(xmlInput);
@@ -188,8 +190,8 @@ public class RdeImportUtilsTest extends ShardableTestCase {
   }
 
   /** Confirms that a ForeignKeyIndex exists in the datastore for a given resource. */
-  private static <T extends EppResource> void assertForeignKeyIndexFor(final T resource) {
-    assertThat(ForeignKeyIndex.load(resource.getClass(), resource.getForeignKey(), DateTime.now()))
+  private <T extends EppResource> void assertForeignKeyIndexFor(final T resource) {
+    assertThat(ForeignKeyIndex.load(resource.getClass(), resource.getForeignKey(), clock.nowUtc()))
         .isNotNull();
   }
 

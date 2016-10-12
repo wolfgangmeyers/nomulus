@@ -26,7 +26,6 @@ import com.beust.jcommander.Parameters;
 import com.google.common.base.Optional;
 import google.registry.flows.TlsCredentials;
 import google.registry.model.registrar.Registrar;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.Command.RemoteApiCommand;
 import google.registry.tools.params.PathParameter;
 import java.nio.file.Files;
@@ -35,13 +34,13 @@ import javax.annotation.Nullable;
 
 /** A command to test registrar login credentials. */
 @Parameters(separators = " =", commandDescription = "Test registrar login credentials")
-final class ValidateLoginCredentialsCommand implements RemoteApiCommand, GtechCommand {
+final class ValidateLoginCredentialsCommand implements RemoteApiCommand {
 
   @Parameter(
       names = {"-c", "--client"},
       description = "Client identifier of the registrar to test",
       required = true)
-  private String clientIdentifier;
+  private String clientId;
 
   @Parameter(
       names = {"-p", "--password"},
@@ -76,7 +75,7 @@ final class ValidateLoginCredentialsCommand implements RemoteApiCommand, GtechCo
       clientCertificateHash = getCertificateHash(
           loadCertificate(new String(Files.readAllBytes(clientCertificatePath), US_ASCII)));
     }
-    Registrar registrar = Registrar.loadByClientId(clientIdentifier);
+    Registrar registrar = Registrar.loadByClientId(clientId);
     new TlsCredentials(clientCertificateHash, Optional.of(clientIpAddress), null)
         .validate(registrar, password);
     checkState(!registrar.getState().equals(Registrar.State.PENDING), "Account pending");

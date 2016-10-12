@@ -19,13 +19,12 @@ import static com.google.common.base.Preconditions.checkState;
 import com.beust.jcommander.Parameter;
 import com.beust.jcommander.Parameters;
 import google.registry.model.registrar.Registrar;
-import google.registry.tools.Command.GtechCommand;
 import google.registry.tools.Command.RemoteApiCommand;
 import java.util.List;
 
 /** Command to show a registrar record. */
 @Parameters(separators = " =", commandDescription = "Show registrar record(s)")
-final class GetRegistrarCommand implements RemoteApiCommand, GtechCommand {
+final class GetRegistrarCommand implements RemoteApiCommand {
 
   @Parameter(
       description = "Client identifier of the registrar account(s)",
@@ -34,8 +33,8 @@ final class GetRegistrarCommand implements RemoteApiCommand, GtechCommand {
 
   @Override
   public void run() {
-    for (String clientIdentifier : mainParameters) {
-      Registrar registrar = Registrar.loadByClientId(clientIdentifier);
+    for (String clientId : mainParameters) {
+      Registrar registrar = Registrar.loadByClientId(clientId);
       checkState(registrar != null, "Registrar does not exist");
 
       System.out.println(registrar);

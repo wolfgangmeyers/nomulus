@@ -16,10 +16,11 @@ package google.registry.flows.domain;
 
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.flows.domain.DomainTransferFlowTestCase.persistWithPendingTransfer;
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
+import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.testing.DatastoreHelper.assertBillingEvents;
 import static google.registry.testing.DatastoreHelper.createTld;
+import static google.registry.testing.DatastoreHelper.createTlds;
 import static google.registry.testing.DatastoreHelper.getOnlyHistoryEntryOfType;
 import static google.registry.testing.DatastoreHelper.getOnlyPollMessage;
 import static google.registry.testing.DatastoreHelper.getPollMessages;
@@ -43,19 +44,22 @@ import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Iterables;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppRequestSource;
-import google.registry.flows.ResourceCreateOrMutateFlow.OnlyToolCanPassMetadataException;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
-import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
-import google.registry.flows.SingleResourceFlow.ResourceStatusProhibitsOperationException;
 import google.registry.flows.domain.DomainDeleteFlow.DomainToDeleteHasHostsException;
+import google.registry.flows.domain.DomainFlowUtils.BadCommandForRegistryPhaseException;
 import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
+import google.registry.flows.exceptions.OnlyToolCanPassMetadataException;
+import google.registry.flows.exceptions.ResourceStatusProhibitsOperationException;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Flag;
 import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
+import google.registry.model.domain.TestExtraLogicManager;
+import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.eppcommon.ProtocolDefinition.ServiceExtension;
 import google.registry.model.eppcommon.StatusValue;
@@ -65,6 +69,7 @@ import google.registry.model.poll.PendingActionNotificationResponse;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
+import google.registry.model.registry.Registry.TldState;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.transfer.TransferData;
 import google.registry.model.transfer.TransferResponse;
@@ -100,7 +105,9 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
 
   @Before
   public void initDomainTest() throws Exception {
-    createTld("tld");
+    createTlds("tld", "flags");
+    // For flags extension tests.
+    RegistryExtraFlowLogicProxy.setOverride("flags", TestExtraLogicManager.class);
   }
 
   private void setupSuccessfulTest() throws Exception {
@@ -252,7 +259,7 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
     clock.advanceOneMilli();
     runFlowAssertResponse(readFile(responseFilename, substitutions));
     // Check that the domain is fully deleted.
-    assertThat(reloadResourceByUniqueId()).isNull();
+    assertThat(reloadResourceByForeignKey()).isNull();
     // The add grace period is for a billable action, so it should trigger a cancellation.
     assertAutorenewClosedAndCancellationCreatedFor(
         graceBillingEvent,
@@ -310,7 +317,7 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
     assertPollMessages(createAutorenewPollMessage("TheRegistrar").build());
     clock.advanceOneMilli();
     runFlowAssertResponse(readFile(responseFilename, substitutions));
-    DomainResource resource = reloadResourceByUniqueId();
+    DomainResource resource = reloadResourceByForeignKey();
     // Check that the domain is in the pending delete state.
     assertAboutDomains().that(resource)
         .hasStatusValue(StatusValue.PENDING_DELETE).and()
@@ -372,14 +379,14 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
     // Modify the autorenew poll message so that it has unacked messages in the past. This should
     // prevent it from being deleted when the domain is deleted.
     persistResource(
-        ofy().load().key(reloadResourceByUniqueId().getAutorenewPollMessage()).now().asBuilder()
+        ofy().load().key(reloadResourceByForeignKey().getAutorenewPollMessage()).now().asBuilder()
             .setEventTime(A_MONTH_FROM_NOW.minusYears(3))
             .build());
     clock.advanceOneMilli();
     runFlowAssertResponse(readFile("domain_delete_response_pending.xml"));
     // There should now be two poll messages; one for the delete of the domain (in the future), and
     // another for the unacked autorenew messages.
-    DateTime deletionTime = reloadResourceByUniqueId().getDeletionTime();
+    DateTime deletionTime = reloadResourceByForeignKey().getDeletionTime();
     assertThat(getPollMessages("TheRegistrar", deletionTime.minusMinutes(1)))
         .hasSize(1);
     assertThat(getPollMessages("TheRegistrar", deletionTime)).hasSize(2);
@@ -479,10 +486,10 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
     setupSuccessfulTest();
     // Modify the domain we are testing to include a pending transfer.
     TransferData oldTransferData =
-        persistWithPendingTransfer(reloadResourceByUniqueId()).getTransferData();
+        persistWithPendingTransfer(reloadResourceByForeignKey()).getTransferData();
     clock.advanceOneMilli();
     runFlowAssertResponse(readFile("domain_delete_response_pending.xml"));
-    DomainResource domain = reloadResourceByUniqueId();
+    DomainResource domain = reloadResourceByForeignKey();
     // Check that the domain is in the pending delete state.
     // The PENDING_TRANSFER status should be gone.
     assertAboutDomains().that(domain)
@@ -551,17 +558,20 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
     setupGracePeriods(GracePeriod.forBillingEvent(GracePeriodStatus.ADD, graceBillingEvent));
     // Add a nameserver.
     HostResource host = persistResource(newHostResource("ns1.example.tld"));
-    persistResource(loadByUniqueId(
+    persistResource(loadByForeignKey(
         DomainResource.class, getUniqueIdFromCommand(), clock.nowUtc())
         .asBuilder()
         .setNameservers(ImmutableSet.of(Key.create(host)))
         .build());
     // Persist another domain that's already been deleted and references this contact and host.
-    persistResource(newDomainResource("example1.tld").asBuilder()
-        .setRegistrant(Key.create(loadByUniqueId(ContactResource.class, "sh8013", clock.nowUtc())))
-        .setNameservers(ImmutableSet.of(Key.create(host)))
-        .setDeletionTime(START_OF_TIME)
-        .build());
+    persistResource(
+        newDomainResource("example1.tld")
+            .asBuilder()
+            .setRegistrant(
+                Key.create(loadByForeignKey(ContactResource.class, "sh8013", clock.nowUtc())))
+            .setNameservers(ImmutableSet.of(Key.create(host)))
+            .setDeletionTime(START_OF_TIME)
+            .build());
     clock.advanceOneMilli();
     runFlowAssertResponse(readFile("domain_delete_response.xml"));
     assertDnsTasksEnqueued("example.tld");
@@ -575,7 +585,7 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
     setupSuccessfulTest();
     persistResource(
         newHostResource("ns1." + getUniqueIdFromCommand()).asBuilder()
-            .setSuperordinateDomain(Key.create(reloadResourceByUniqueId()))
+            .setSuperordinateDomain(Key.create(reloadResourceByForeignKey()))
             .setDeletionTime(clock.nowUtc().minusDays(1))
             .build());
     clock.advanceOneMilli();
@@ -585,9 +595,26 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
   }
 
   @Test
+  public void testFailure_predelegation() throws Exception {
+    createTld("tld", TldState.PREDELEGATION);
+    setupSuccessfulTest();
+    thrown.expect(BadCommandForRegistryPhaseException.class);
+    runFlow();
+  }
+
+  @Test
+  public void testSuccess_superuserPredelegation() throws Exception {
+    createTld("tld", TldState.PREDELEGATION);
+    setupSuccessfulTest();
+    clock.advanceOneMilli();
+    runFlowAssertResponse(
+        CommitMode.LIVE, UserPrivileges.SUPERUSER, readFile("domain_delete_response_pending.xml"));
+  }
+
+  @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -595,9 +622,9 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
-    persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc());
+    persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc().minusDays(1));
     runFlow();
   }
 
@@ -607,7 +634,7 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
     DomainResource domain = persistActiveDomain(getUniqueIdFromCommand());
     HostResource subordinateHost = persistResource(
         newHostResource("ns1." + getUniqueIdFromCommand()).asBuilder()
-            .setSuperordinateDomain(Key.create(reloadResourceByUniqueId()))
+            .setSuperordinateDomain(Key.create(reloadResourceByForeignKey()))
             .build());
     domain = persistResource(domain.asBuilder()
         .addSubordinateHost(subordinateHost.getFullyQualifiedHostName())
@@ -678,7 +705,7 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
     setupSuccessfulTest();
     clock.advanceOneMilli();
     runFlow();
-    assertAboutDomains().that(reloadResourceByUniqueId())
+    assertAboutDomains().that(reloadResourceByForeignKey())
         .hasOneHistoryEntryEachOfTypes(
             HistoryEntry.Type.DOMAIN_CREATE,
             HistoryEntry.Type.DOMAIN_DELETE);
@@ -694,6 +721,14 @@ public class DomainDeleteFlowTest extends ResourceFlowTestCase<DomainDeleteFlow,
     thrown.expect(OnlyToolCanPassMetadataException.class);
     setEppInput("domain_delete_metadata.xml");
     persistResource(newDomainResource(getUniqueIdFromCommand()));
+    runFlow();
+  }
+
+  @Test
+  public void testSuccess_flags() throws Exception {
+    setEppInput("domain_delete_flags.xml");
+    setupSuccessfulTest();
+    thrown.expect(TestExtraLogicManagerSuccessException.class, "deleted");
     runFlow();
   }
 }

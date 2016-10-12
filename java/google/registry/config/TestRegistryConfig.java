@@ -166,14 +166,4 @@ public class TestRegistryConfig implements RegistryConfig {
   public String getCheckApiServletRegistrarClientId() {
     return "TheRegistrar";
   }
-
-  @Override
-  public Duration getAsyncDeleteFlowMapreduceDelay() {
-    return Duration.standardSeconds(90);
-  }
-
-  @Override
-  public Duration getAsyncFlowFailureBackoff() {
-    return Duration.standardMinutes(10);
-  }
 }

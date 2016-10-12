@@ -29,9 +29,9 @@ import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSortedMap;
-import google.registry.flows.ResourceCheckFlow.TooManyResourceChecksException;
 import google.registry.flows.ResourceCheckFlowTestCase;
 import google.registry.flows.domain.DomainCheckFlow.OnlyCheckedNamesCanBeFeeCheckedException;
+import google.registry.flows.domain.DomainFlowUtils.BadCommandForRegistryPhaseException;
 import google.registry.flows.domain.DomainFlowUtils.BadDomainNameCharacterException;
 import google.registry.flows.domain.DomainFlowUtils.BadDomainNamePartsCountException;
 import google.registry.flows.domain.DomainFlowUtils.BadPeriodUnitException;
@@ -48,6 +48,7 @@ import google.registry.flows.domain.DomainFlowUtils.RestoresAreAlwaysForOneYearE
 import google.registry.flows.domain.DomainFlowUtils.TldDoesNotExistException;
 import google.registry.flows.domain.DomainFlowUtils.TrailingDashException;
 import google.registry.flows.domain.DomainFlowUtils.UnknownFeeCommandException;
+import google.registry.flows.exceptions.TooManyResourceChecksException;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.launch.ApplicationStatus;
 import google.registry.model.domain.launch.LaunchPhase;
@@ -60,6 +61,7 @@ import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 /** Unit tests for {@link DomainCheckFlow}. */
@@ -138,7 +140,7 @@ public class DomainCheckFlowTest
 
   @Test
   public void testSuccess_oneExistsButWasDeleted() throws Exception {
-    persistDeletedDomain("example1.tld", clock.nowUtc());
+    persistDeletedDomain("example1.tld", clock.nowUtc().minusDays(1));
     doCheckTest(
         create(true, "example1.tld", null),
         create(true, "example2.tld", null),
@@ -344,6 +346,13 @@ public class DomainCheckFlowTest
   public void testFailure_invalidIdnCodePoints() throws Exception {
     // ❤☀☆☂☻♞☯.tld
     doFailingBadLabelTest("xn--k3hel9n7bxlu1e.tld", InvalidIdnDomainLabelException.class);
+  }
+
+  @Test
+  public void testFailure_predelegation() throws Exception {
+    createTld("tld", TldState.PREDELEGATION);
+    thrown.expect(BadCommandForRegistryPhaseException.class);
+    runFlow();
   }
 
   @Test
@@ -705,7 +714,7 @@ public class DomainCheckFlowTest
     setEppInput("domain_check_fee_not_in_avail.xml");
     runFlow();
   }
-  
+
   @Test
   public void testFeeExtension_multiyearRestore_v06() throws Exception {
     thrown.expect(RestoresAreAlwaysForOneYearException.class);
@@ -776,7 +785,8 @@ public class DomainCheckFlowTest
         .setEapFeeSchedule(ImmutableSortedMap.of(
             START_OF_TIME, Money.of(USD, 0),
             clock.nowUtc().minusDays(1), Money.of(USD, 100),
-            clock.nowUtc().plusDays(1), Money.of(USD, 0)))
+            clock.nowUtc().plusDays(1), Money.of(USD, 50),
+            clock.nowUtc().plusDays(2), Money.of(USD, 0)))
         .build());
     setEppInput(inputFile);
     runFlowAssertResponse(readFile(outputFile));
@@ -795,5 +805,18 @@ public class DomainCheckFlowTest
   @Test
   public void testSuccess_eapFeeCheck_v12() throws Exception {
     runEapFeeCheckTest("domain_check_fee_v12.xml", "domain_check_eap_fee_response_v12.xml");
+  }
+
+  @Test
+  public void testSuccess_eapFeeCheck_date_v12() throws Exception {
+    runEapFeeCheckTest("domain_check_fee_date_v12.xml",
+        "domain_check_eap_fee_response_date_v12.xml");
+  }
+
+  @Ignore
+  @Test
+  public void testSuccess_feeCheck_multipleRanges() throws Exception {
+    // TODO: If at some point we have more than one type of fees that are time dependent, populate
+    // this test to test if the notAfter date is the earliest of the end points of the ranges.
   }
 }

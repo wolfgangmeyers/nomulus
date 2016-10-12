@@ -15,9 +15,10 @@
 package google.registry.flows;
 
 import static com.google.common.truth.Truth.assertThat;
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
+import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.tmch.ClaimsListShardTest.createTestClaimsListShard;
+import static google.registry.testing.TaskQueueHelper.assertTasksEnqueued;
 
 import com.google.common.base.Predicate;
 import com.google.common.collect.FluentIterable;
@@ -26,6 +27,8 @@ import com.google.common.collect.ImmutableMap;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException.CommandUseErrorException;
 import google.registry.model.EppResource;
+import google.registry.model.EppResourceUtils;
+import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.launch.ApplicationIdTargetExtension;
 import google.registry.model.eppinput.EppInput.ResourceCommandWrapper;
 import google.registry.model.eppinput.ResourceCommand;
@@ -34,8 +37,10 @@ import google.registry.model.index.EppResourceIndexBucket;
 import google.registry.model.tmch.ClaimsListShard.ClaimsListRevision;
 import google.registry.model.tmch.ClaimsListShard.ClaimsListSingleton;
 import google.registry.testing.ExceptionRule;
+import google.registry.testing.TaskQueueHelper.TaskMatcher;
 import google.registry.util.TypeUtils.TypeInstantiator;
 import org.joda.time.DateTime;
+import org.joda.time.Duration;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -51,19 +56,20 @@ public abstract class ResourceFlowTestCase<F extends Flow, R extends EppResource
   @Rule
   public final ExceptionRule thrown = new ExceptionRule();
 
-  private R reloadResourceByUniqueId(DateTime now) throws Exception {
+  protected R reloadResourceByForeignKey(DateTime now) throws Exception {
     // Force the session to be cleared so that when we read it back, we read from the datastore and
     // not from the transaction cache or memcache.
     ofy().clearSessionCache();
-    return loadByUniqueId(getResourceClass(), getUniqueIdFromCommand(), now);
+    return loadByForeignKey(getResourceClass(), getUniqueIdFromCommand(), now);
   }
 
-  protected R reloadResourceByUniqueId() throws Exception {
-    return reloadResourceByUniqueId(clock.nowUtc());
+  protected R reloadResourceByForeignKey() throws Exception {
+    return reloadResourceByForeignKey(clock.nowUtc());
   }
 
-  protected R reloadResourceByUniqueIdYesterday() throws Exception {
-    return reloadResourceByUniqueId(clock.nowUtc().minusDays(1));
+  protected DomainApplication reloadDomainApplication() throws Exception {
+    ofy().clearSessionCache();
+    return EppResourceUtils.loadDomainApplication(getUniqueIdFromCommand(), clock.nowUtc());
   }
 
   protected <T extends EppResource> T reloadResourceAndCloneAtTime(T resource, DateTime now) {
@@ -135,5 +141,19 @@ public abstract class ResourceFlowTestCase<F extends Flow, R extends EppResource
     assertThat(indices).hasSize(1);
     assertThat(indices.get(0).getBucket())
         .isEqualTo(EppResourceIndexBucket.getBucketKey(Key.create(resource)));
+  }
+
+  /** Asserts the presence of a single enqueued async contact or host deletion */
+  protected static <T extends EppResource> void assertAsyncDeletionTaskEnqueued(
+      T resource, String requestingClientId, boolean isSuperuser) throws Exception {
+    String expectedPayload =
+        String.format(
+            "resourceKey=%s&requestingClientId=%s&isSuperuser=%s",
+            Key.create(resource).getString(), requestingClientId, Boolean.toString(isSuperuser));
+    assertTasksEnqueued(
+        "async-delete-pull",
+        new TaskMatcher()
+            .etaDelta(Duration.standardSeconds(75), Duration.standardSeconds(105)) // expected: 90
+            .payload(expectedPayload));
   }
 }

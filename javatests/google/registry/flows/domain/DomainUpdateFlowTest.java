@@ -17,7 +17,7 @@ package google.registry.flows.domain;
 import static com.google.common.collect.Sets.union;
 import static com.google.common.io.BaseEncoding.base16;
 import static com.google.common.truth.Truth.assertThat;
-import static google.registry.model.EppResourceUtils.loadByUniqueId;
+import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.testing.DatastoreHelper.assertBillingEvents;
 import static google.registry.testing.DatastoreHelper.assertNoBillingEvents;
@@ -30,6 +30,7 @@ import static google.registry.testing.DatastoreHelper.persistActiveDomain;
 import static google.registry.testing.DatastoreHelper.persistActiveHost;
 import static google.registry.testing.DatastoreHelper.persistActiveSubordinateHost;
 import static google.registry.testing.DatastoreHelper.persistDeletedDomain;
+import static google.registry.testing.DatastoreHelper.persistPremiumList;
 import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.testing.DomainResourceSubject.assertAboutDomains;
 import static google.registry.testing.HistoryEntrySubject.assertAboutHistoryEntries;
@@ -42,21 +43,16 @@ import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException.UnimplementedExtensionException;
 import google.registry.flows.EppRequestSource;
-import google.registry.flows.ResourceCreateOrMutateFlow.OnlyToolCanPassMetadataException;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
-import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
-import google.registry.flows.ResourceUpdateFlow.AddRemoveSameValueEppException;
-import google.registry.flows.ResourceUpdateFlow.ResourceHasClientUpdateProhibitedException;
-import google.registry.flows.ResourceUpdateFlow.StatusNotClientSettableException;
-import google.registry.flows.SingleResourceFlow.ResourceStatusProhibitsOperationException;
-import google.registry.flows.domain.BaseDomainUpdateFlow.EmptySecDnsUpdateException;
-import google.registry.flows.domain.BaseDomainUpdateFlow.MaxSigLifeChangeNotSupportedException;
-import google.registry.flows.domain.BaseDomainUpdateFlow.SecDnsAllUsageException;
-import google.registry.flows.domain.BaseDomainUpdateFlow.UrgentAttributeNotSupportedException;
 import google.registry.flows.domain.DomainFlowUtils.DuplicateContactForRoleException;
+import google.registry.flows.domain.DomainFlowUtils.EmptySecDnsUpdateException;
+import google.registry.flows.domain.DomainFlowUtils.FeesMismatchException;
+import google.registry.flows.domain.DomainFlowUtils.FeesRequiredForNonFreeUpdateException;
 import google.registry.flows.domain.DomainFlowUtils.LinkedResourceInPendingDeleteProhibitsOperationException;
 import google.registry.flows.domain.DomainFlowUtils.LinkedResourcesDoNotExistException;
+import google.registry.flows.domain.DomainFlowUtils.MaxSigLifeChangeNotSupportedException;
 import google.registry.flows.domain.DomainFlowUtils.MissingAdminContactException;
 import google.registry.flows.domain.DomainFlowUtils.MissingContactTypeException;
 import google.registry.flows.domain.DomainFlowUtils.MissingTechnicalContactException;
@@ -64,8 +60,15 @@ import google.registry.flows.domain.DomainFlowUtils.NameserversNotAllowedExcepti
 import google.registry.flows.domain.DomainFlowUtils.NameserversNotSpecifiedException;
 import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
 import google.registry.flows.domain.DomainFlowUtils.RegistrantNotAllowedException;
+import google.registry.flows.domain.DomainFlowUtils.SecDnsAllUsageException;
 import google.registry.flows.domain.DomainFlowUtils.TooManyDsRecordsException;
 import google.registry.flows.domain.DomainFlowUtils.TooManyNameserversException;
+import google.registry.flows.domain.DomainFlowUtils.UrgentAttributeNotSupportedException;
+import google.registry.flows.exceptions.AddRemoveSameValueEppException;
+import google.registry.flows.exceptions.OnlyToolCanPassMetadataException;
+import google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException;
+import google.registry.flows.exceptions.ResourceStatusProhibitsOperationException;
+import google.registry.flows.exceptions.StatusNotClientSettableException;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.contact.ContactResource;
@@ -74,6 +77,7 @@ import google.registry.model.domain.DesignatedContact.Type;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.TestExtraLogicManager;
+import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.domain.secdns.DelegationSignerData;
 import google.registry.model.eppcommon.StatusValue;
@@ -105,6 +109,14 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
   @Before
   public void initDomainTest() {
     createTlds("tld", "flags");
+    // Super-hack premium list: The domain name has to be of the form feetype-amount for the
+    // test extra logic manager to be happy. So we use domain name "renew-0" to designate a premium
+    // name with a zero-cost update. This has nothing to do with renewals -- we just need to use a
+    // valid fee type.
+    persistResource(
+        Registry.get("flags").asBuilder()
+            .setPremiumList(persistPremiumList("flags", "renew-0,USD 100"))
+            .build());
     // For flags extension tests.
     RegistryExtraFlowLogicProxy.setOverride("flags", TestExtraLogicManager.class);
   }
@@ -119,7 +131,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
   }
 
   private DomainResource persistDomain() throws Exception {
-    HostResource host = loadByUniqueId(HostResource.class, "ns1.example.foo", clock.nowUtc());
+    HostResource host = loadByForeignKey(HostResource.class, "ns1.example.foo", clock.nowUtc());
     DomainResource domain = persistResource(
         newDomainResource(getUniqueIdFromCommand()).asBuilder()
             .setContacts(ImmutableSet.of(
@@ -140,7 +152,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     assertTransactionalFlow(true);
     runFlowAssertResponse(readFile("domain_update_response.xml"));
     // Check that the domain was updated. These values came from the xml.
-    assertAboutDomains().that(reloadResourceByUniqueId())
+    assertAboutDomains().that(reloadResourceByForeignKey())
         .hasStatusValue(StatusValue.CLIENT_HOLD).and()
         .hasAuthInfoPwd("2BARfoo").and()
         .hasOneHistoryEntryEachOfTypes(
@@ -176,12 +188,12 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
         CommitMode.LIVE, userPrivileges, readFile("domain_update_response.xml"));
 
     // Verify that the domain now has the new nameserver and is in the add grace period.
-    DomainResource resource = reloadResourceByUniqueId();
+    DomainResource resource = reloadResourceByForeignKey();
     HistoryEntry historyEntryDomainUpdate =
         getOnlyHistoryEntryOfType(resource, HistoryEntry.Type.DOMAIN_UPDATE);
     assertThat(resource.getNameservers()).containsExactly(
         Key.create(
-            loadByUniqueId(HostResource.class, "ns2.example.foo", clock.nowUtc())));
+            loadByForeignKey(HostResource.class, "ns2.example.foo", clock.nowUtc())));
     BillingEvent.OneTime regularAddBillingEvent = new BillingEvent.OneTime.Builder()
         .setReason(Reason.CREATE)
         .setTargetId("example.tld")
@@ -234,7 +246,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
             getSunrushAddBillingEvent(clock.nowUtc().plusDays(20)));
     // Modify domain so it has no nameservers and is in the sunrush add grace period.
     persistResource(
-        reloadResourceByUniqueId().asBuilder()
+        reloadResourceByForeignKey().asBuilder()
             .setNameservers(null)
             .addGracePeriod(GracePeriod.forBillingEvent(
                 GracePeriodStatus.SUNRUSH_ADD, sunrushAddBillingEvent))
@@ -258,7 +270,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     // that grace period only has a couple days left so that the resultant add grace period will get
     // truncated.
     persistResource(
-        reloadResourceByUniqueId().asBuilder()
+        reloadResourceByForeignKey().asBuilder()
             .setNameservers(null)
             .addGracePeriod(GracePeriod.forBillingEvent(
                 GracePeriodStatus.SUNRUSH_ADD, sunrushAddBillingEvent))
@@ -277,9 +289,9 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     // Modify domain so that it is in the sunrush add grace period, has nameservers, but has a
     // serverHold on it.
     persistResource(
-        reloadResourceByUniqueId().asBuilder()
+        reloadResourceByForeignKey().asBuilder()
             .setNameservers(ImmutableSet.of(Key.create(
-                loadByUniqueId(HostResource.class, "ns2.example.foo", clock.nowUtc()))))
+                loadByForeignKey(HostResource.class, "ns2.example.foo", clock.nowUtc()))))
             .addGracePeriod(GracePeriod.forBillingEvent(
                 GracePeriodStatus.SUNRUSH_ADD, sunrushAddBillingEvent))
             .addStatusValue(StatusValue.SERVER_HOLD)
@@ -301,9 +313,9 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     // Modify domain so that it is in the sunrush add grace period, has nameservers, but has a
     // serverHold on it.
     persistResource(
-        reloadResourceByUniqueId().asBuilder()
+        reloadResourceByForeignKey().asBuilder()
             .setNameservers(ImmutableSet.of(Key.create(
-                loadByUniqueId(HostResource.class, "ns2.example.foo", clock.nowUtc()))))
+                loadByForeignKey(HostResource.class, "ns2.example.foo", clock.nowUtc()))))
             .addGracePeriod(GracePeriod.forBillingEvent(
                 GracePeriodStatus.SUNRUSH_ADD, sunrushAddBillingEvent))
             .addStatusValue(StatusValue.CLIENT_HOLD)
@@ -326,7 +338,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     // Modify domain so it has no nameservers and is in the sunrush add grace period, but also has a
     // server hold on it that will prevent the sunrush add grace period from being removed.
     persistResource(
-        reloadResourceByUniqueId().asBuilder()
+        reloadResourceByForeignKey().asBuilder()
             .setNameservers(null)
             .addGracePeriod(GracePeriod.forBillingEvent(
                 GracePeriodStatus.SUNRUSH_ADD, sunrushAddBillingEvent))
@@ -337,7 +349,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
         CommitMode.LIVE, UserPrivileges.NORMAL, readFile("domain_update_response.xml"));
     // Verify that the domain is still in the sunrush add grace period.
     assertGracePeriods(
-        reloadResourceByUniqueId().getGracePeriods(),
+        reloadResourceByForeignKey().getGracePeriods(),
         ImmutableMap.of(
             GracePeriod.create(
                 GracePeriodStatus.SUNRUSH_ADD, endOfGracePeriod, "TheRegistrar", null),
@@ -348,12 +360,12 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     ImmutableSet.Builder<Key<HostResource>> nameservers = new ImmutableSet.Builder<>();
     for (int i = 1; i < 15; i++) {
       if (i != 2) { // Skip 2 since that's the one that the tests will add.
-        nameservers.add(Key.create(loadByUniqueId(
+        nameservers.add(Key.create(loadByForeignKey(
             HostResource.class, String.format("ns%d.example.foo", i), clock.nowUtc())));
       }
     }
     persistResource(
-        reloadResourceByUniqueId().asBuilder()
+        reloadResourceByForeignKey().asBuilder()
             .setNameservers(nameservers.build())
             .build());
     clock.advanceOneMilli();
@@ -390,7 +402,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     }
     ImmutableList<DesignatedContact> contacts = contactsBuilder.build();
     persistResource(
-        reloadResourceByUniqueId().asBuilder()
+        reloadResourceByForeignKey().asBuilder()
             .setNameservers(nameservers.build())
             .setContacts(ImmutableSet.copyOf(contacts.subList(0, 3)))
             .setRegistrant(contacts.get(3).getContactKey())
@@ -398,7 +410,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     clock.advanceOneMilli();
     assertTransactionalFlow(true);
     runFlowAssertResponse(readFile("domain_update_response.xml"));
-    DomainResource domain = reloadResourceByUniqueId();
+    DomainResource domain = reloadResourceByForeignKey();
     assertAboutDomains().that(domain)
         .hasOneHistoryEntryEachOfTypes(
             HistoryEntry.Type.DOMAIN_CREATE,
@@ -419,7 +431,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     persistReferencedEntities();
     persistDomain();
     runFlow();
-    DomainResource domain = reloadResourceByUniqueId();
+    DomainResource domain = reloadResourceByForeignKey();
     assertAboutDomains().that(domain)
         .hasOneHistoryEntryEachOfTypes(
             HistoryEntry.Type.DOMAIN_CREATE,
@@ -460,16 +472,16 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
         .addSubordinateHost("ns1.example.tld")
         .addSubordinateHost("ns2.example.tld")
         .setNameservers(ImmutableSet.of(Key.create(
-            loadByUniqueId(HostResource.class, "ns1.example.tld", clock.nowUtc()))))
+            loadByForeignKey(HostResource.class, "ns1.example.tld", clock.nowUtc()))))
         .build());
     clock.advanceOneMilli();
     assertTransactionalFlow(true);
     runFlowAssertResponse(readFile("domain_update_response.xml"));
-    domain = reloadResourceByUniqueId();
+    domain = reloadResourceByForeignKey();
     assertThat(domain.getNameservers()).containsExactly(Key.create(addedHost));
     assertThat(domain.getSubordinateHosts()).containsExactly("ns1.example.tld", "ns2.example.tld");
-    existingHost = loadByUniqueId(HostResource.class, "ns1.example.tld", clock.nowUtc());
-    addedHost = loadByUniqueId(HostResource.class, "ns2.example.tld", clock.nowUtc());
+    existingHost = loadByForeignKey(HostResource.class, "ns1.example.tld", clock.nowUtc());
+    addedHost = loadByForeignKey(HostResource.class, "ns2.example.tld", clock.nowUtc());
     assertThat(existingHost.getSuperordinateDomain()).isEqualTo(Key.create(domain));
     assertThat(addedHost.getSuperordinateDomain()).isEqualTo(Key.create(domain));
   }
@@ -478,7 +490,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
   public void testSuccess_registrantMovedToTechContact() throws Exception {
     setEppInput("domain_update_registrant_to_tech.xml");
     persistReferencedEntities();
-    ContactResource sh8013 = loadByUniqueId(ContactResource.class, "sh8013", clock.nowUtc());
+    ContactResource sh8013 = loadByForeignKey(ContactResource.class, "sh8013", clock.nowUtc());
     persistResource(
         newDomainResource(getUniqueIdFromCommand()).asBuilder()
             .setRegistrant(Key.create(sh8013))
@@ -491,7 +503,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
   public void testSuccess_multipleReferencesToSameContactRemoved() throws Exception {
     setEppInput("domain_update_remove_multiple_contacts.xml");
     persistReferencedEntities();
-    ContactResource sh8013 = loadByUniqueId(ContactResource.class, "sh8013", clock.nowUtc());
+    ContactResource sh8013 = loadByForeignKey(ContactResource.class, "sh8013", clock.nowUtc());
     Key<ContactResource> sh8013Key = Key.create(sh8013);
     persistResource(
         newDomainResource(getUniqueIdFromCommand()).asBuilder()
@@ -514,7 +526,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
             .build());
     clock.advanceOneMilli();
     runFlow();
-    assertAboutDomains().that(reloadResourceByUniqueId())
+    assertAboutDomains().that(reloadResourceByForeignKey())
         .doesNotHaveStatusValue(StatusValue.CLIENT_UPDATE_PROHIBITED);
   }
 
@@ -531,7 +543,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     assertTransactionalFlow(true);
     clock.advanceOneMilli();
     runFlowAssertResponse(readFile("domain_update_response.xml"));
-    DomainResource resource = reloadResourceByUniqueId();
+    DomainResource resource = reloadResourceByForeignKey();
     assertAboutDomains().that(resource)
         .hasOnlyOneHistoryEntryWhich()
         .hasType(HistoryEntry.Type.DOMAIN_UPDATE);
@@ -658,7 +670,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
                .setEventTime(clock.nowUtc())
                .setBillingTime(clock.nowUtc())
                .setParent(getOnlyHistoryEntryOfType(
-                   reloadResourceByUniqueId(), HistoryEntry.Type.DOMAIN_UPDATE))
+                   reloadResourceByForeignKey(), HistoryEntry.Type.DOMAIN_UPDATE))
                .build());
      } else {
        assertNoBillingEvents();
@@ -740,7 +752,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
         CommitMode.LIVE,
         UserPrivileges.SUPERUSER,
         readFile("domain_update_response.xml"));
-    assertAboutDomains().that(reloadResourceByUniqueId())
+    assertAboutDomains().that(reloadResourceByForeignKey())
         .hasStatusValue(StatusValue.CLIENT_UPDATE_PROHIBITED).and()
         .hasStatusValue(StatusValue.SERVER_HOLD);
   }
@@ -810,13 +822,15 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
   public void testFailure_wrongExtension() throws Exception {
     thrown.expect(UnimplementedExtensionException.class);
     setEppInput("domain_update_wrong_extension.xml");
+    persistReferencedEntities();
+    persistDomain();
     runFlow();
   }
 
   @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     persistReferencedEntities();
     runFlow();
@@ -825,10 +839,10 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     persistReferencedEntities();
-    persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc());
+    persistDeletedDomain(getUniqueIdFromCommand(), clock.nowUtc().minusDays(1));
     runFlow();
   }
 
@@ -889,10 +903,10 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     // Add a tech contact to the persisted entity, which should cause the flow to fail when it tries
     // to add "mak21" as a second tech contact.
     persistResource(
-        reloadResourceByUniqueId().asBuilder()
+        reloadResourceByForeignKey().asBuilder()
             .setContacts(ImmutableSet.of(
                 DesignatedContact.create(Type.TECH, Key.create(
-                    loadByUniqueId(ContactResource.class, "foo", clock.nowUtc())))))
+                    loadByForeignKey(ContactResource.class, "foo", clock.nowUtc())))))
             .build());
     runFlow();
   }
@@ -988,7 +1002,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     persistResource(
         newDomainResource(getUniqueIdFromCommand()).asBuilder()
             .setNameservers(ImmutableSet.of(Key.create(
-                loadByUniqueId(HostResource.class, "ns1.example.foo", clock.nowUtc()))))
+                loadByForeignKey(HostResource.class, "ns1.example.foo", clock.nowUtc()))))
             .build());
     runFlow();
   }
@@ -1003,7 +1017,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
             .setContacts(ImmutableSet.of(DesignatedContact.create(
                 Type.TECH,
                 Key.create(
-                    loadByUniqueId(ContactResource.class, "sh8013", clock.nowUtc())))))
+                    loadByForeignKey(ContactResource.class, "sh8013", clock.nowUtc())))))
             .build());
     runFlow();
   }
@@ -1046,7 +1060,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     persistActiveHost("ns1.example.foo");
     persistActiveHost("ns2.example.foo");
     persistActiveContact("sh8013");
-    persistResource(loadByUniqueId(ContactResource.class, "mak21", clock.nowUtc()).asBuilder()
+    persistResource(loadByForeignKey(ContactResource.class, "mak21", clock.nowUtc()).asBuilder()
         .addStatusValue(StatusValue.PENDING_DELETE)
         .build());
     clock.advanceOneMilli();
@@ -1064,7 +1078,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     persistActiveContact("mak21");
     persistActiveContact("sh8013");
     persistResource(
-        loadByUniqueId(HostResource.class, "ns2.example.foo", clock.nowUtc()).asBuilder()
+        loadByForeignKey(HostResource.class, "ns2.example.foo", clock.nowUtc()).asBuilder()
           .addStatusValue(StatusValue.PENDING_DELETE)
           .build());
     clock.advanceOneMilli();
@@ -1109,11 +1123,11 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
             .setAllowedFullyQualifiedHostNames(
                 ImmutableSet.of("ns1.example.foo", "ns2.example.foo"))
             .build());
-    assertThat(reloadResourceByUniqueId().getNameservers()).doesNotContain(
-        Key.create(loadByUniqueId(HostResource.class, "ns2.example.foo", clock.nowUtc())));
+    assertThat(reloadResourceByForeignKey().getNameservers()).doesNotContain(
+        Key.create(loadByForeignKey(HostResource.class, "ns2.example.foo", clock.nowUtc())));
     runFlow();
-    assertThat(reloadResourceByUniqueId().getNameservers()).contains(
-        Key.create(loadByUniqueId(HostResource.class, "ns2.example.foo", clock.nowUtc())));
+    assertThat(reloadResourceByForeignKey().getNameservers()).contains(
+        Key.create(loadByForeignKey(HostResource.class, "ns2.example.foo", clock.nowUtc())));
   }
 
   @Test
@@ -1128,7 +1142,7 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
             .setAllowedFullyQualifiedHostNames(ImmutableSet.of("ns1.example.foo"))
             .build());
     runFlow();
-    assertThat(ofy().load().key(reloadResourceByUniqueId().getRegistrant()).now().getContactId())
+    assertThat(ofy().load().key(reloadResourceByForeignKey().getRegistrant()).now().getContactId())
         .isEqualTo("sh8013");
   }
 
@@ -1150,21 +1164,21 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     persistReferencedEntities();
     persistDomain();
     persistResource(
-        reloadResourceByUniqueId().asBuilder()
+        reloadResourceByForeignKey().asBuilder()
             .addNameservers(ImmutableSet.of(Key.create(
-                loadByUniqueId(HostResource.class, "ns2.example.foo", clock.nowUtc()))))
+                loadByForeignKey(HostResource.class, "ns2.example.foo", clock.nowUtc()))))
             .build());
     persistResource(
         Registry.get("tld").asBuilder()
             .setAllowedFullyQualifiedHostNames(
                 ImmutableSet.of("ns1.example.foo", "ns2.example.foo"))
             .build());
-    assertThat(reloadResourceByUniqueId().getNameservers()).contains(
-        Key.create(loadByUniqueId(HostResource.class, "ns1.example.foo", clock.nowUtc())));
+    assertThat(reloadResourceByForeignKey().getNameservers()).contains(
+        Key.create(loadByForeignKey(HostResource.class, "ns1.example.foo", clock.nowUtc())));
     clock.advanceOneMilli();
     runFlow();
-    assertThat(reloadResourceByUniqueId().getNameservers()).doesNotContain(
-        Key.create(loadByUniqueId(HostResource.class, "ns1.example.foo", clock.nowUtc())));
+    assertThat(reloadResourceByForeignKey().getNameservers()).doesNotContain(
+        Key.create(loadByForeignKey(HostResource.class, "ns1.example.foo", clock.nowUtc())));
   }
 
   @Test
@@ -1180,12 +1194,105 @@ public class DomainUpdateFlowTest extends ResourceFlowTestCase<DomainUpdateFlow,
     runFlow();
   }
 
+  // This test should work, because the fee extension is not required when the fee is zero.
   @Test
-  public void testAddAndRemoveFlags() throws Exception {
-    setEppInput("domain_update_addremove_flags.xml");
+  public void testAddAndRemoveFlags_free_noFee() throws Exception {
+    setEppInput("domain_update_addremove_flags.xml", ImmutableMap.of("DOMAIN", "update-0"));
     persistReferencedEntities();
     persistDomain();
-    thrown.expect(UnimplementedExtensionException.class);
+    thrown.expect(
+        TestExtraLogicManagerSuccessException.class, "add:flag1,flag2;remove:flag3,flag4");
+    runFlow();
+  }
+
+  @Test
+  public void testAddAndRemoveFlags_free_wrongFee() throws Exception {
+    setEppInput(
+        "domain_update_addremove_flags_fee.xml",
+        ImmutableMap.of("DOMAIN", "update-0", "FEE", "1.00"));
+    persistReferencedEntities();
+    persistDomain();
+    thrown.expect(FeesMismatchException.class);
+    runFlow();
+  }
+
+  @Test
+  public void testAddAndRemoveFlags_free_correctFee() throws Exception {
+    setEppInput(
+        "domain_update_addremove_flags_fee.xml",
+        ImmutableMap.of("DOMAIN", "update-0", "FEE", "0.00"));
+    persistReferencedEntities();
+    persistDomain();
+    thrown.expect(
+        TestExtraLogicManagerSuccessException.class, "add:flag1,flag2;remove:flag3,flag4");
+    runFlow();
+  }
+
+  // This should also work, even though the domain is premium (previously, a bug caused it to fail).
+  @Test
+  public void testAddAndRemoveFlags_freePremium_noFee() throws Exception {
+    setEppInput("domain_update_addremove_flags.xml", ImmutableMap.of("DOMAIN", "renew-0"));
+    persistReferencedEntities();
+    persistDomain();
+    thrown.expect(
+        TestExtraLogicManagerSuccessException.class, "add:flag1,flag2;remove:flag3,flag4");
+    runFlow();
+  }
+
+  @Test
+  public void testAddAndRemoveFlags_freePremium_wrongFee() throws Exception {
+    setEppInput(
+        "domain_update_addremove_flags_fee.xml",
+        ImmutableMap.of("DOMAIN", "renew-0", "FEE", "1.00"));
+    persistReferencedEntities();
+    persistDomain();
+    thrown.expect(FeesMismatchException.class);
+    runFlow();
+  }
+
+  @Test
+  public void testAddAndRemoveFlags_freePremium_correctFee() throws Exception {
+    setEppInput(
+        "domain_update_addremove_flags_fee.xml",
+        ImmutableMap.of("DOMAIN", "renew-0", "FEE", "0.00"));
+    persistReferencedEntities();
+    persistDomain();
+    thrown.expect(
+        TestExtraLogicManagerSuccessException.class, "add:flag1,flag2;remove:flag3,flag4");
+    runFlow();
+  }
+
+  // This test should throw an exception, because the fee extension is required when the fee is not
+  // zero.
+  @Test
+  public void testAddAndRemoveFlags_paid_noFee() throws Exception {
+    setEppInput("domain_update_addremove_flags.xml", ImmutableMap.of("DOMAIN", "update-13"));
+    persistReferencedEntities();
+    persistDomain();
+    thrown.expect(FeesRequiredForNonFreeUpdateException.class);
+    runFlow();
+  }
+
+  @Test
+  public void testAddAndRemoveFlags_paid_wrongFee() throws Exception {
+    setEppInput(
+        "domain_update_addremove_flags_fee.xml",
+        ImmutableMap.of("DOMAIN", "update-13", "FEE", "11.00"));
+    persistReferencedEntities();
+    persistDomain();
+    thrown.expect(FeesMismatchException.class);
+    runFlow();
+  }
+
+  @Test
+  public void testAddAndRemoveFlags_paid_correctFee() throws Exception {
+    setEppInput(
+        "domain_update_addremove_flags_fee.xml",
+        ImmutableMap.of("DOMAIN", "update-13", "FEE", "13.00"));
+    persistReferencedEntities();
+    persistDomain();
+    thrown.expect(
+        TestExtraLogicManagerSuccessException.class, "add:flag1,flag2;remove:flag3,flag4");
     runFlow();
   }
 }

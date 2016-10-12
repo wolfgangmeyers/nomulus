@@ -53,11 +53,12 @@ public final class ProductionRegistryConfigExample implements RegistryConfig {
 
   @Override
   public String getProjectId() {
+    String prodProjectId = "domain-registry";
     switch (environment) {
       case PRODUCTION:
-        return "domain-registry";
+        return prodProjectId;
       default:
-        return "domain-registry-" + Ascii.toLowerCase(environment.name());
+        return prodProjectId + "-" + Ascii.toLowerCase(environment.name());
     }
   }
 
@@ -217,15 +218,5 @@ public final class ProductionRegistryConfigExample implements RegistryConfig {
   @Override
   public String getCheckApiServletRegistrarClientId() {
     return "TheRegistrar";
-  }
-
-  @Override
-  public Duration getAsyncDeleteFlowMapreduceDelay() {
-    return Duration.standardSeconds(90);
-  }
-
-  @Override
-  public Duration getAsyncFlowFailureBackoff() {
-    return Duration.standardMinutes(10);
   }
 }

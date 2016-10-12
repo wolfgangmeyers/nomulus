@@ -56,8 +56,9 @@ import google.registry.model.ImmutableObject;
 import google.registry.model.common.EntityGroupRoot;
 import google.registry.model.common.TimedTransitionProperty;
 import google.registry.model.common.TimedTransitionProperty.TimedTransition;
-import google.registry.model.domain.fee.EapFee;
-import google.registry.model.registry.label.PremiumList;
+import google.registry.model.domain.fee.BaseFee.FeeType;
+import google.registry.model.domain.fee.Fee;
+import google.registry.model.registry.label.BasePremiumList;
 import google.registry.model.registry.label.ReservedList;
 import google.registry.util.Idn;
 import java.util.Set;
@@ -292,8 +293,8 @@ public class Registry extends ImmutableObject implements Buildable {
     return nullToEmptyImmutableCopy(reservedLists);
   }
 
-  /** The static {@link PremiumList} for this TLD, if there is one. */
-  Key<PremiumList> premiumList;
+  /** The static {@link BasePremiumList} for this TLD, if there is one. */
+  Key<BasePremiumList> premiumList;
 
   /** Should RDE upload a nightly escrow deposit for this TLD? */
   boolean escrowEnabled = DEFAULT_ESCROW_ENABLED;
@@ -465,7 +466,7 @@ public class Registry extends ImmutableObject implements Buildable {
     return anchorTenantAddGracePeriodLength;
   }
 
-  public Key<PremiumList> getPremiumList() {
+  public Key<BasePremiumList> getPremiumList() {
     return premiumList;
   }
 
@@ -518,15 +519,19 @@ public class Registry extends ImmutableObject implements Buildable {
   /**
    * Returns the EAP fee for the registry at the given time.
    */
-  public EapFee getEapFeeFor(DateTime now) {
+  public Fee getEapFeeFor(DateTime now) {
     ImmutableSortedMap<DateTime, Money> valueMap = eapFeeSchedule.toValueMap();
     DateTime periodStart = valueMap.floorKey(now);
     DateTime periodEnd = valueMap.ceilingKey(now);
-    return EapFee.create(
-        eapFeeSchedule.getValueAtTime(now),
-        Range.closedOpen(
-            periodStart != null ? periodStart : START_OF_TIME,
-            periodEnd != null ? periodEnd : END_OF_TIME));
+    // NOTE: assuming END_OF_TIME would never be reached...
+    Range<DateTime> validPeriod = Range.closedOpen(
+        periodStart != null ? periodStart : START_OF_TIME,
+            periodEnd != null ? periodEnd : END_OF_TIME);
+    return Fee.create(
+        eapFeeSchedule.getValueAtTime(now).getAmount(),
+        FeeType.EAP,
+        validPeriod,
+        validPeriod.upperEndpoint());
   }
 
   public String getLordnUsername() {
@@ -725,7 +730,7 @@ public class Registry extends ImmutableObject implements Buildable {
       return this;
     }
 
-    public Builder setPremiumList(PremiumList premiumList) {
+    public Builder setPremiumList(BasePremiumList premiumList) {
       getInstance().premiumList = (premiumList == null) ? null : Key.create(premiumList);
       return this;
     }

@@ -24,13 +24,14 @@ import static google.registry.testing.DatastoreHelper.persistResource;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
-import google.registry.flows.ResourceMutateFlow.ResourceToMutateDoesNotExistException;
-import google.registry.flows.ResourceUpdateFlow.ResourceHasClientUpdateProhibitedException;
-import google.registry.flows.ResourceUpdateFlow.StatusNotClientSettableException;
-import google.registry.flows.SingleResourceFlow.ResourceStatusProhibitsOperationException;
 import google.registry.flows.contact.ContactFlowUtils.BadInternationalizedPostalInfoException;
 import google.registry.flows.contact.ContactFlowUtils.DeclineContactDisclosureFieldDisallowedPolicyException;
+import google.registry.flows.exceptions.AddRemoveSameValueEppException;
+import google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException;
+import google.registry.flows.exceptions.ResourceStatusProhibitsOperationException;
+import google.registry.flows.exceptions.StatusNotClientSettableException;
 import google.registry.model.contact.ContactAddress;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.contact.PostalInfo;
@@ -52,7 +53,7 @@ public class ContactUpdateFlowTest
     assertTransactionalFlow(true);
     runFlowAssertResponse(readFile("contact_update_response.xml"));
     // Check that the contact was updated. This value came from the xml.
-    assertAboutContacts().that(reloadResourceByUniqueId())
+    assertAboutContacts().that(reloadResourceByForeignKey())
         .hasAuthInfoPwd("2fooBAR").and()
         .hasOnlyOneHistoryEntryWhich()
         .hasNoXml();
@@ -78,7 +79,7 @@ public class ContactUpdateFlowTest
             .setStatusValues(ImmutableSet.of(StatusValue.CLIENT_UPDATE_PROHIBITED))
             .build());
     doSuccessfulTest();
-    assertAboutContacts().that(reloadResourceByUniqueId())
+    assertAboutContacts().that(reloadResourceByForeignKey())
         .doesNotHaveStatusValue(StatusValue.CLIENT_UPDATE_PROHIBITED);
   }
 
@@ -106,7 +107,7 @@ public class ContactUpdateFlowTest
         .hasInternationalizedPostalInfo(null);
 
     runFlowAssertResponse(readFile("contact_update_response.xml"));
-    assertAboutContacts().that(reloadResourceByUniqueId())
+    assertAboutContacts().that(reloadResourceByForeignKey())
         .hasLocalizedPostalInfo(null).and()
         .hasNonNullInternationalizedPostalInfo();
   }
@@ -132,7 +133,7 @@ public class ContactUpdateFlowTest
     clock.advanceOneMilli();
     // The test xml updates the address of the postal info and should leave the name untouched.
     runFlowAssertResponse(readFile("contact_update_response.xml"));
-    assertAboutContacts().that(reloadResourceByUniqueId()).hasLocalizedPostalInfo(
+    assertAboutContacts().that(reloadResourceByForeignKey()).hasLocalizedPostalInfo(
         new PostalInfo.Builder()
             .setType(Type.LOCALIZED)
             .setName("A. Person")
@@ -150,7 +151,7 @@ public class ContactUpdateFlowTest
   @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -158,9 +159,9 @@ public class ContactUpdateFlowTest
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToMutateDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
-    persistDeletedContact(getUniqueIdFromCommand(), clock.nowUtc());
+    persistDeletedContact(getUniqueIdFromCommand(), clock.nowUtc().minusDays(1));
     runFlow();
   }
 
@@ -212,7 +213,7 @@ public class ContactUpdateFlowTest
         CommitMode.LIVE,
         UserPrivileges.SUPERUSER,
         readFile("contact_update_response.xml"));
-    assertAboutContacts().that(reloadResourceByUniqueId())
+    assertAboutContacts().that(reloadResourceByForeignKey())
         .hasStatusValue(StatusValue.CLIENT_UPDATE_PROHIBITED).and()
         .hasStatusValue(StatusValue.SERVER_DELETE_PROHIBITED);
   }
@@ -255,6 +256,14 @@ public class ContactUpdateFlowTest
   public void testFailure_declineDisclosure() throws Exception {
     thrown.expect(DeclineContactDisclosureFieldDisallowedPolicyException.class);
     setEppInput("contact_update_decline_disclosure.xml");
+    persistActiveContact(getUniqueIdFromCommand());
+    runFlow();
+  }
+
+  @Test
+  public void testFailure_addRemoveSameValue() throws Exception {
+    thrown.expect(AddRemoveSameValueEppException.class);
+    setEppInput("contact_update_add_remove_same.xml");
     persistActiveContact(getUniqueIdFromCommand());
     runFlow();
   }

@@ -1,4 +1,6 @@
 Cancellation
+CategorizedListEntry
+CategorizedPremiumList
 ContactResource
 Cursor
 DomainApplicationIndex
@@ -10,6 +12,7 @@ ForeignKeyDomainIndex
 ForeignKeyHostIndex
 HistoryEntry
 HostResource
+IcannReportField
 LogsExportCursor
 LrpToken
 Modification

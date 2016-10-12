@@ -27,8 +27,8 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
 import google.registry.flows.ResourceFlowTestCase;
+import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
-import google.registry.flows.ResourceQueryFlow.ResourceToQueryDoesNotExistException;
 import google.registry.flows.domain.DomainApplicationInfoFlow.ApplicationLaunchPhaseMismatchException;
 import google.registry.flows.domain.DomainApplicationInfoFlow.MissingApplicationIdException;
 import google.registry.flows.domain.DomainFlowUtils.ApplicationDomainNameMismatchException;
@@ -261,7 +261,7 @@ public class DomainApplicationInfoFlowTest
   @Test
   public void testFailure_neverExisted() throws Exception {
     thrown.expect(
-        ResourceToQueryDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     runFlow();
   }
@@ -269,12 +269,12 @@ public class DomainApplicationInfoFlowTest
   @Test
   public void testFailure_existedButWasDeleted() throws Exception {
     thrown.expect(
-        ResourceToQueryDoesNotExistException.class,
+        ResourceDoesNotExistException.class,
         String.format("(%s)", getUniqueIdFromCommand()));
     persistResource(new DomainApplication.Builder()
         .setRepoId("123-COM")
         .setFullyQualifiedDomainName("timber.com")
-        .setDeletionTime(DateTime.now().minusDays(1))
+        .setDeletionTime(clock.nowUtc().minusDays(1))
         .setRegistrant(Key.create(persistActiveContact("jd1234")))
         .build());
     runFlow();
@@ -284,7 +284,7 @@ public class DomainApplicationInfoFlowTest
   public void testFailure_unauthorized() throws Exception {
     thrown.expect(ResourceNotOwnedException.class);
     persistResource(
-        AppEngineRule.makeRegistrar1().asBuilder().setClientIdentifier("ClientZ").build());
+        AppEngineRule.makeRegistrar1().asBuilder().setClientId("ClientZ").build());
     sessionMetadata.setClientId("ClientZ");
     persistTestEntities(HostsState.NO_HOSTS_EXIST, MarksState.NO_MARKS_EXIST);
     runFlow();

@@ -20,14 +20,16 @@ import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import dagger.Module;
 import dagger.Provides;
-import java.lang.annotation.Documented;
-import java.net.URI;
-import java.net.URL;
-import javax.annotation.Nullable;
-import javax.inject.Qualifier;
 import org.joda.money.CurrencyUnit;
 import org.joda.time.DateTimeConstants;
 import org.joda.time.Duration;
+
+import java.lang.annotation.Documented;
+import java.net.URI;
+import java.net.URL;
+
+import javax.annotation.Nullable;
+import javax.inject.Qualifier;
 
 /**
  * Configuration example for the Domain Registry codebase.
@@ -79,6 +81,34 @@ public final class ConfigModule {
   @Config("projectId")
   public static String provideProjectId(RegistryConfig config) {
     return config.getProjectId();
+  }
+
+  /** The filename of the logo to be displayed in the header of the registrar console. */
+  @Provides
+  @Config("logoFilename")
+  public static String provideLogoFilename(RegistryEnvironment environment) {
+    switch (environment) {
+      case UNITTEST:
+      case LOCAL:
+        return "logo.png";
+      default:
+        // Change this to the filename of your logo.
+        return "google_registry.png";
+    }
+  }
+
+  /** The product name of this specific registry.  Used throughout the registrar console. */
+  @Provides
+  @Config("productName")
+  public static String provideProductName(RegistryEnvironment environment) {
+    switch (environment) {
+      case UNITTEST:
+      case LOCAL:
+        return "Domain Registry";
+      default:
+        // Change this to the name of your product.
+        return "Google Registry";
+    }
   }
 
   /** @see RegistryConfig#getZoneFilesBucket() */
@@ -407,6 +437,18 @@ public final class ConfigModule {
   }
 
   /**
+   * Returns the identity (an email address) used for the SSH keys used in RDE SFTP uploads.
+   *
+   * @see google.registry.keyring.api.Keyring#getRdeSshClientPublicKey()
+   * @see google.registry.keyring.api.Keyring#getRdeSshClientPrivateKey()
+   */
+  @Provides
+  @Config("rdeSshIdentity")
+  public static String provideSshIdentity() {
+    return "mercury-donuts-test@example.test";
+  }
+
+  /**
    * Returns SFTP URL containing a username, hostname, port (optional), and directory (optional) to
    * which cloud storage files are uploaded. The password should not be included, as it's better to
    * use public key authentication.
@@ -608,19 +650,21 @@ public final class ConfigModule {
   @Provides
   @Config("whoisDisclaimer")
   public static String provideWhoisDisclaimer() {
-    return "WHOIS information is provided by Charleston Road Registry Inc. (CRR) solely for\n"
-        + "query-based, informational purposes. By querying our WHOIS database, you are\n"
-        + "agreeing to comply with these terms\n"
-        + "(http://www.registry.google/about/whois-disclaimer.html) so please read them\n"
-        + "carefully.  Any information provided is \"as is\" without any guarantee of\n"
-        + "accuracy. You may not use such information to (a) allow, enable, or otherwise\n"
-        + "support the transmission of mass unsolicited, commercial advertising or\n"
-        + "solicitations; (b) enable high volume, automated, electronic processes that\n"
-        + "access the systems of CRR or any ICANN-Accredited Registrar, except as\n"
-        + "reasonably necessary to register domain names or modify existing registrations;\n"
-        + "or (c) engage in or support unlawful behavior. CRR reserves the right to\n"
-        + "restrict or deny your access to the Whois database, and may modify these terms\n"
-        + "at any time.\n";
+    return "Terms of Use: Users accessing the Donuts WHOIS service must agree to use the data "
+        + "only for lawful purposes, and under under no circumstances use the data to: Allow, "
+        + "enable, or otherwise support the transmission by e-mail, telephone, or facsimile "
+        + "of mass unsolicited, commercial advertising or solicitations to entities other "
+        + "than the registrar's own existing customers. Enable high volume, automated, "
+        + "electronic processes that send queries or data to the systems of Donuts or "
+        + "any ICANN-accredited registrar, except as reasonably necessary to register "
+        + "domain names or modify existing registrations. When using the Donuts Whois "
+        + "service, please consider the following: The Whois service is not a replacement "
+        + "for standard EPP commands to the SRS service. Whois is not considered authoritative "
+        + "for registered domain objects. The Whois service may be scheduled for downtime "
+        + "during production or OT&E maintenance periods. Queries to the Whois services are "
+        + "throttled. If too many queries are received from a single IP address within a "
+        + "specified time, the service will begin to reject further queries for a period of "
+        + "time to prevent disruption of Whois service access.";
   }
 
   /**
@@ -657,5 +701,41 @@ public final class ConfigModule {
   @Config("metricsWriteInterval")
   public static Duration provideMetricsWriteInterval() {
     return Duration.standardSeconds(60);
+  }
+
+  @Provides
+  @Config("contactAutomaticTransferLength")
+  public static Duration provideContactAutomaticTransferLength(RegistryConfig config) {
+    return config.getContactAutomaticTransferLength();
+  }
+
+  @Provides
+  @Config("maxChecks")
+  public static int provideMaxChecks(RegistryConfig config) {
+    return config.getMaxChecks();
+  }
+
+  /**
+   * Returns the delay before executing async delete flow mapreduces.
+   *
+   * <p>This delay should be sufficiently longer than a transaction, to solve the following problem:
+   * <ul>
+   *   <li>a domain mutation flow starts a transaction
+   *   <li>the domain flow non-transactionally reads a resource and sees that it's not in
+   *       PENDING_DELETE
+   *   <li>the domain flow creates a new reference to this resource
+   *   <li>a contact/host delete flow runs and marks the resource PENDING_DELETE and commits
+   *   <li>the domain flow commits
+   * </ul>
+   *
+   * <p>Although we try not to add references to a PENDING_DELETE resource, strictly speaking that
+   * is ok as long as the mapreduce eventually sees the new reference (and therefore asynchronously
+   * fails the delete). Without this delay, the mapreduce might have started before the domain flow
+   * committed, and could potentially miss the reference.
+   */
+  @Provides
+  @Config("asyncDeleteFlowMapreduceDelay")
+  public static Duration getAsyncDeleteFlowMapreduceDelay() {
+    return Duration.standardSeconds(90);
   }
 }
