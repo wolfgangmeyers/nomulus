@@ -1,11 +1,11 @@
 # App Engine architecture
 
-This document contains information on the overall architecture of the Domain
-Registry project as it is implemented in App Engine.
+This document contains information on the overall architecture of Nomulus as
+pertains to App Engine.
 
 ## Services
 
-The Domain Registry contains three
+Nomulus contains three
 [services](https://cloud.google.com/appengine/docs/python/an-overview-of-app-engine),
 which were previously called modules in earlier versions of App Engine. The
 services are: default (also called front-end), backend, and tools. Each service
@@ -79,19 +79,19 @@ https://tools-dot-project-id.appspot.com, like `/_dr/task/refreshAllDomains`.
 Engine provide an asynchronous way to enqueue tasks and then execute them on
 some kind of schedule. There are two types of queues, push queues and pull
 queues. Tasks in push queues are always executing up to some throttlable limit.
-Tasks in pull queues remain there indefinitely until the queue is polled by code
-that is running for some other reason. Essentially, push queues run their own
-tasks while pull queues just enqueue data that is used by something else. Many
-other parts of App Engine are implemented using task queues. For example, [App
-Engine cron](https://cloud.google.com/appengine/docs/java/config/cron) adds
+Tasks in pull queues remain there until the queue is polled by code that is
+running for some other reason. Essentially, push queues run their own tasks
+while pull queues just enqueue data that is used by something else.
+Many other parts of App Engine are implemented using task queues. For example,
+[App Engine cron](https://cloud.google.com/appengine/docs/java/config/cron) adds
 tasks to push queues at regularly scheduled intervals, and the [MapReduce
 framework](https://cloud.google.com/appengine/docs/java/dataprocessing/) adds
 tasks for each phase of the MapReduce algorithm.
 
-The Domain Registry project uses a particular pattern of paired push/pull queues
-that is worth explaining in detail. Push queues are essential because App
-Engine's architecture does not support long-running background processes, and so
-push queues are thus the fundamental building block that allows asynchronous and
+Nomulus uses a particular pattern of paired push/pull queues that is worth
+explaining in detail. Push queues are essential because App Engine's
+architecture does not support long-running background processes, and so push
+queues are thus the fundamental building block that allows asynchronous and
 background execution of code that is not in response to incoming web requests.
 However, they also have limitations in that they do not allow batch processing
 or grouping. That's where the pull queue comes in. Regularly scheduled tasks in
@@ -99,16 +99,21 @@ the push queue will, upon execution, poll the corresponding pull queue for a
 specified number of tasks and execute them in a batch. This allows the code to
 execute in the background while taking advantage of batch processing.
 
-Particulars on the task queues in use by the Domain Registry project are
-specified in the `queue.xml` file. Note that many push queues have a direct
-one-to-one correspondence with entries in `cron.xml` because they need to be
-fanned-out on a per-TLD or other basis (see the Cron section below for more
-explanation). The exact queue that a given cron task will use is passed as the
-query string parameter "queue" in the url specification for the cron task.
+The task queues used by Nomulus are configured in the `queue.xml` file. Note
+that many push queues have a direct one-to-one correspondence with entries in
+`cron.xml` because they need to be fanned-out on a per-TLD or other basis (see
+the Cron section below for more explanation). The exact queue that a given cron
+task will use is passed as the query string parameter "queue" in the url
+specification for the cron task.
 
 Here are the task queues in use by the system. All are push queues unless
 explicitly marked as otherwise.
 
+*   `async-delete-pull` and `async-host-rename-pull` -- Pull queues for tasks to
+    asynchronously delete contacts/hosts and to asynchronously refresh DNS
+    for renamed hosts, respectively. Tasks are enqueued during EPP
+    flows and then handled in batches by the regularly running cron tasks
+    `DeleteContactsAndHostsAction` and `RefreshDnsOnHostRenameAction`.
 *   `bigquery-streaming-metrics` -- Queue for metrics that are asynchronously
     streamed to BigQuery in the `Metrics` class. Tasks are enqueued during EPP
     flows in `EppController`. This means that there is a lag of a few seconds to
@@ -149,19 +154,15 @@ explicitly marked as otherwise.
 *   `export-snapshot-update-view` -- Queue for tasks to update the BigQuery
     views to point to the most recently uploaded snapshot. Tasks are enqueued by
     `LoadSnapshotAction` and executed by `UpdateSnapshotViewAction`.
-*   `flows-async` -- Queue for asynchronous tasks that are enqueued during EPP
-    command flows. Currently all of these tasks correspond to invocations of any
-    of the following three MapReduces: `DnsRefreshForHostRenameAction`,
-    `DeleteHostResourceAction`, or `DeleteContactResourceAction`.
 *   `group-members-sync` -- Cron queue for tasks to sync registrar contacts (not
     domain contacts!) to Google Groups. Tasks are executed by
     `SyncGroupMembersAction`.
 *   `load[0-9]` -- Queues used to load-test the system by `LoadTestAction`.
     These queues don't need to exist except when actively running load tests
-    (which is not recommended on production environments). There are ten of
-    these queues to provide simple sharding, because the Domain Registry system
-    is capable of handling significantly more Queries Per Second than the
-    highest throttle limit available on task queues (which is 500 qps).
+    (running load tests on production environments is not recommended). There
+    are ten of these queues to provide simple sharding, because Nomulus is
+    capable of handling significantly more Queries Per Second than the highest
+    throttle limit available on task queues (which is 500 qps).
 *   `lordn-claims` and `lordn-sunrise` -- Pull queues for handling LORDN
     exports. Tasks are enqueued synchronously during EPP commands depending on
     whether the domain name in question has a claims notice ID.
@@ -184,10 +185,10 @@ explicitly marked as otherwise.
 
 ## Environments
 
-The domain registry codebase comes pre-configured with support for a number of
-different environments, all of which are used in Google's registry system. Other
-registry operators may choose to user more or fewer environments, depending on
-their needs.
+Nomulus comes pre-configured with support for a number of different
+environments, all of which are used in Google's registry system. Other registry
+operators may choose to user more or fewer environments, depending on their
+needs.
 
 The different environments are specified in `RegistryEnvironment`. Most
 correspond to a separate App Engine app except for `UNITTEST` and `LOCAL`, which
@@ -202,8 +203,8 @@ The full list of environments supported out-of-the-box, in descending order from
 real to not, is:
 
 *   `PRODUCTION` -- The real production environment that is actually running
-    live TLDs. Since the Domain Registry is a shared registry platform, there
-    need only ever be one of these.
+    live TLDs. Since Nomulus is a shared registry platform, there need only ever
+    be one of these.
 *   `SANDBOX` -- A playground environment for external users to test commands in
     without the possibility of affecting production data. This is the
     environment new registrars go through
@@ -287,7 +288,7 @@ cron.xml is:
 
 ## Cloud Datastore
 
-The Domain Registry platform uses [Cloud
+Nomulus uses [Cloud
 Datastore](https://cloud.google.com/appengine/docs/java/datastore/) as its
 primary database. Cloud Datastore is a NoSQL document database that provides
 automatic horizontal scaling, high performance, and high availability. All
@@ -388,15 +389,14 @@ registry codebase:
 
 ## Cloud Storage buckets
 
-The Domain Registry platform uses [Cloud
-Storage](https://cloud.google.com/storage/) for bulk storage of large flat files
-that aren't suitable for Datastore. These files include backups, RDE exports,
-Datastore snapshots (for ingestion into BigQuery), and reports. Each bucket name
-must be unique across all of Google Cloud Storage, so we use the common
-recommended pattern of prefixing all buckets with the name of the App Engine app
-(which is itself globally unique). Most of the bucket names are configurable,
-but the defaults are as follows, with PROJECT standing in as a placeholder for
-the App Engine app name:
+Nomulus uses [Cloud Storage](https://cloud.google.com/storage/) for bulk storage
+of large flat files that aren't suitable for Datastore. These files include
+backups, RDE exports, Datastore snapshots (for ingestion into BigQuery), and
+reports. Each bucket name must be unique across all of Google Cloud Storage, so
+we use the common recommended pattern of prefixing all buckets with the name of
+the App Engine app (which is itself globally unique). Most of the bucket names
+are configurable, but the defaults are as follows, with PROJECT standing in as a
+placeholder for the App Engine app name:
 
 *   `PROJECT-billing` -- Monthly invoice files for each registrar.
 *   `PROJECT-commits` -- Daily exports of commit logs that are needed for
