@@ -210,8 +210,10 @@ test {
     // Add the default 'gpg' and 'tar' install locations to the path
     environment 'PATH', "/usr/local/bin:/usr/bin:$System.env.PATH"
 
-    maxParallelForks = 6
+    maxParallelForks = 2
     forkEvery = 1
+
+    maxHeapSize = "1024m"
 
     // Ignore ui and parent tests
     exclude 'google/registry/ui/**'
