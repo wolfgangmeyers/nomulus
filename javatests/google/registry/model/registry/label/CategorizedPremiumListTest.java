@@ -1,13 +1,20 @@
 package google.registry.model.registry.label;
 
 import static com.google.common.truth.Truth.assertThat;
+import static google.registry.model.ofy.ObjectifyService.ofy;
+import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistCategorizedPremiumList;
 import static google.registry.testing.DatastoreHelper.persistPricingCategory;
+import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
+import static org.joda.money.CurrencyUnit.USD;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
+
+import com.googlecode.objectify.VoidWork;
+
 import google.registry.model.pricing.PricingCategory;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry;
@@ -26,9 +33,6 @@ public class CategorizedPremiumListTest {
   private static final String US_PRICE_CATEGORY = "US_PRICE_CATEGORY";
   private static final String EURO_PRICE_CATEGORY = "EURO_PRICE_CATEGORY";
   private static final String JAPANESE_PRICE_CATEGORY = "JAPANESE_PRICE_CATEGORY";
-
-  private final DateTime THREE_DAYS = DateTime.now().plusDays(3);
-  private final DateTime FIVE_DAYS = DateTime.now().plusDays(5);
   private static final String JAPANESE_PRICE = CurrencyUnit.JPY + " 511";
   private static final String USD_PRICE = CurrencyUnit.USD + " 5.00";
   private static final String EURO_PRICE = CurrencyUnit.EUR + " 4.48";
@@ -36,6 +40,11 @@ public class CategorizedPremiumListTest {
   private static final String LABEL_TWO = "label_two";
   private static final String TLD_ONE = "tld_one";
   private static final String TLD_TWO = "tld_two";
+  private static final String FUTURE_CATEGORY = "fc";
+
+  private final DateTime THREE_DAYS = DateTime.now().plusDays(3);
+  private final DateTime FIVE_DAYS = DateTime.now().plusDays(5);
+  private final DateTime FUTURE_DATE = new DateTime().plusDays(5);
 
   @Rule public final ExceptionRule thrown = new ExceptionRule();
   @Rule public final AppEngineRule appEngine = AppEngineRule.builder().withDatastore().build();
@@ -143,4 +152,249 @@ public class CategorizedPremiumListTest {
         .isEqualTo(premiumList.getPremiumListEntries().size() + 1);
   }
 
+  @Test
+  public void testUpdateFutureTransition_Valid() throws Exception {
+    final String sld3 = "sld3";
+    final String tld3 = "tld3";
+    final String fqdn3 = sld3 + "." + tld3;
+
+    // Need to create a temporary TLD in order to get past .build()
+    // and then delete prior to calling .run()
+    TldCreator.build(sld3, tld3);
+    final PricingCategory pc = TldCreator.getPricingCategory();
+
+    // Validate data
+    CategorizedPremiumList result = CategorizedPremiumList.updatePremiumList2(
+        TLD_ONE, LABEL_ONE, FUTURE_DATE, FUTURE_CATEGORY);
+    assertThat(result).isEqualTo(CategorizedPremiumList.class);
+  }
+
+  @Test
+  public void testDeleteTransition_Valid() throws Exception {
+    final String sld3 = "sld3";
+    final String tld3 = "tld3";
+
+    // Need to create a temporary TLD and then delete
+    TldCreator.build(sld3, tld3);
+
+    // Validate data
+    CategorizedPremiumList result = CategorizedPremiumList.deletePremiumListEntry(
+        tld3, sld3);
+    assertThat(result.getPremiumListEntries()).hasSize(0);
+  }
+
+  @Test
+  public void testDeleteTransition_Invalid_TldDoesNotExist() throws Exception {
+    final String sld3 = "sld3";
+    final String tld3 = "invalid";
+
+    thrown.expect(IllegalStateException.class, "Unable to find CategorizedPremiumList for invalid");
+    CategorizedPremiumList.deletePremiumListEntry(tld3, sld3);
+  }
+
+  @Test
+  public void testGetCategorizedPremiumList_Valid() throws Exception {
+      CategorizedPremiumList result =
+          CategorizedPremiumList.getCategorizedPremiumList(TLD_ONE);
+    assertThat(result).isNotNull();
+  }
+
+  @Test
+  public void testGetCategorizedPremiumList_Invalid_UnableToFindList() throws Exception {
+    final String sld2 = "sld2";
+    final String tld2 = "tld2";
+    final String fqdn2 = sld2 + "." + tld2;
+
+    // Need to create a temporary TLD in order to get past .build()
+    // and then delete prior to calling .run()
+    // Create second TLD and
+    TldCreator.build(sld2, tld2);
+
+    // Remove from data store prior to calling result.run()
+    ofy().transact(new VoidWork() {
+      @Override
+      public void vrun() {
+        ofy().delete().entity(CategorizedPremiumList.get(tld2).get()).now();
+      }
+    });
+
+    // Invoke the 'deleteCategorizedListEntries()' which will throw IllegalStateException
+    thrown.expect(IllegalStateException.class, "Unable to find CategorizedPremiumList for " + tld2);
+
+    CategorizedPremiumList result =
+        CategorizedPremiumList.getCategorizedPremiumList(TLD_ONE);
+    assertThat(result).isNotNull();
+  }
+
+  @Test
+  public void testUpdatePremiumList_Valid_ExistingPremiumListEntries() throws Exception {
+//    CategorizedPremiumList result =
+//        CategorizedPremiumList.updatePremiumList2(TLD_ONE, LABEL_ONE, US_PRICE_CATEGORY);
+//    assertThat(result).isNotNull();
+  }
+
+  @Test
+  public void testCreatePremiumList_Valid_NoExistingPremiumListEntries() throws Exception {
+    CategorizedPremiumList result =
+        CategorizedPremiumList.createPremiumList(TLD_ONE, "sld6", US_PRICE_CATEGORY);
+    assertThat(result).isNotNull();
+  }
+
+
+  @Test
+  public void testDeleteTransition_Invalid_UnableToFindCpl() throws Exception {
+//    final String sld2 = "sld2";
+//    final String tld2 = "tld2";
+//    final String fqdn2 = sld2 + "." + tld2;
+//
+//    // Need to create a temporary TLD in order to get past .build()
+//    // and then delete prior to calling .run()
+//    // Create second TLD and
+//    TldCreator.build(sld2, tld2);
+//
+//    // Validate data
+//    CategorizedPremiumOperation result = CategorizedPremiumOperation.builder()
+//        .operation(D)
+//        .fqdn(fqdn2)
+//        .pricingCategory("")  // Ignored
+//        .effectiveDate("")  // Ignored
+//        .futureCategory("") // Ignored
+//        .build();
+//
+//    // Remove from data store prior to calling result.run()
+//    ofy().transact(new VoidWork() {
+//      @Override
+//      public void vrun() {
+//        ofy().delete().entity(CategorizedPremiumList.get(tld2).get()).now();
+//      }
+//    });
+//
+//    // Invoke the 'deleteCategorizedListEntries()' which will throw IllegalStateException
+//    thrown.expect(IllegalStateException.class, "Unable to find CategorizedPremiumList for " + tld2);
+//    result.run();
+  }
+
+  @Test
+  public void testDeleteTransition_Invalid_UnableToFindEntry() throws Exception {
+//    final String sld4 = "sld4";
+//    final String tld4 = "tld4";
+//    final String fqdn4 = sld4 + "." + tld4;
+//
+//    // Need to create a temporary TLD in order to get past .build()
+//    // and then delete prior to calling .run()
+//    // Create second TLD and
+//    TldCreator.build(sld4, tld4);
+//
+//    // Validate data
+//    CategorizedPremiumOperation result = CategorizedPremiumOperation.builder()
+//        .operation(D)
+//        .fqdn(fqdn4)
+//        .pricingCategory("")  // Ignored
+//        .effectiveDate("")    // Ignored
+//        .futureCategory("")   // Ignored
+//        .build();
+//
+//    // Purposely remove the CategorizedPremiumListEntries to ensure exception is thrown
+//    removePremiumListEntries(sld4, tld4);
+//
+//    // Invoke the 'deleteCategorizedListEntries()' which will throw IllegalStateException
+//    thrown.expect(IllegalStateException.class, "Unable to find entry for " + sld4);
+//    result.run();
+  }
+
+
+
+
+  @Test
+  public void testAddFutureTransition_Invalid_UnableToFindCpl() throws Exception {
+//    final String sld3 = "sld3";
+//    final String tld3 = "tld3";
+//    final String fqdn3 = sld3 + "." + tld3;
+//
+//    // Need to create a temporary TLD in order to get past .build()
+//    // and then delete prior to calling .run()
+//    TldCreator.build(sld3, tld3);
+//    final PricingCategory pc = TldCreator.getPricingCategory();
+//
+//    // Validate data
+//    CategorizedPremiumList result = CategorizedPremiumList.addFutureTransition(
+//        tld3, sld3, FUTURE_DATE, FUTURE_CATEGORY);
+//
+//    // Remove from data store prior to calling result.run()
+//    ofy().transact(new VoidWork() {
+//      @Override
+//      public void vrun() {
+//        ofy().delete().entity(CategorizedPremiumList.get(tld3).get()).now();
+//      }
+//    });
+//
+//    // Invoke the 'deleteCategorizedListEntries()' which will throw IllegalStateException
+//    thrown.expect(IllegalStateException.class, "Unable to find CategorizedPremiumList for " + tld3);
+  }
+
+  @Test
+  public void testUpdateCategorizedListEntries_Invalid_UnableToFindEntry() throws Exception {
+//    final String sld5 = "sld5";
+//    final String tld5 = "tld5";
+//    final String fqdn5 = sld5 + "." + tld5;
+//
+//    // Need to create a temporary TLD in order to get past .build()
+//    // and then delete prior to calling .run()
+//    // Create second TLD and
+//    TldCreator.build(sld5, tld5);
+//
+//    // Validate data before issuing the result.run()
+//    CategorizedPremiumOperation result = CategorizedPremiumOperation.builder()
+//        .operation(U)
+//        .fqdn(fqdn5)
+//        .pricingCategory(TldCreator.getPricingCategory().getName())  // Ignored
+//        .effectiveDate(FUTURE_DATE.toString(formatter))  // Ignored
+//        .futureCategory(futureCategory) // Ignored
+//        .build();
+//
+//    // Purposely remove the CategorizedPremiumListEntries to ensure exception is thrown
+//    removePremiumListEntries(sld5, tld5);
+//
+//    // Invoke the 'deleteCategorizedListEntries()' which will throw IllegalStateException
+//    thrown.expect(IllegalStateException.class, "Unable to find entry for " + sld5);
+//    result.run();
+  }
+
+  /**
+   * Class is used to support the creation of temporary TLDs and dependent entities used
+   * for specific test cases that require a TLD to be created and then deleted during
+   * test case run
+   */
+  private static class TldCreator {
+    private static String pricingCategoryName = "pricingCategory";
+    private static PricingCategory pc;
+    private static CategorizedPremiumList.CategorizedListEntry entry;
+
+    public static PricingCategory getPricingCategory() {
+      return pc;
+    }
+
+    public static CategorizedPremiumList.CategorizedListEntry getEntry() {
+      return entry;
+    }
+
+    public static void build(String sld, String tld) {
+      createTld(tld);
+
+      pc = new PricingCategory.Builder().setName(pricingCategoryName).setPrice(Money.zero(USD)).build();
+      persistResource(pc);
+
+      entry =
+          new CategorizedPremiumList.CategorizedListEntry.Builder()
+              .setLabel(sld)
+              .setPricingCategoryTransitions(ImmutableSortedMap.of(START_OF_TIME, pc.getName()))
+              .build();
+
+      new CategorizedPremiumList.Builder()
+          .setName(tld)
+          .setPremiumListMap(ImmutableMap.of(sld, entry))
+          .build()
+          .saveAndUpdateEntries();
+    }
+  }
 }
