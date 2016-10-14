@@ -85,7 +85,7 @@ public class CategorizedPremiumList
 
 
   /**
-   * Method creates a new CategorizedPremiumList
+   * Method creates a new CategorizedPremiumList based upon the TLD, SLD and PriceCategory
    */
   public static CategorizedPremiumList createPremiumList(
       final String tld, final String sld, final String priceCategory) {
@@ -214,11 +214,11 @@ public class CategorizedPremiumList
   }
 
   /**
-   * Method saves a CategorizedPremmiumList
+   * Method saves a CategorizedPremiumList
    * @param tld
    * @param newMapEntries
    */
-  private static CategorizedPremiumList savePremiumList(
+  static CategorizedPremiumList savePremiumList(
       final String tld, final ImmutableMap<String, CategorizedListEntry> newMapEntries) {
 
     // Build a new CategorizedPremiumList

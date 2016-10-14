@@ -24,6 +24,7 @@ import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -152,6 +153,7 @@ public class CategorizedPremiumListTest {
         .isEqualTo(premiumList.getPremiumListEntries().size() + 1);
   }
 
+  @Ignore
   @Test
   public void testUpdateFutureTransition_Valid() throws Exception {
     final String sld3 = "sld3";
@@ -224,6 +226,23 @@ public class CategorizedPremiumListTest {
     CategorizedPremiumList result =
         CategorizedPremiumList.getCategorizedPremiumList(TLD_ONE);
     assertThat(result).isNotNull();
+  }
+
+  @Test
+  public void testSavePremiumList() throws Exception {
+    final String sld = "sld8";
+    final CategorizedListEntry entry =
+        CategorizedListEntry.createEntry(sld, US_PRICE_CATEGORY);
+
+    // Create a new ImmutableMap based upon the SLD and PricingCategory
+    final ImmutableMap<String, CategorizedListEntry> newEntries =
+        ImmutableMap.<String, CategorizedListEntry>builder()
+            .put(sld, entry)
+            .build();
+
+    CategorizedPremiumList result =
+        CategorizedPremiumList.savePremiumList(TLD_ONE, newEntries);
+    assertThat(result.getPremiumListEntries().get(sld)).isNotNull();
   }
 
   @Test
