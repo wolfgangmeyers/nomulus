@@ -87,20 +87,12 @@ public class CategorizedPremiumList
   /**
    * Method creates a new CategorizedPremiumList based upon the TLD, SLD and PriceCategory
    */
-  public static CategorizedPremiumList createPremiumList(
-      final String tld, final String sld, final String priceCategory) {
-
-    // Build and return the CategorizedListEntry
-    final CategorizedListEntry entry = CategorizedListEntry.createEntry(sld, priceCategory);
-
-    // Create a new ImmutableMap based upon the SLD and PricingCategory
-    final ImmutableMap<String, CategorizedListEntry> newEntries =
-        ImmutableMap.<String, CategorizedListEntry>builder()
-            .put(sld, entry)
-            .build();
-
-    return savePremiumList(tld, newEntries);
-  }
+//  static CategorizedPremiumList createPremiumList(
+//      final String tld, final String sld, final String priceCategory) {
+//
+//    //CategorizedPremiumList premiumList = savePremiumList(tld, newEntries);
+//    return savePremiumList(tld).addEntry(sld, priceCategory);
+//  }
 
 
   /**
@@ -145,90 +137,80 @@ public class CategorizedPremiumList
 //  }
 
 
-  /**
-   * Method deletes a PremiumListEntry from the list of entries associated with PremiumList
-   *
-   * @return a CategorizedPremiumList which will contain updated
-   */
-  public static CategorizedPremiumList deletePremiumListEntry(final String tld, final String sld) {
-
-    final CategorizedPremiumList premiumList = getCategorizedPremiumList(tld);
-
-    // Get a modifiable map so we can remove the sld
-    final Map<String, CategorizedListEntry> entries =
-        Maps.newHashMap(premiumList.getPremiumListEntries());
-    checkState(entries.containsKey(sld), "Unable to find entry for %s", sld);
-
-    entries.remove(sld);
-
-    return premiumList.asBuilder()
-        .setPremiumListMap(
-            ImmutableMap.copyOf(entries))
-        .build()
-        .saveAndUpdateEntries();
-  }
+//  /**
+//   * Method deletes a PremiumListEntry from the list of entries associated with PremiumList
+//   *
+//   * @return a CategorizedPremiumList which will contain updated
+//   */
+//  public static CategorizedPremiumList deletePremiumListEntry(final String tld, final String sld) {
+//
+//    final CategorizedPremiumList premiumList = getCategorizedPremiumList(tld);
+//
+//    // Get a modifiable map so we can remove the sld
+//    final Map<String, CategorizedListEntry> entries =
+//        Maps.newHashMap(premiumList.getPremiumListEntries());
+//    checkState(entries.containsKey(sld), "Unable to find entry for %s", sld);
+//
+//    entries.remove(sld);
+//
+//    return premiumList.asBuilder()
+//        .setPremiumListMap(
+//            ImmutableMap.copyOf(entries))
+//        .build()
+//        .saveAndUpdateEntries();
+//  }
 
 
   /**
    * Method adds a future transition date to list of existing Premium List Entries
    */
-  public static CategorizedPremiumList updatePremiumList2(
-      final String tld, final String sld, final DateTime date, final String futureCategory) {
-    //CategorizedPremiumList newPremiumList;
+//  public static CategorizedPremiumList updatePremiumList2(
+//      final String tld, final String sld, final DateTime date, final String futureCategory) {
+//    //CategorizedPremiumList newPremiumList;
+//
+//    final CategorizedPremiumList premiumList = getCategorizedPremiumList(tld);
+//
+////    final CategorizedPremiumList.Builder premiumListBuilder =
+////        new CategorizedPremiumList.Builder().setName(tld);
+//
+//    // Get a modifiable map so we can remove the sld
+//    Map<String, CategorizedListEntry> premiumListMap =
+//        Maps.newHashMap(premiumList.getPremiumListEntries());
+//    checkState(premiumListMap.containsKey(sld),
+//        "Unable to find entry for %s", sld);
+//
+//    // Get the CategorizedListEntry for given SLD
+//    final CategorizedListEntry oldEntry = premiumListMap.get(sld);
+//
+//    DateTime nextTransition =
+//        CategorizedListEntry.getNextTransitionDateTime(oldEntry);
+//
+//    // Determine if next transition is before date passed in and if it is
+//    // then it is appended to the end of the transitions otherwise update
+//    if (nextTransition.getMillis() < date.getMillis()) {
+//      final ImmutableMap<String, CategorizedListEntry> newMapEntries =
+//          ImmutableMap.<String, CategorizedListEntry>builder()
+//              .putAll(premiumListMap) // Shove existing entries into map
+//              .put(sld, CategorizedListEntry.createEntry(sld, futureCategory)) // now add new entries
+//              .build();
+//
+//      final CategorizedPremiumList finalizedPremiumList = savePremiumList(tld, newMapEntries);
+//
+//
+//    } else {
+//      // TODO: Fill this in ask Steve
+//
+//    }
+//
+//    return null;
+//  }
 
-    final CategorizedPremiumList premiumList = getCategorizedPremiumList(tld);
 
-//    final CategorizedPremiumList.Builder premiumListBuilder =
-//        new CategorizedPremiumList.Builder().setName(tld);
-
-    // Get a modifiable map so we can remove the sld
-    Map<String, CategorizedListEntry> premiumListMap =
-        Maps.newHashMap(premiumList.getPremiumListEntries());
-    checkState(premiumListMap.containsKey(sld),
-        "Unable to find entry for %s", sld);
-
-    // Get the CategorizedListEntry for given SLD
-    final CategorizedListEntry oldEntry = premiumListMap.get(sld);
-
-    DateTime nextTransition =
-        CategorizedListEntry.getNextTransitionDateTime(oldEntry);
-
-    // Determine if next transition is before date passed in and if it is
-    // then it is appended to the end of the transitions otherwise update
-    if (nextTransition.getMillis() < date.getMillis()) {
-      final ImmutableMap<String, CategorizedListEntry> newMapEntries =
-          ImmutableMap.<String, CategorizedListEntry>builder()
-              .putAll(premiumListMap) // Shove existing entries into map
-              .put(sld, CategorizedListEntry.createEntry(sld, futureCategory)) // now add new entries
-                      .build();
-
-      final CategorizedPremiumList finalizedPremiumList = savePremiumList(tld, newMapEntries);
-
-
-    } else {
-      // TODO: Fill this in ask Steve
-
-    }
-
-    return null;
-  }
-
-  /**
-   * Method saves a CategorizedPremiumList
-   * @param tld
-   * @param newMapEntries
-   */
-  static CategorizedPremiumList savePremiumList(
-      final String tld, final ImmutableMap<String, CategorizedListEntry> newMapEntries) {
+  static CategorizedPremiumList savePremiumList(final String tld) {
 
     // Build a new CategorizedPremiumList
-    final CategorizedPremiumList.Builder premiumListBuilder =
-        new CategorizedPremiumList.Builder().setName(tld);
-
     final CategorizedPremiumList newPremiumList =
-        premiumListBuilder.setPremiumListMap(newMapEntries).build();
-
-    newPremiumList.saveAndUpdateEntries();
+        new CategorizedPremiumList.Builder().setName(tld).build().saveAndUpdateEntries();
 
     ofy().transact(new VoidWork() {
       @Override
@@ -245,17 +227,17 @@ public class CategorizedPremiumList
     return newPremiumList;
   }
 
-  /**
-   * Method verifies if TLD is associated with a CategorizedPremiumList and if so returns it.
-   */
-  static CategorizedPremiumList getCategorizedPremiumList(String tld) {
-    final Optional<CategorizedPremiumList> premiumListOptional = CategorizedPremiumList.get(tld);
-    checkState(premiumListOptional.isPresent(),
-        "Unable to find CategorizedPremiumList for %s", tld);
-
-    // Retrieve the actual PremiumList after verifying existence
-    return premiumListOptional.get();
-  }
+//  /**
+//   * Method verifies if TLD is associated with a CategorizedPremiumList and if so returns it.
+//   */
+//  static CategorizedPremiumList getCategorizedPremiumList(String tld) {
+//    final Optional<CategorizedPremiumList> premiumListOptional = CategorizedPremiumList.get(tld);
+//    checkState(premiumListOptional.isPresent(),
+//        "Unable to find CategorizedPremiumList for %s", tld);
+//
+//    // Retrieve the actual PremiumList after verifying existence
+//    return premiumListOptional.get();
+//  }
 
   /**
    * A categorized list entry entity, persisted to Datastore. Each instance represents the price
@@ -330,8 +312,8 @@ public class CategorizedPremiumList
 
     /**
      * Method returns the next date time
-     * @param entry
-     * @return
+     * @param entry a CategorizedListEntry object
+     * @return DateTime of the next transition
      */
     static DateTime getNextTransitionDateTime(CategorizedListEntry entry) {
       return entry.getNextTransitionDateTime();
@@ -460,6 +442,12 @@ public class CategorizedPremiumList
       super(instance);
     }
 
+    /**
+     * Method assigns the ImmutableMap of CategorizedListEntry objects into the PremiumListMap
+     * for this given instance of CategorizedPremiumList
+     * @param premiumListMap an ImmutableMap of CategorizedListEntry objects to be assigned
+     * @return a Builder object
+     */
     public Builder setPremiumListMap(ImmutableMap<String, CategorizedListEntry> premiumListMap) {
       getInstance().entriesWereUpdated = true;
       getInstance().premiumListMap = premiumListMap;
@@ -468,6 +456,83 @@ public class CategorizedPremiumList
 
     public Builder setPremiumListFromLines(Iterable<String> lines) {
       return setPremiumListMap(getInstance().parse(lines));
+    }
+
+    /**
+     * Method accepts a second-level domain name and a price category and is to create a
+     * CategorizedListEntry object and then add it to the CategorizedPremiumList map
+     * @param sld a second-level domain
+     * @param priceCategory a price category
+     * @return
+     */
+    public Builder addEntry(final String sld, final String priceCategory) {
+      return addEntry(CategorizedListEntry.createEntry(sld, priceCategory));
+    }
+
+    /**
+     * Method accepts a CategorizedListEntry and determines if it has a list of PremiumListEntries
+     * and if it does then it retrieves then otherwise it creates a new ImmutableMap to store
+     * @param entry a CategorizedListEntry to load into the PremiumListMap
+     * @return a Builder object
+     */
+    public Builder addEntry(final CategorizedListEntry entry) {
+      // Determines if we have a list of PremiumListEntries or not and if
+      // not creates an ImmutableMap
+      final Map<String, CategorizedListEntry> existingEntries =
+          (getInstance().getPremiumListEntries() != null)
+              ? getInstance().getPremiumListEntries()
+              : ImmutableMap.<String, CategorizedListEntry>of();
+
+      // Create a new ImmutableMap based upon the SLD and PricingCategory
+      final ImmutableMap<String, CategorizedListEntry> newEntries =
+          ImmutableMap.<String, CategorizedListEntry>builder()
+              .putAll(existingEntries) // Adds entries regardless if it has entries or is empty
+              .put(entry.getLabel(), entry)
+              .build();
+
+      // Loads the new entries into the PremiumListMap and then returns PremiumListMap to caller
+      // of this method
+      return setPremiumListMap(newEntries);
+    }
+
+    /**
+     * Method deletes an entry from the PremiumListMap based upon the
+     * second level domain and price category
+     * @param sld a string value representing a second level domain
+     * @param priceCategory a string value representing a price category
+     * @return
+     */
+    public Builder deleteEntry(final String sld, final String priceCategory) {
+      return deleteEntry(CategorizedListEntry.createEntry(sld, priceCategory));
+    }
+
+    /**
+     * Method deletes an entry from the PremiumListMap
+     * @param entry the entry to remove from the PremiumListMap
+     * @return
+     */
+    public Builder deleteEntry(final CategorizedListEntry entry) {
+      // Determines if we have a list of PremiumListEntries or not and if
+      // not creates an ImmutableMap
+      final Map<String, CategorizedListEntry> existingEntries =
+          (getInstance().getPremiumListEntries() != null)
+              ? getInstance().getPremiumListEntries()
+              : ImmutableMap.<String, CategorizedListEntry>of();
+
+      // Remove entry from existing PremiumListMap
+      final Map<String, CategorizedListEntry> tmpEntries =
+          Maps.newHashMap(existingEntries);
+
+      checkState(tmpEntries.containsKey(entry.getLabel()),
+          "Unable to find entry for %s", entry.getLabel());
+      tmpEntries.remove(entry.getLabel());
+
+      final ImmutableMap<String, CategorizedListEntry> newEntries =
+          ImmutableMap.<String, CategorizedListEntry>builder()
+          .putAll(tmpEntries)
+          .build();
+
+      return setPremiumListMap(newEntries);
     }
 
     @Override
