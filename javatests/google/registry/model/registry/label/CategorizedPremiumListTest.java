@@ -423,10 +423,10 @@ public class CategorizedPremiumListTest {
     // Should now have two entries in map
     assertThat(threeSchools.getPremiumListEntries().size()).isEqualTo(3);
 
-    // Delete the road bicycle
+    // Delete the middle school by using the SLD and PriceCategory
     CategorizedPremiumList twoSchools =
         threeSchools.asBuilder()
-            .deleteEntry(middle_school_entry)
+            .deleteEntry(middle_sld, US_PRICE_CATEGORY)
             .build();
 
     // Verify that we have two bicycles left - Tandem, Mountain
