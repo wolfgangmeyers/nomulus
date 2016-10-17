@@ -40,6 +40,7 @@ import google.registry.util.DateTimeUtils;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
@@ -338,6 +339,9 @@ public class CategorizedPremiumList
               ? getInstance().getPremiumListEntries()
               : ImmutableMap.<String, CategorizedListEntry>of();
 
+      checkState(!existingEntries.containsKey(entry.getLabel()),
+          "Entry [%s] already exists", entry.getLabel());
+
       // Create a new ImmutableMap based upon the SLD and PricingCategory
       final ImmutableMap<String, CategorizedListEntry> newEntries =
           ImmutableMap.<String, CategorizedListEntry>builder()
@@ -357,24 +361,19 @@ public class CategorizedPremiumList
      * @return
      */
     public Builder deleteEntry(final String sld) {
-      // Determines if we have a list of PremiumListEntries or not and if
-      // not creates an ImmutableMap
+
       final Map<String, CategorizedListEntry> existingEntries =
-          (getInstance().getPremiumListEntries() != null)
-              ? getInstance().getPremiumListEntries()
-              : ImmutableMap.<String, CategorizedListEntry>of();
+          getInstance().getPremiumListEntries();
+
+      checkState(existingEntries.containsKey(sld), "Unable to find entry [%s]", sld);
 
       // Remove entry from existing PremiumListMap
-      final Map<String, CategorizedListEntry> tmpEntries =
-          Maps.newHashMap(existingEntries);
-
-      checkState(tmpEntries.containsKey(sld),
-          "Unable to find entry for %s", sld);
-      tmpEntries.remove(sld);
+      Map<String, CategorizedListEntry> tmpMap = new HashMap<>(existingEntries);
+      tmpMap.remove(sld);
 
       final ImmutableMap<String, CategorizedListEntry> newEntries =
           ImmutableMap.<String, CategorizedListEntry>builder()
-              .putAll(tmpEntries)
+              .putAll(tmpMap)
               .build();
 
       return setPremiumListMap(ImmutableMap.copyOf(newEntries));
