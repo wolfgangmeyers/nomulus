@@ -1,5 +1,23 @@
 package google.registry.model.registry.label;
 
+import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSortedMap;
+
+import org.joda.money.CurrencyUnit;
+import org.joda.money.Money;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
+import org.junit.Before;
+import org.junit.Rule;
+import org.junit.Test;
+
+import google.registry.model.pricing.PricingCategory;
+import google.registry.model.registry.Registry;
+import google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry;
+import google.registry.testing.AppEngineRule;
+import google.registry.testing.ExceptionRule;
+
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry.createEntry;
 import static google.registry.testing.DatastoreHelper.createTld;
@@ -8,23 +26,6 @@ import static google.registry.testing.DatastoreHelper.persistPricingCategory;
 import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static org.joda.money.CurrencyUnit.USD;
-
-import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSortedMap;
-
-import google.registry.model.pricing.PricingCategory;
-import google.registry.model.registry.Registry;
-import google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry;
-import google.registry.testing.AppEngineRule;
-import google.registry.testing.ExceptionRule;
-import org.joda.money.CurrencyUnit;
-import org.joda.money.Money;
-import org.joda.time.DateTime;
-import org.joda.time.DateTimeZone;
-import org.junit.Before;
-import org.junit.Rule;
-import org.junit.Test;
 
 /** Unit tests for {@link CategorizedPremiumList} */
 public class CategorizedPremiumListTest {
@@ -204,6 +205,23 @@ public class CategorizedPremiumListTest {
   }
 
   @Test
+  public void testAddEntry_Invalid_EntryAlreadyExists() throws Exception {
+
+    // Test case verifies that we cannot add duplicate entries
+
+    final String public_sld = "public";
+    final String private_sld = "private";
+
+    thrown.expect(IllegalStateException.class, "Entry [public] already exists");
+
+    premiumList.asBuilder()
+        .addEntry(public_sld, pricingCategory_AA.getName()) // public.institute
+        .addEntry(private_sld, pricingCategory_BB.getName()) // private.institute
+        .addEntry(public_sld, pricingCategory_AA.getName()) // public.institute
+        .build();
+  }
+
+  @Test
   public void testAddEntry_Valid_ExistingPremiumList() {
      // Test method exercises the functionality of both 'addEntry' methods however it is using
      // a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
@@ -332,6 +350,39 @@ public class CategorizedPremiumListTest {
         .isEquivalentAccordingToCompareTo(createEntry(longmire_sld, US_PRICE_CATEGORY));
 
     assertThat(twoCamps.getPremiumListEntries().containsKey(kachess_sld)).isTrue();
+  }
+
+  @Test
+  public void testDeleteEntry_Invalid_SldDoesNotExist() throws Exception {
+
+    // Test case verifies if a second level domain does not exist
+    final String rubies = "rubies";
+    final String pearls_sld = "pearls";
+    final String diamonds_sld = "diamonds";
+    final String jewelry = "jewelry";
+    final String sapphire = "sapphire";
+
+    // create a pre-loaded premium list and then add an entry
+    final CategorizedPremiumList premiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                FIVE_DAYS, pricingCategory_AA.getName(),
+                START_OF_TIME, pricingCategory_CCCC.getName(),
+                THREE_DAYS, pricingCategory_BB.getName()),
+            jewelry,
+            rubies);  // rubies.jewelry
+
+    // Add more CategorizedListEntry objects into PremiumList
+    final CategorizedPremiumList newPremiumList = premiumList.asBuilder()
+        .addEntry(pearls_sld, US_PRICE_CATEGORY) // pearls.jewelry
+        .addEntry(diamonds_sld, pricingCategory_BB.getName()) // diamonds.jewelry
+        .build();
+
+    thrown.expect(IllegalStateException.class, "Unable to find entry [sapphire]");
+
+    newPremiumList.asBuilder()
+        .deleteEntry(sapphire)  // Sapphire does NOT exist
+        .build();
   }
 
   /**
