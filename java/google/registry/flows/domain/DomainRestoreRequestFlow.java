@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -108,6 +108,7 @@ public final class DomainRestoreRequestFlow extends LoggedInFlow implements Tran
   @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
   @Inject HistoryEntry.Builder historyBuilder;
+  @Inject DnsQueue dnsQueue;
   @Inject DomainRestoreRequestFlow() {}
 
   @Override
@@ -157,7 +158,7 @@ public final class DomainRestoreRequestFlow extends LoggedInFlow implements Tran
     entitiesToSave.add(newDomain, historyEntry, autorenewEvent, autorenewPollMessage);
     ofy().save().entities(entitiesToSave.build());
     ofy().delete().key(existingDomain.getDeletePollMessage());
-    DnsQueue.create().addDomainRefreshTask(existingDomain.getFullyQualifiedDomainName());
+    dnsQueue.addDomainRefreshTask(existingDomain.getFullyQualifiedDomainName());
     return createOutput(SUCCESS, null, createResponseExtensions(restoreCost, renewCost, feeUpdate));
   }
 

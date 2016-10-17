@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ public enum RegistryEnvironment {
   }
 
   /**
-   * Returns configuration for this Domain Registry environment.
+   * Returns configuration for this registry environment.
    *
    * <p><b>WARNING:</b> Do not store this value to a static field, otherwise you won't be able to
    * override it for testing. You should instead store the environment object to a static field.

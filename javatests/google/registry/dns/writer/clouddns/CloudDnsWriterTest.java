@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,6 +37,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
 import com.google.common.net.InetAddresses;
+import com.google.common.util.concurrent.RateLimiter;
 import com.googlecode.objectify.Key;
 import google.registry.dns.writer.clouddns.CloudDnsWriter.ZoneStateException;
 import google.registry.model.domain.DomainResource;
@@ -101,6 +102,7 @@ public class CloudDnsWriterTest {
             "projectId",
             "zoneName",
             DEFAULT_TTL,
+            RateLimiter.create(20),
             new SystemClock(),
             new Retrier(new SystemSleeper(), 5));
 

@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,6 +33,7 @@ import google.registry.model.eppoutput.CreateData.DomainCreateData;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.eppoutput.Result;
 import google.registry.model.poll.PollMessage;
+import javax.inject.Inject;
 import org.joda.time.DateTime;
 
 /** An EPP flow that creates or allocates a new domain resource. */
@@ -40,6 +41,8 @@ public abstract class DomainCreateOrAllocateFlow
     extends BaseDomainCreateFlow<DomainResource, Builder> {
 
   protected boolean isAnchorTenantViaExtension;
+
+  @Inject DnsQueue dnsQueue;
 
   @Override
   protected final void initDomainCreateFlow() {
@@ -85,7 +88,7 @@ public abstract class DomainCreateOrAllocateFlow
   @Override
   protected final void enqueueTasks() {
     if (newResource.shouldPublishToDns()) {
-      DnsQueue.create().addDomainRefreshTask(newResource.getFullyQualifiedDomainName());
+      dnsQueue.addDomainRefreshTask(newResource.getFullyQualifiedDomainName());
     }
     enqueueLordnTaskIfNeeded();
   }

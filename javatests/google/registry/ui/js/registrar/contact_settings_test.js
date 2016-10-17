@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -52,7 +52,11 @@ function setUp() {
     clientId: test.testClientId,
     showPaymentLink: false,
     logoFilename: 'logo.png',
-    productName: 'Domain Registry'
+    productName: 'Nomulus',
+    integrationEmail: 'integration@google.com',
+    supportEmail: 'support@google.com',
+    announcementsEmail: 'announcements@google.com',
+    supportPhoneNumber: '123 456 7890',
   });
   stubs.setPath('goog.net.XhrIo', goog.testing.net.XhrIo);
   registry.registrar.ConsoleTestUtil.setup(test);
@@ -70,8 +74,8 @@ function tearDown() {
 function testCollectionView() {
   registry.registrar.ConsoleTestUtil.visit(test, {
     path: 'contact-settings',
-    testXsrfToken: test.testXsrfToken,
-    testClientId: test.testClientId
+    xsrfToken: test.testXsrfToken,
+    clientId: test.testClientId
   });
   registry.testing.assertReqMockRsp(
       test.testXsrfToken,
@@ -93,8 +97,8 @@ function testCollectionView() {
 function testItemView() {
   registry.registrar.ConsoleTestUtil.visit(test, {
     path: 'contact-settings/test@example.com',
-    testXsrfToken: test.testXsrfToken,
-    testClientId: test.testClientId
+    xsrfToken: test.testXsrfToken,
+    clientId: test.testClientId
   });
   registry.testing.assertReqMockRsp(
       test.testXsrfToken,
@@ -196,7 +200,7 @@ function testChangeContactTypes() {
 function testOneOfManyUpdate() {
   registry.registrar.ConsoleTestUtil.visit(test, {
     path: 'contact-settings/test@example.com',
-    testXsrfToken: test.testXsrfToken,
+    xsrfToken: test.testXsrfToken,
     testClientId: test.testClientId
   });
   var testContacts = [
@@ -243,7 +247,7 @@ function testOneOfManyUpdate() {
 function testDelete() {
   registry.registrar.ConsoleTestUtil.visit(test, {
     path: 'contact-settings/test@example.com',
-    testXsrfToken: test.testXsrfToken,
+    xsrfToken: test.testXsrfToken,
     testClientId: test.testClientId
   });
   var testContacts = [

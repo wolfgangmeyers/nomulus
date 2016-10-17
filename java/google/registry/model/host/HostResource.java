@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -75,7 +75,6 @@ public class HostResource extends EppResource implements ForeignKeyedEppResource
    * from (creationTime, deletionTime) there can only be one host in the datastore with this name.
    * However, there can be many hosts with the same name and non-overlapping lifetimes.
    */
-  // TODO(b/25644770): Backfill this index. Until that's done, don't rely on it!
   @Index
   @XmlTransient
   String fullyQualifiedHostName;

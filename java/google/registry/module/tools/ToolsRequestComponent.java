@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,6 +15,7 @@
 package google.registry.module.tools;
 
 import dagger.Subcomponent;
+import google.registry.dns.DnsModule;
 import google.registry.export.PublishDetailReportAction;
 import google.registry.flows.EppToolAction;
 import google.registry.flows.EppToolAction.EppToolModule;
@@ -41,14 +42,13 @@ import google.registry.tools.server.ResaveAllEppResourcesAction;
 import google.registry.tools.server.ToolsServerModule;
 import google.registry.tools.server.UpdatePremiumListAction;
 import google.registry.tools.server.VerifyOteAction;
-import google.registry.tools.server.javascrap.BackfillAutorenewBillingFlagAction;
-import google.registry.tools.server.javascrap.CountRecurringBillingEventsAction;
 import google.registry.tools.server.javascrap.RefreshAllDomainsAction;
 
 /** Dagger component with per-request lifetime for "tools" App Engine module. */
 @RequestScope
 @Subcomponent(
     modules = {
+        DnsModule.class,
         EppToolModule.class,
         LoadTestModule.class,
         MapreduceModule.class,
@@ -57,8 +57,6 @@ import google.registry.tools.server.javascrap.RefreshAllDomainsAction;
         WhiteboxModule.class,
     })
 interface ToolsRequestComponent {
-  BackfillAutorenewBillingFlagAction backfillAutorenewBillingFlagAction();
-  CountRecurringBillingEventsAction countRecurringBillingEventsAction();
   CreateGroupsAction createGroupsAction();
   CreatePremiumListAction createPremiumListAction();
   DeleteEntityAction deleteEntityAction();

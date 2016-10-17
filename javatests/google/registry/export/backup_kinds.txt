@@ -14,7 +14,7 @@ HistoryEntry
 HostResource
 IcannReportField
 LogsExportCursor
-LrpToken
+LrpTokenEntity
 Modification
 OneTime
 PermissionGroup

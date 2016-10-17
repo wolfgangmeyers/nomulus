@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@ package google.registry.module.frontend;
 
 import dagger.Subcomponent;
 import domains.donuts.config.DonutsTlsCredentialsModule;
+import google.registry.dns.DnsModule;
 import google.registry.flows.CheckApiAction;
 import google.registry.flows.CheckApiAction.CheckApiModule;
 import google.registry.flows.EppConsoleAction;
@@ -48,6 +49,7 @@ import google.registry.whois.WhoisServer;
 @Subcomponent(
     modules = {
         CheckApiModule.class,
+        DnsModule.class,
         DonutsTlsCredentialsModule.class,
         RdapModule.class,
         RegistrarUserModule.class,

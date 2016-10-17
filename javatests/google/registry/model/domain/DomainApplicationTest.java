@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -120,8 +120,10 @@ public class DomainApplicationTest extends EntityTestCase {
     verifyIndexing(
         domainApplication,
         "allContacts.contactId.linked",
+        "allContacts.contact",
         "fullyQualifiedDomainName",
         "nameservers.linked",
+        "nsHosts",
         "deletionTime",
         "currentSponsorClientId",
         "tld");
