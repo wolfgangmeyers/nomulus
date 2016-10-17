@@ -337,12 +337,11 @@ public class CategorizedPremiumListTest {
   }
 
   @Test
-  public void testDeleteEntry_Valid() throws Exception {
-    /**
-     * Test method exercises the functionality of both 'deleteEntry' methods however it is using
-     * a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
-     * the new CategorizedListEntry objects in it
-     */
+  public void testDeleteEntry_Valid_UsingSld() throws Exception {
+
+     // Test method exercises the functionality of both 'deleteEntry' methods however it is using
+     // a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
+     // the new CategorizedListEntry objects in it
 
     final String mountain_sld = "mountain";
     final String road_sld = "road";
@@ -360,9 +359,6 @@ public class CategorizedPremiumListTest {
             bike_tld,
             mountain_sld);  // mountain.bike
 
-    // create a temporary entry to compare against
-    final CategorizedListEntry road_bike_entry = createEntry(road_sld, US_PRICE_CATEGORY);
-
     // Add more CategorizedListEntry objects into PremiumList
     final CategorizedPremiumList threeBicycles = bicyclePremiumList.asBuilder()
         .addEntry(road_sld, US_PRICE_CATEGORY) // road.bike
@@ -375,7 +371,7 @@ public class CategorizedPremiumListTest {
     // Delete the road bicycle
     CategorizedPremiumList twoBicycles =
         threeBicycles.asBuilder()
-            .deleteEntry(road_bike_entry)
+            .deleteEntry(road_sld)
             .build();
 
     // Verify that we have two bicycles left - Tandem, Mountain
@@ -388,7 +384,57 @@ public class CategorizedPremiumListTest {
   }
 
   @Test
-  public void testDeleteEntry_Valid_SLDAndPriceCategory() throws Exception {
+  public void testDeleteEntry_Valid_UsingCategorizedListEntry() throws Exception {
+
+     // Test method exercises the functionality of both 'deleteEntry' methods however it is using
+     // a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
+     // the new CategorizedListEntry objects in it
+
+    final String white_sld = "white";
+    final String red_sld = "red";
+    final String rose_sld = "rose";
+    final String wine_tld = "wine";
+
+
+    // create a pre-loaded premium list and then add an entry
+    final CategorizedPremiumList bicyclePremiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                FIVE_DAYS, pricingCategory_AA.getName(),
+                START_OF_TIME, pricingCategory_CCCC.getName(),
+                THREE_DAYS, pricingCategory_BB.getName()),
+            wine_tld,
+            white_sld);  // white.wine
+
+    // create a temporary entry to compare against
+    final CategorizedListEntry entry = createEntry(red_sld, US_PRICE_CATEGORY);
+
+    // Add more CategorizedListEntry objects into PremiumList
+    final CategorizedPremiumList threeWines = bicyclePremiumList.asBuilder()
+        .addEntry(red_sld, US_PRICE_CATEGORY) // red.wine
+        .addEntry(rose_sld, US_PRICE_CATEGORY) // rose.wine
+        .build();
+
+    // Should now have two entries in map
+    assertThat(threeWines.getPremiumListEntries().size()).isEqualTo(3);
+
+    // Delete the road bicycle
+    CategorizedPremiumList twoWines =
+        threeWines.asBuilder()
+            .deleteEntry(entry)
+            .build();
+
+    // Verify that we have two bicycles left - Tandem, Mountain
+    assertThat(twoWines.getPremiumListEntries().size()).isEqualTo(2);
+
+    assertThat(twoWines.getPremiumListEntries().get(rose_sld))
+        .isEquivalentAccordingToCompareTo(createEntry(rose_sld, US_PRICE_CATEGORY));
+
+    assertThat(twoWines.getPremiumListEntries().containsKey(white_sld)).isTrue();
+  }
+
+  @Test
+  public void testDeleteEntry_Valid_SldAndPriceCategory() throws Exception {
     /**
      * Test method exercises the functionality of both 'deleteEntry' methods however it is using
      * a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
@@ -410,9 +456,6 @@ public class CategorizedPremiumListTest {
                 THREE_DAYS, pricingCategory_BB.getName()),
             school_tld,
             elementary_sld);  // elementary.school
-
-    // create a temporary entry to compare against
-    final CategorizedListEntry middle_school_entry = createEntry(middle_sld, US_PRICE_CATEGORY);
 
     // Add more CategorizedListEntry objects into PremiumList
     final CategorizedPremiumList threeSchools = bicyclePremiumList.asBuilder()
