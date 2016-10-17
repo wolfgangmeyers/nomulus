@@ -41,7 +41,6 @@ public class CategorizedPremiumListTest {
   private static final String LABEL_TWO = "label_two";
   private static final String TLD_ONE = "tld_one";
   private static final String TLD_TWO = "tld_two";
-  private static final String FUTURE_CATEGORY = "fc";
 
   private final DateTime THREE_DAYS = DateTime.now().plusDays(3);
   private final DateTime FIVE_DAYS = DateTime.now().plusDays(5);
@@ -166,104 +165,6 @@ public class CategorizedPremiumListTest {
         .isEqualTo(premiumList.getPremiumListEntries().size() + 1);
   }
 
-  @Ignore
-  @Test
-  public void testUpdateFutureTransition_Valid() throws Exception {
-    final String sld3 = "sld3";
-    final String tld3 = "tld3";
-    final String fqdn3 = sld3 + "." + tld3;
-
-    // Need to create a temporary TLD in order to get past .build()
-    // and then delete prior to calling .run()
-    TldCreator.build(sld3, tld3);
-    final PricingCategory pc = TldCreator.getPricingCategory();
-
-    // Validate data
-//    CategorizedPremiumList result = CategorizedPremiumList.updatePremiumList2(
-//        TLD_ONE, LABEL_ONE, FUTURE_DATE, FUTURE_CATEGORY);
-//    assertThat(result).isEqualTo(CategorizedPremiumList.class);
-  }
-
-  @Ignore
-  @Test
-  public void testDeletePremiumListEntry_Valid() throws Exception {
-//    final String sld3 = "sld3";
-//    final String tld3 = "tld3";
-//
-//    // Need to create a temporary TLD and then delete
-//    TldCreator.build(sld3, tld3);
-//
-//    // Validate data
-//    CategorizedPremiumList result = CategorizedPremiumList.deletePremiumListEntry(
-//        tld3, sld3);
-//    assertThat(result.getPremiumListEntries()).hasSize(0);
-  }
-
-  @Ignore
-  @Test
-  public void testDeletePremiumListEntry_Invalid_TldDoesNotExist() throws Exception {
-//    final String sld3 = "sld3";
-//    final String tld3 = "invalid";
-//
-//    thrown.expect(IllegalStateException.class, "Unable to find CategorizedPremiumList for invalid");
-//    CategorizedPremiumList.deletePremiumListEntry(tld3, sld3);
-  }
-
-  @Ignore
-  @Test
-  public void testGetCategorizedPremiumList_Valid() throws Exception {
-//      CategorizedPremiumList result =
-//          CategorizedPremiumList.getCategorizedPremiumList(TLD_ONE);
-//    assertThat(result).isNotNull();
-  }
-
-  @Ignore
-  @Test
-  public void testGetCategorizedPremiumList_Invalid_UnableToFindList() throws Exception {
-//    final String sld2 = "sld2";
-//    final String tld2 = "tld2";
-//    final String fqdn2 = sld2 + "." + tld2;
-//
-//    // Need to create a temporary TLD in order to get past .build()
-//    // and then delete prior to calling .run()
-//    // Create second TLD and
-//    TldCreator.build(sld2, tld2);
-//
-//    // Remove from data store prior to calling result.run()
-//    ofy().transact(new VoidWork() {
-//      @Override
-//      public void vrun() {
-//        ofy().delete().entity(CategorizedPremiumList.get(tld2).get()).now();
-//      }
-//    });
-//
-//    // Invoke the 'deleteCategorizedListEntries()' which will throw IllegalStateException
-//    thrown.expect(IllegalStateException.class,
-//        "Unable to find CategorizedPremiumList for " + tld2);
-//
-//    CategorizedPremiumList result =
-//        CategorizedPremiumList.getCategorizedPremiumList(TLD_TWO);
-  }
-
-  @Ignore
-  @Test
-  public void testSavePremiumList() throws Exception {
-    final String sld = "sld8";
-    final CategorizedListEntry entry =
-        createEntry(sld, US_PRICE_CATEGORY);
-
-    // Create a new ImmutableMap based upon the SLD and PricingCategory
-    final ImmutableMap<String, CategorizedListEntry> newEntries =
-        ImmutableMap.<String, CategorizedListEntry>builder()
-            .put(sld, entry)
-            .build();
-
-//    CategorizedPremiumList result =
-//        CategorizedPremiumList.savePremiumList(TLD_ONE, newEntries);
-//    assertThat(result.getPremiumListEntries().get(sld)).isNotNull();
-  }
-
-
   @Test
   public void testAddEntry_Valid() throws Exception {
     /**
@@ -298,11 +199,9 @@ public class CategorizedPremiumListTest {
 
   @Test
   public void testAddEntry_Valid_ExistingPremiumList() {
-    /**
-     * Test method exercises the functionality of both 'addEntry' methods however it is using
-     * a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
-     * the new CategorizedListEntry objects in it
-     */
+     // Test method exercises the functionality of both 'addEntry' methods however it is using
+     // a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
+     // the new CategorizedListEntry objects in it
 
     final String washington_sld = "washington";
     final String oregon_sld = "oregon";
@@ -321,10 +220,7 @@ public class CategorizedPremiumListTest {
     // create a temporary entry to compare against
     final CategorizedListEntry oregon_entry = createEntry(oregon_sld, US_PRICE_CATEGORY);
 
-    // TODO: Use Builder - > get a pre-loaded PremiumList
-
     final CategorizedPremiumList result = preloadedPremiumList.asBuilder()
-        //.addEntry(washington_doctor_entry) // washington.doctor
         .addEntry(oregon_sld, US_PRICE_CATEGORY) // oregon.doctor
         .build();
 
@@ -381,104 +277,6 @@ public class CategorizedPremiumListTest {
         .isEquivalentAccordingToCompareTo(createEntry(tandem_sld, US_PRICE_CATEGORY));
 
     assertThat(twoBicycles.getPremiumListEntries().containsKey(mountain_sld)).isTrue();
-  }
-
-  @Test
-  public void testDeleteEntry_Valid_UsingCategorizedListEntry() throws Exception {
-
-     // Test method exercises the functionality of both 'deleteEntry' methods however it is using
-     // a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
-     // the new CategorizedListEntry objects in it
-
-    final String white_sld = "white";
-    final String red_sld = "red";
-    final String rose_sld = "rose";
-    final String wine_tld = "wine";
-
-
-    // create a pre-loaded premium list and then add an entry
-    final CategorizedPremiumList bicyclePremiumList =
-        persistCategorizedPremiumList(
-            ImmutableSortedMap.of(
-                FIVE_DAYS, pricingCategory_AA.getName(),
-                START_OF_TIME, pricingCategory_CCCC.getName(),
-                THREE_DAYS, pricingCategory_BB.getName()),
-            wine_tld,
-            white_sld);  // white.wine
-
-    // create a temporary entry to compare against
-    final CategorizedListEntry entry = createEntry(red_sld, US_PRICE_CATEGORY);
-
-    // Add more CategorizedListEntry objects into PremiumList
-    final CategorizedPremiumList threeWines = bicyclePremiumList.asBuilder()
-        .addEntry(red_sld, US_PRICE_CATEGORY) // red.wine
-        .addEntry(rose_sld, US_PRICE_CATEGORY) // rose.wine
-        .build();
-
-    // Should now have two entries in map
-    assertThat(threeWines.getPremiumListEntries().size()).isEqualTo(3);
-
-    // Delete the road bicycle
-    CategorizedPremiumList twoWines =
-        threeWines.asBuilder()
-            .deleteEntry(entry)
-            .build();
-
-    // Verify that we have two bicycles left - Tandem, Mountain
-    assertThat(twoWines.getPremiumListEntries().size()).isEqualTo(2);
-
-    assertThat(twoWines.getPremiumListEntries().get(rose_sld))
-        .isEquivalentAccordingToCompareTo(createEntry(rose_sld, US_PRICE_CATEGORY));
-
-    assertThat(twoWines.getPremiumListEntries().containsKey(white_sld)).isTrue();
-  }
-
-  @Test
-  public void testDeleteEntry_Valid_SldAndPriceCategory() throws Exception {
-    /**
-     * Test method exercises the functionality of both 'deleteEntry' methods however it is using
-     * a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
-     * the new CategorizedListEntry objects in it
-     */
-
-    final String elementary_sld = "elementary";
-    final String middle_sld = "middle";
-    final String senior_high_sld = "senior-high";
-    final String school_tld = "school";
-
-
-    // create a pre-loaded premium list and then add an entry
-    final CategorizedPremiumList bicyclePremiumList =
-        persistCategorizedPremiumList(
-            ImmutableSortedMap.of(
-                FIVE_DAYS, pricingCategory_AA.getName(),
-                START_OF_TIME, pricingCategory_CCCC.getName(),
-                THREE_DAYS, pricingCategory_BB.getName()),
-            school_tld,
-            elementary_sld);  // elementary.school
-
-    // Add more CategorizedListEntry objects into PremiumList
-    final CategorizedPremiumList threeSchools = bicyclePremiumList.asBuilder()
-        .addEntry(middle_sld, US_PRICE_CATEGORY) // middle.school
-        .addEntry(senior_high_sld, US_PRICE_CATEGORY) // senior-high.school
-        .build();
-
-    // Should now have two entries in map
-    assertThat(threeSchools.getPremiumListEntries().size()).isEqualTo(3);
-
-    // Delete the middle school by using the SLD and PriceCategory
-    CategorizedPremiumList twoSchools =
-        threeSchools.asBuilder()
-            .deleteEntry(middle_sld, US_PRICE_CATEGORY)
-            .build();
-
-    // Verify that we have two bicycles left - Tandem, Mountain
-    assertThat(twoSchools.getPremiumListEntries().size()).isEqualTo(2);
-
-    assertThat(twoSchools.getPremiumListEntries().get(senior_high_sld))
-        .isEquivalentAccordingToCompareTo(createEntry(senior_high_sld, US_PRICE_CATEGORY));
-
-    assertThat(twoSchools.getPremiumListEntries().containsKey(elementary_sld)).isTrue();
   }
 
   /**
