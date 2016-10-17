@@ -21,8 +21,8 @@ import google.registry.testing.ExceptionRule;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Rule;
 import org.junit.Test;
 
@@ -42,9 +42,15 @@ public class CategorizedPremiumListTest {
   private static final String TLD_ONE = "tld_one";
   private static final String TLD_TWO = "tld_two";
 
-  private final DateTime THREE_DAYS = DateTime.now().plusDays(3);
-  private final DateTime FIVE_DAYS = DateTime.now().plusDays(5);
-  private final DateTime FUTURE_DATE = new DateTime().plusDays(5);
+  // Create three future dates
+  private final DateTime THREE_DAYS_UTC = DateTime.now()
+      .withTimeAtStartOfDay()
+      .plusDays(3)
+      .toDateTime(DateTimeZone.UTC);
+  private final DateTime FIVE_DAYS_UTC = DateTime.now()
+      .withTimeAtStartOfDay()
+      .plusDays(5)
+      .toDateTime(DateTimeZone.UTC);
 
   @Rule public final ExceptionRule thrown = new ExceptionRule();
   @Rule public final AppEngineRule appEngine = AppEngineRule.builder().withDatastore().build();
@@ -76,7 +82,7 @@ public class CategorizedPremiumListTest {
     premiumList =
         persistCategorizedPremiumList(
             ImmutableSortedMap.of(
-                FIVE_DAYS, pc.getName(), START_OF_TIME, pc2.getName(), THREE_DAYS, pc3.getName()),
+                FIVE_DAYS_UTC, pc.getName(), START_OF_TIME, pc2.getName(), THREE_DAYS_UTC, pc3.getName()),
             TLD_ONE,
             LABEL_ONE);
 
@@ -112,7 +118,7 @@ public class CategorizedPremiumListTest {
     DateTime nextTransitionDateTime = entry.getNextTransitionDateTime();
     PricingCategory futurePriceCategory = entry.getValueAtTime(nextTransitionDateTime);
 
-    assertThat(nextTransitionDateTime).isEqualTo(THREE_DAYS);
+    assertThat(nextTransitionDateTime).isEqualTo(THREE_DAYS_UTC);
     assertThat(futurePriceCategory.getName()).isEqualTo(JAPANESE_PRICE_CATEGORY);
     assertThat(futurePriceCategory.getPrice().toString()).isEqualTo(JAPANESE_PRICE);
   }
@@ -211,9 +217,9 @@ public class CategorizedPremiumListTest {
     final CategorizedPremiumList preloadedPremiumList =
         persistCategorizedPremiumList(
             ImmutableSortedMap.of(
-                FIVE_DAYS, pricingCategory_AA.getName(),
+                FIVE_DAYS_UTC, pricingCategory_AA.getName(),
                 START_OF_TIME, pricingCategory_CCCC.getName(),
-                THREE_DAYS, pricingCategory_BB.getName()),
+                THREE_DAYS_UTC, pricingCategory_BB.getName()),
             doctor_tld,
             washington_sld);
 
@@ -249,9 +255,9 @@ public class CategorizedPremiumListTest {
     final CategorizedPremiumList bicyclePremiumList =
         persistCategorizedPremiumList(
             ImmutableSortedMap.of(
-                FIVE_DAYS, pricingCategory_AA.getName(),
+                FIVE_DAYS_UTC, pricingCategory_AA.getName(),
                 START_OF_TIME, pricingCategory_CCCC.getName(),
-                THREE_DAYS, pricingCategory_BB.getName()),
+                THREE_DAYS_UTC, pricingCategory_BB.getName()),
             bike_tld,
             mountain_sld);  // mountain.bike
 
@@ -277,6 +283,55 @@ public class CategorizedPremiumListTest {
         .isEquivalentAccordingToCompareTo(createEntry(tandem_sld, US_PRICE_CATEGORY));
 
     assertThat(twoBicycles.getPremiumListEntries().containsKey(mountain_sld)).isTrue();
+  }
+
+  @Test
+  public void testUpdateEntry_Valid_NoFutureDateExists() throws Exception {
+
+    // TODO: Fill in a proper description here
+
+    final String kachess_sld = "kachess";
+    final String paradise_sld = "paradise";
+    final String longmire_sld = "longmire";
+    final String camp_tld = "camp";
+
+
+    // create a pre-loaded premium list and then add an entry
+    final CategorizedPremiumList campsPremiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                FIVE_DAYS_UTC, pricingCategory_AA.getName(),
+                START_OF_TIME, pricingCategory_CCCC.getName(),
+                THREE_DAYS_UTC, pricingCategory_BB.getName()),
+            camp_tld,
+            kachess_sld);  // kachess.camp
+
+    // Add more CategorizedListEntry objects into PremiumList
+    final CategorizedPremiumList threeCamps = campsPremiumList.asBuilder()
+        .addEntry(paradise_sld, pricingCategory_AA.getName()) // paradise.camp
+        .addEntry(longmire_sld, pricingCategory_BB.getName()) // longmire.camp
+        .build();
+
+    // Should now have two entries in map
+    assertThat(threeCamps.getPremiumListEntries().size()).isEqualTo(3);
+
+    // Delete the road bicycle
+    CategorizedPremiumList twoCamps =
+        threeCamps.asBuilder()
+            .updateEntry(
+                paradise_sld, // Paradise only has one transition date (START_OF_TIME)
+                pricingCategory_AA.getName(),
+                pricingCategory_AA_Plus.getName(),
+                FIVE_DAYS_UTC)
+            .build();
+
+    // Verify that we have two bicycles left - Tandem, Mountain
+    assertThat(twoCamps.getPremiumListEntries().size()).isEqualTo(2);
+
+    assertThat(twoCamps.getPremiumListEntries().get(longmire_sld))
+        .isEquivalentAccordingToCompareTo(createEntry(longmire_sld, US_PRICE_CATEGORY));
+
+    assertThat(twoCamps.getPremiumListEntries().containsKey(kachess_sld)).isTrue();
   }
 
   /**

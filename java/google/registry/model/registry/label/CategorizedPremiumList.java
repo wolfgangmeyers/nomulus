@@ -380,6 +380,62 @@ public class CategorizedPremiumList
       return setPremiumListMap(ImmutableMap.copyOf(newEntries));
     }
 
+    /**
+     * Method updates a CategorizedListEntry from the PremiumListMap based upon the second
+     * level domain
+     * @param sld a string value representing a second level domain
+     * @return a Builder object
+     */
+    public Builder updateEntry(final String sld,
+                               final String priceCategory,
+                               final String futureCategory,
+                               final DateTime effectiveDate) {
+
+      // Determines if we have a list of PremiumListEntries or not and if
+      // not creates an ImmutableMap
+      final Map<String, CategorizedListEntry> existingEntries =
+          (getInstance().getPremiumListEntries() != null)
+              ? getInstance().getPremiumListEntries()
+              : ImmutableMap.<String, CategorizedListEntry>of();
+
+      // Get a modifiable map so we can remove the sld
+      final Map<String, CategorizedListEntry> premiumListEntries =
+          Maps.newHashMap(existingEntries);
+      checkState(premiumListEntries.containsKey(sld), "Unable to find entry for %s", sld);
+
+      final CategorizedListEntry oldEntry = premiumListEntries.get(sld);
+
+      CategorizedListEntry updatedEntry=null;
+
+      // Determine if we only have a transition of START_OF_TIME
+      if(oldEntry.getNextTransitionDateTime() == null) {
+        updatedEntry = oldEntry.asBuilder()
+            .setPricingCategoryTransitions(ImmutableSortedMap.of(
+                START_OF_TIME, oldEntry.getValueAtTime(START_OF_TIME).getName(),
+                effectiveDate, futureCategory)).build();
+        int x = 1;
+      } else {
+        //oldEntry.getNextTransitionDateTime()
+      }
+
+//      final CategorizedListEntry updatedEntry = oldEntry.asBuilder()
+//          .setPricingCategoryTransitions(ImmutableSortedMap.of(
+//              START_OF_TIME, oldEntry.getValueAtTime(START_OF_TIME).getName(),
+//              effectiveDate, futureCategory)).build();
+
+      // Remove the existing entry
+      premiumListEntries.remove(sld);
+      premiumListEntries.put(sld, updatedEntry);
+
+      int x = 1;
+//      cpl.asBuilder()
+//          .setPremiumListMap(
+//              ImmutableMap.copyOf(premiumListEntries))
+//          .build()
+//          .saveAndUpdateEntries();
+      return null;
+    }
+
     @Override
     public CategorizedPremiumList build() {
       final CategorizedPremiumList instance = getInstance();
