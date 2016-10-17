@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,9 +16,7 @@ package google.registry.model;
 
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
-
 import com.googlecode.objectify.Key;
-
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.RegistrarBillingEntry;
 import google.registry.model.billing.RegistrarCredit;
@@ -30,7 +28,7 @@ import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.DomainResource;
-import google.registry.model.domain.LrpToken;
+import google.registry.model.domain.LrpTokenEntity;
 import google.registry.model.export.LogsExportCursor;
 import google.registry.model.host.HostResource;
 import google.registry.model.icann.IcannReportField;
@@ -65,15 +63,11 @@ import google.registry.model.tmch.ClaimsListShard.ClaimsListSingleton;
 import google.registry.model.tmch.TmchCrl;
 import google.registry.model.user.User;
 
-/**
- * Sets of classes of the Objectify-registered entities in use throughout the model.
- */
+/** Sets of classes of the Objectify-registered entities in use throughout the model. */
 public final class EntityClasses {
 
-  /**
-   * Set of entity classes.
-   */
-  @SuppressWarnings("unchecked")  // varargs
+  /** Set of entity classes. */
+  @SuppressWarnings("unchecked") // varargs
   public static final ImmutableSet<Class<? extends ImmutableObject>> ALL_CLASSES =
       ImmutableSet.<Class<? extends ImmutableObject>>of(
           BasePremiumList.PremiumListRevision.class,
@@ -109,7 +103,7 @@ public final class EntityClasses {
           IcannReportField.class,
           Lock.class,
           LogsExportCursor.class,
-          LrpToken.class,
+          LrpTokenEntity.class,
           PermissionGroup.class,
           PollMessage.class,
           PollMessage.Autorenew.class,
@@ -146,6 +140,5 @@ public final class EntityClasses {
         }
       };
 
-  private EntityClasses() {
-  }
+  private EntityClasses() {}
 }

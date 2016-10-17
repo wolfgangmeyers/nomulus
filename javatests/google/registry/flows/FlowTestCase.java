@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -47,6 +47,7 @@ import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.tmch.ClaimsListShard.ClaimsListSingleton;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.EppLoader;
+import google.registry.testing.ExceptionRule;
 import google.registry.testing.FakeClock;
 import google.registry.testing.FakeHttpSession;
 import google.registry.testing.InjectRule;
@@ -81,6 +82,9 @@ public abstract class FlowTestCase<F extends Flow> extends ShardableTestCase {
       .withDatastore()
       .withTaskQueue()
       .build();
+
+  @Rule
+  public final ExceptionRule thrown = new ExceptionRule();
 
   @Rule
   public final InjectRule inject = new InjectRule();

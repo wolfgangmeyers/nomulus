@@ -72,17 +72,6 @@
     <url-pattern>/_dr/task/resaveAllEppResources</url-pattern>
   </servlet-mapping>
 
-  <!--  Mapreduce to count recurring billing events (to test the child entity reader). -->
-  <servlet-mapping>
-    <servlet-name>tools-servlet</servlet-name>
-    <url-pattern>/_dr/task/countRecurringBillingEvents</url-pattern>
-  </servlet-mapping>
-
-  <!--  Mapreduce to backfill new autorenew flag on recurring billing events. -->
-  <servlet-mapping>
-    <servlet-name>tools-servlet</servlet-name>
-    <url-pattern>/_dr/task/backfillAutorenewBillingFlag</url-pattern>
-  </servlet-mapping>
 
   <!-- Mapreduce to delete EppResources, children, and indices. -->
   <servlet-mapping>
@@ -142,7 +131,7 @@
         Any request path starting with `/_dr/` will be restricted to requests originating
         from the backend or by anyone authenticated to a Google account that's listed in
         the AppEngine control panel settings for this project as a Viewer/Owner/Developer.
-        The `_dr` is short for Domain Registry to follow AppEngine naming conventions.
+        The `_dr` is short for domain registry to follow AppEngine naming conventions.
       </description>
       <url-pattern>/_dr/*</url-pattern>
     </web-resource-collection>

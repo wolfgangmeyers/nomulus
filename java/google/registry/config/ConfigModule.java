@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -34,13 +34,13 @@ import dagger.Provides;
 import static google.registry.config.ConfigUtils.makeUrl;
 
 /**
- * Configuration example for the Domain Registry codebase.
+ * Configuration example for the Nomulus codebase.
  *
- * <p>The Domain Registry codebase contains many classes that inject configurable settings. This is
+ * <p>The Nomulus codebase contains many classes that inject configurable settings. This is
  * the centralized class that is used by default to configure them all, in hard-coded type-safe
  * Java code.
  *
- * <p>This class does not represent the total configuration of the Domain Registry service. It's
+ * <p>This class does not represent the total configuration of the Nomulus service. It's
  * <b>only meant for settings that need to be configured <i>once</i></b>. Settings which may
  * be subject to change in the future, should instead be retrieved from Datastore. The
  * {@link google.registry.model.registry.Registry Registry} class is one such example of this.
@@ -114,14 +114,46 @@ public final class ConfigModule {
   @Provides
   @Config("productName")
   public static String provideProductName(RegistryEnvironment environment) {
-    switch (environment) {
-      case UNITTEST:
-      case LOCAL:
-        return "Domain Registry";
-      default:
-        // Change this to the name of your product.
-        return "Google Registry";
-    }
+    return "Nomulus";
+  }
+
+  /**
+   * The e-mail address for questions about integrating with the registry.  Used in the
+   * "contact-us" section of the registrar console.
+   */
+  @Provides
+  @Config("integrationEmail")
+  public static String provideIntegrationEmail(RegistryEnvironment environment) {
+    return "integration@example.com";
+  }
+
+  /**
+   * The e-mail address for general support.  Used in the "contact-us" section of the registrar
+   * console.
+   */
+  @Provides
+  @Config("supportEmail")
+  public static String provideSupportEmail(RegistryEnvironment environment) {
+    return "support@example.com";
+  }
+
+  /**
+   * The "From" e-mail address for announcements.  Used in the "contact-us" section of the
+   * registrar console.
+   */
+  @Provides
+  @Config("announcementsEmail")
+  public static String provideAnnouncementsEmail(RegistryEnvironment environment) {
+    return "announcements@example.com";
+  }
+
+  /**
+   * The contact phone number.  Used in the "contact-us" section of the registrar console.
+   */
+  @Provides
+  @Config("supportPhoneNumber")
+  public static String provideSupportPhoneNumber(RegistryEnvironment environment) {
+    return "+1 (888) 555 0123";
   }
 
   /** @see RegistryConfig#getZoneFilesBucket() */
@@ -631,7 +663,7 @@ public final class ConfigModule {
       case PRODUCTION:
         return "6gm2mm48k9ty4zmx";
       default:
-        // Valentine: Domain Registry Braintree Sandbox
+        // Valentine: Nomulus Braintree Sandbox
         return "vqgn8khkq2cs6y9s";
     }
   }
@@ -650,7 +682,7 @@ public final class ConfigModule {
       case PRODUCTION:
         return "tzcfxggzgbh2jg5x";
       default:
-        // Valentine: Domain Registry Braintree Sandbox
+        // Valentine: Nomulus Braintree Sandbox
         return "tzcyzvm3mn7zkdnx";
     }
   }

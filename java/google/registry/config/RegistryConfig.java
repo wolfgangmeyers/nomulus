@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -21,7 +21,7 @@ import java.net.URL;
 import org.joda.time.Duration;
 
 /**
- * Domain Registry configuration for global constants that can't be injected.
+ * Registry configuration for global constants that can't be injected.
  *
  * <p>The goal of this custom configuration system is to have our project environments configured
  * in type-safe Java code that can be refactored, rather than XML files and system properties.
@@ -109,7 +109,7 @@ public interface RegistryConfig {
   public Optional<String> getECatcherAddress();
 
   /**
-   * Returns the address of the Domain Registry app HTTP server.
+   * Returns the address of the Nomulus app HTTP server.
    *
    * <p>This is used by the {@code nomulus} tool to connect to the App Engine remote API.
    */
@@ -137,7 +137,7 @@ public interface RegistryConfig {
   public String getReservedTermsExportDisclaimer();
 
   /**
-   * Returns a display name that is used on outgoing emails sent by Domain Registry.
+   * Returns a display name that is used on outgoing emails sent by Nomulus.
    *
    * @see google.registry.util.SendEmailUtils
    */

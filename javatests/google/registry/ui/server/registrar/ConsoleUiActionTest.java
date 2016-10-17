@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -51,7 +51,11 @@ public class ConsoleUiActionTest {
   public void setUp() throws Exception {
     action.enabled = true;
     action.logoFilename = "logo.png";
-    action.productName = "Domain Registry";
+    action.productName = "Nomulus";
+    action.integrationEmail = "integration@example.com";
+    action.supportEmail = "support@example.com";
+    action.announcementsEmail = "announcements@example.com";
+    action.supportPhoneNumber = "1 (888) 555 0123";
     action.response = response;
     action.sessionUtils = sessionUtils;
     action.userService = UserServiceFactory.getUserService();

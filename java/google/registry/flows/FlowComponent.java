@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ import dagger.Module;
 import dagger.Provides;
 import dagger.Subcomponent;
 import google.registry.config.ConfigModule;
+import google.registry.dns.DnsModule;
 import google.registry.flows.async.AsyncFlowsModule;
 import google.registry.flows.contact.ContactCheckFlow;
 import google.registry.flows.contact.ContactCreateFlow;
@@ -65,6 +66,7 @@ import google.registry.util.SystemSleeper.SystemSleeperModule;
 @Subcomponent(modules = {
     AsyncFlowsModule.class,
     ConfigModule.class,
+    DnsModule.class,
     FlowModule.class,
     FlowComponent.FlowComponentModule.class,
     SystemSleeperModule.class})

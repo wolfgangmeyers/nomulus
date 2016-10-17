@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -57,7 +57,7 @@ public class ToolsServerModule {
   }
 
   @Provides
-  @Parameter("name")
+  @Parameter("premiumListName")
   static String provideName(HttpServletRequest req) {
     return extractRequiredParameter(req, CreatePremiumListAction.NAME_PARAM);
   }

@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -23,7 +23,7 @@ import java.net.URL;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 
-/** Lightweight HTTP server for testing the Domain Registry Admin and Registrar consoles. */
+/** Lightweight HTTP server for testing the Nomulus Admin and Registrar consoles. */
 public final class RegistryTestServer {
 
   public static final ImmutableMap<String, Path> RUNFILES =

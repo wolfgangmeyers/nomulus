@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -37,7 +37,7 @@ import javax.servlet.http.HttpServletResponse;
 import org.joda.time.Duration;
 
 /**
- * Dagger request processor for Domain Registry.
+ * Dagger request processor for Nomulus.
  *
  * <p>This class creates an HTTP request processor from a Dagger component. It routes requests from
  * your servlet to an {@link Action @Action} annotated handler class.

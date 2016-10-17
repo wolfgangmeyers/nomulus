@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -69,7 +69,6 @@ public class FlowRunnerTest extends ShardableTestCase {
 
     final EppOutput eppOutput = mock(EppOutput.class);
     EppResponse eppResponse = mock(EppResponse.class);
-    when(eppResponse.getCreatedRepoId()).thenReturn("foo");
     when(eppResponse.getExecutionTime()).thenReturn(new DateTime(1337));
     when(eppOutput.getResponse()).thenReturn(eppResponse);
 

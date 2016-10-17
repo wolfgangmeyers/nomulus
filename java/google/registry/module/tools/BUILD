@@ -18,6 +18,7 @@ java_library(
         "//third_party/java/servlet/servlet_api",
         "//java/domains/donuts/keyring",
         "//java/google/registry/config",
+        "//java/google/registry/dns",
         "//java/google/registry/export",
         "//java/google/registry/flows",
         "//java/google/registry/gcs",
