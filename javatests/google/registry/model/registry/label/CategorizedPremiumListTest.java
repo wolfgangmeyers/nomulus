@@ -430,6 +430,52 @@ public class CategorizedPremiumListTest {
   }
 
   @Test
+  public void testUpdateEntry_Valid_UnableToAddFutureDates() throws Exception {
+
+    // Test case verifies that by updating multiple times that the effective
+    // future date is being overwritten - and is not adding a new transition
+
+    final String california_sld = "california";
+    final String capital_tld = "capital";
+
+    final CategorizedPremiumList localPremiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                START_OF_TIME, pricingCategory_CCCC.getName()),
+            capital_tld,
+            california_sld);  // california.capital
+
+    // Purposely set the Effective Date to five days ahead in time
+    CategorizedPremiumList resultFiveDaysAhead =
+        localPremiumList.asBuilder()
+            .updateEntry(
+                california_sld,
+                pricingCategory_AA_Plus.getName(),
+                FIVE_DAYS_AHEAD_UTC)
+            .build();
+
+    // Verify that we have the new transition date
+    assertThat(resultFiveDaysAhead.getPremiumListEntries()
+        .get(california_sld).getNextTransitionDateTime())
+        .isEqualTo(FIVE_DAYS_AHEAD_UTC);
+
+
+    // Purposely set the Effective Date to six months ahead in time
+    CategorizedPremiumList resultSixMonthAhead =
+        localPremiumList.asBuilder()
+            .updateEntry(
+                california_sld,
+                pricingCategory_CCCC.getName(),
+                SIX_MONTHS_AHEAD_UTC)
+            .build();
+
+    // Verify that we have the new transition date
+    assertThat(resultSixMonthAhead.getPremiumListEntries()
+        .get(california_sld).getNextTransitionDateTime())
+        .isEqualTo(SIX_MONTHS_AHEAD_UTC);
+  }
+
+  @Test
   public void testDeleteEntry_Invalid_SldDoesNotExist() throws Exception {
 
     // Test case verifies if a second level domain does not exist
