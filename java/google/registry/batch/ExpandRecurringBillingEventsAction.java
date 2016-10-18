@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,6 +67,8 @@ import org.joda.time.DateTime;
  * {@code cursorTime}) represents the inclusive lower bound on the range of billing times that will
  * be expanded as a result of the job (the exclusive upper bound being the execution time of the
  * job).
+ *
+ * <p>NOTE: This is not yet production ready and not configured to run.
  */
 @Action(path = "/_dr/task/expandRecurringBillingEvents")
 public class ExpandRecurringBillingEventsAction implements Runnable {

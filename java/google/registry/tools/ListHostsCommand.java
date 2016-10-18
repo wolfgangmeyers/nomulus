@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,8 +17,8 @@ package google.registry.tools;
 import com.beust.jcommander.Parameters;
 import google.registry.tools.server.ListHostsAction;
 
-/** Command to list all HostResource entities associated with a TLD. */
-@Parameters(separators = " =", commandDescription = "List hosts associated with a TLD.")
+/** Command to list all HostResource entities in the system. */
+@Parameters(separators = " =", commandDescription = "List all hosts.")
 final class ListHostsCommand extends ListObjectsCommand {
 
   @Override

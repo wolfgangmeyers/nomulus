@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -103,7 +103,7 @@ import google.registry.model.billing.BillingEvent.Flag;
 import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
-import google.registry.model.domain.LrpToken;
+import google.registry.model.domain.LrpTokenEntity;
 import google.registry.model.domain.TestExtraLogicManager;
 import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.launch.ApplicationStatus;
@@ -823,7 +823,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
             "tld-reserved",
             "anchor,RESERVED_FOR_ANCHOR_TENANT,2fooBAR"))
         .build());
-    LrpToken token = persistResource(new LrpToken.Builder()
+    LrpTokenEntity token = persistResource(new LrpTokenEntity.Builder()
         .setToken("2fooBAR")
         .setAssignee("anchor.tld")
         .build());

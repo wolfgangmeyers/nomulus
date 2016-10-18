@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,9 +55,7 @@ registry.registrar.Dashboard.prototype.bindToDom = function(id) {
   goog.dom.removeChildren(goog.dom.getRequiredElement('reg-appbar'));
   goog.soy.renderElement(goog.dom.getElement('reg-content'),
                          registry.soy.registrar.console.dashboard,
-                         {
-                           productName: this.console.productName
-                         });
+                         this.console.params);
   goog.events.listen(goog.dom.getElement('rotate'),
                      goog.events.EventType.CLICK,
                      goog.bind(this.rotate_, this));

@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -55,7 +55,7 @@ import org.junit.Rule;
 
 /**
  * Base test class for mapreduces.  Adapted from EndToEndTestCase with some modifications that
- * allow it to work with the Domain Registry project, most notably inside knowledge of our
+ * allow it to work with the Nomulus project, most notably inside knowledge of our
  * routing paths and our Datastore/Task Queue configurations.
  *
  * <p>See https://github.com/GoogleCloudPlatform/appengine-mapreduce/blob/master/java/src/test/java/com/google/appengine/tools/mapreduce/EndToEndTestCase.java
@@ -156,10 +156,6 @@ public abstract class MapreduceTestCase<T> extends ShardableTestCase {
     } catch (NumberFormatException e) {
       return -1;
     }
-  }
-
-  protected void executeTasksUntilEmpty() throws Exception {
-    executeTasksUntilEmpty("default");
   }
 
   protected void executeTasksUntilEmpty(String queueName) throws Exception {

@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -31,7 +31,7 @@ public abstract class CreateOrUpdatePremiumListAction implements Runnable {
   public static final String INPUT_PARAM = "inputData";
 
   @Inject JsonResponse response;
-  @Inject @Parameter(NAME_PARAM) String name;
+  @Inject @Parameter("premiumListName") String name;
   @Inject @Parameter(INPUT_PARAM) String inputData;
 
   @Override

@@ -3,7 +3,11 @@ package google.registry.model.registry.label;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
-
+import google.registry.model.pricing.PricingCategory;
+import google.registry.model.registry.Registry;
+import google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry;
+import google.registry.testing.AppEngineRule;
+import google.registry.testing.ExceptionRule;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;

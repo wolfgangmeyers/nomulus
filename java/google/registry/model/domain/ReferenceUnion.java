@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -26,7 +26,9 @@ import google.registry.model.ImmutableObject;
  *
  * @param <T> the type being referenced
  */
+// TODO(b/28713909): Delete ReferenceUnion entirely.
 @Embed
+@Deprecated
 public class ReferenceUnion<T extends EppResource> extends ImmutableObject {
 
   @Index

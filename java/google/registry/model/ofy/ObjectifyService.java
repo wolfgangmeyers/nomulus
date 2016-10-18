@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -121,15 +121,15 @@ public class ObjectifyService {
   /** Register translators that allow less common types to be stored directly in Datastore. */
   private static void registerTranslators() {
     for (TranslatorFactory<?> translatorFactory : Arrays.asList(
-        new ReadableInstantUtcTranslatorFactory(),
         new CidrAddressBlockTranslatorFactory(),
+        new CommitLogRevisionsTranslatorFactory(),
+        new CreateAutoTimestampTranslatorFactory(),
         new CurrencyUnitTranslatorFactory(),
         new DurationTranslatorFactory(),
         new InetAddressTranslatorFactory(),
         new MoneyStringTranslatorFactory(),
-        new CreateAutoTimestampTranslatorFactory(),
-        new UpdateAutoTimestampTranslatorFactory(),
-        new CommitLogRevisionsTranslatorFactory())) {
+        new ReadableInstantUtcTranslatorFactory(),
+        new UpdateAutoTimestampTranslatorFactory())) {
       factory().getTranslators().add(translatorFactory);
     }
   }

@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -445,22 +445,5 @@ public class RegistryTest extends EntityTestCase {
     Registry.get("tld").asBuilder()
         .setEapFeeSchedule(ImmutableSortedMap.of(START_OF_TIME, Money.zero(EUR)))
         .build();
-  }
-
-  @Test
-  public void testFailure_lrpTldState_notInTransitions() {
-    Registry registry = Registry.get("tld").asBuilder()
-        .setTldStateTransitions(ImmutableSortedMap.<DateTime, TldState>naturalOrder()
-            .put(START_OF_TIME, TldState.PREDELEGATION)
-            .put(clock.nowUtc().plusMonths(1), TldState.SUNRISE)
-            .put(clock.nowUtc().plusMonths(3), TldState.LANDRUSH)
-            .put(clock.nowUtc().plusMonths(4), TldState.QUIET_PERIOD)
-            .put(clock.nowUtc().plusMonths(5), TldState.GENERAL_AVAILABILITY)
-            .build())
-        .build();
-    thrown.expect(
-        IllegalArgumentException.class,
-        "Cannot specify an LRP TLD state that is not part of the TLD state transitions.");
-    registry.asBuilder().setLrpTldStates(ImmutableSet.of(TldState.SUNRUSH)).build();
   }
 }

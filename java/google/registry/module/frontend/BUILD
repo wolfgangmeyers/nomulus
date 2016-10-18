@@ -20,6 +20,7 @@ java_library(
         "//java/domains/donuts/keyring",
         "//java/google/registry/braintree",
         "//java/google/registry/config",
+        "//java/google/registry/dns",
         "//java/google/registry/flows",
         "//java/google/registry/keyring/api",
         "//java/google/registry/monitoring/metrics",

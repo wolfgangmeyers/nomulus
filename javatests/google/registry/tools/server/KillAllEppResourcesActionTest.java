@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -120,7 +120,8 @@ public class KillAllEppResourcesActionTest extends MapreduceTestCase<KillAllEppR
               .setEventTime(START_OF_TIME)
               .setClientId("")
               .setTargetId("")
-              .setReason(Reason.ERROR)
+              .setReason(Reason.CREATE)
+              .setPeriodYears(1)
               .setCost(Money.of(CurrencyUnit.USD, 1))
               .build(),
           new BillingEvent.Recurring.Builder()
@@ -128,7 +129,7 @@ public class KillAllEppResourcesActionTest extends MapreduceTestCase<KillAllEppR
               .setEventTime(START_OF_TIME)
               .setClientId("")
               .setTargetId("")
-              .setReason(Reason.ERROR)
+              .setReason(Reason.AUTO_RENEW)
               .build())) {
         persistResource(descendant);
       }

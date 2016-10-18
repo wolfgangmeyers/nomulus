@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,10 @@
 
 package google.registry.dns;
 
+import static com.google.appengine.api.taskqueue.QueueFactory.getQueue;
 import static com.google.common.collect.Lists.transform;
 import static google.registry.dns.DnsConstants.DNS_PUBLISH_PUSH_QUEUE_NAME;
+import static google.registry.dns.DnsConstants.DNS_PULL_QUEUE_NAME;
 import static google.registry.dns.DnsConstants.DNS_TARGET_NAME_PARAM;
 import static google.registry.dns.DnsConstants.DNS_TARGET_TYPE_PARAM;
 import static google.registry.request.RequestParameters.PARAM_TLD;
@@ -84,13 +86,14 @@ public class ReadDnsQueueActionTest {
     clock.setTo(DateTime.now(DateTimeZone.UTC));
     createTlds("com", "net", "example");
     persistResource(Registry.get("example").asBuilder().setTldType(TldType.TEST).build());
-    dnsQueue = DnsQueue.create();
-    dnsQueue.writeLockTimeout = Duration.standardSeconds(10);
+    dnsQueue = new DnsQueue();
+    dnsQueue.queue = getQueue(DNS_PULL_QUEUE_NAME);
   }
 
   private void run(boolean keepTasks) throws Exception {
     ReadDnsQueueAction action = new ReadDnsQueueAction();
     action.tldUpdateBatchSize = TEST_TLD_UPDATE_BATCH_SIZE;
+    action.writeLockTimeout = Duration.standardSeconds(10);
     action.dnsQueue = dnsQueue;
     action.dnsPublishPushQueue = QueueFactory.getQueue(DNS_PUBLISH_PUSH_QUEUE_NAME);
     action.taskEnqueuer = new TaskEnqueuer(new Retrier(null, 1));

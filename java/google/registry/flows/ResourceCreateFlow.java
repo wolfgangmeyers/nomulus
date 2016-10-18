@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -86,11 +86,6 @@ public abstract class ResourceCreateFlow
     }
     ofy().save().entity(EppResourceIndex.create(Key.create(newResource)));
     modifyCreateRelatedResources();
-  }
-
-  @Override
-  protected final String getCreatedRepoId() {
-    return newResource.getRepoId();
   }
 
   /** Modify any other resources that need to be informed of this create. */

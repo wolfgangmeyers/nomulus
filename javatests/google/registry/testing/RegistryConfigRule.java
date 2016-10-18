@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -22,7 +22,7 @@ import google.registry.config.RegistryEnvironment;
 import google.registry.config.TestRegistryConfig;
 import org.junit.rules.ExternalResource;
 
-/** JUnit Rule for overriding Domain Registry configuration values. */
+/** JUnit Rule for overriding Nomulus configuration values. */
 public final class RegistryConfigRule extends ExternalResource {
 
   private final Optional<RegistryConfig> override;

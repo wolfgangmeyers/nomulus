@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,16 +30,11 @@ import google.registry.flows.session.LoginFlow.TooManyFailedLoginsException;
 import google.registry.flows.session.LoginFlow.UnsupportedLanguageException;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.Registrar.State;
-import google.registry.testing.ExceptionRule;
 import org.junit.Before;
-import org.junit.Rule;
 import org.junit.Test;
 
 /** Unit tests for {@link LoginFlow}. */
 public abstract class LoginFlowTestCase extends FlowTestCase<LoginFlow> {
-
-  @Rule
-  public final ExceptionRule thrown = new ExceptionRule();
 
   Registrar registrar;
   Registrar.Builder registrarBuilder;

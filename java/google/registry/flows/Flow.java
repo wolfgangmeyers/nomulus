@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -58,14 +58,6 @@ public abstract class Flow {
 
   /** Execute the business logic for this flow. */
   protected abstract EppOutput run() throws EppException;
-
-  /**
-   * Subclasses that create a resource should override this to return the repoId of the new
-   * resource.
-   */
-  protected String getCreatedRepoId() {
-    return null;
-  }
 
   protected String getClientId() {
     return sessionMetadata.getClientId();

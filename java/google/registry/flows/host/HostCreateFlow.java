@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -74,6 +74,7 @@ public final class HostCreateFlow extends LoggedInFlow implements TransactionalF
   @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
   @Inject HistoryEntry.Builder historyBuilder;
+  @Inject DnsQueue dnsQueue;
   @Inject HostCreateFlow() {}
 
   @Override
@@ -126,7 +127,7 @@ public final class HostCreateFlow extends LoggedInFlow implements TransactionalF
               .build());
       // Only update DNS if this is a subordinate host. External hosts have no glue to write, so
       // they are only written as NS records from the referencing domain.
-      DnsQueue.create().addHostRefreshTask(targetId);
+      dnsQueue.addHostRefreshTask(targetId);
     }
     ofy().save().entities(entitiesToSave);
     return createOutput(SUCCESS, HostCreateData.create(targetId, now));

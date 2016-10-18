@@ -1,4 +1,4 @@
-// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+// Copyright 2016 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -229,8 +229,6 @@ public final class Modules {
           .setJsonFactory(googleCredential.getJsonFactory())
           .setServiceAccountId(googleCredential.getServiceAccountId())
           .setServiceAccountPrivateKey(googleCredential.getServiceAccountPrivateKey())
-          // TODO(b/31317128): Also set serviceAccountProjectId from value off googleCredential when
-          // that functionality is publicly released.
           // Set the scopes to empty because the default value is null, which throws an NPE in the
           // GoogleCredential constructor.  We don't yet know the actual scopes to use here, and it
           // is thus the responsibility of every user of a delegated admin credential to call
