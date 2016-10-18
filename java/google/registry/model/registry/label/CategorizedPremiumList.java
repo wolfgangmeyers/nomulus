@@ -19,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.VoidWork;
 import com.googlecode.objectify.Work;
@@ -29,6 +30,7 @@ import com.googlecode.objectify.annotation.Ignore;
 import com.googlecode.objectify.annotation.Mapify;
 import com.googlecode.objectify.annotation.Parent;
 import com.googlecode.objectify.cmd.Query;
+
 import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.common.TimedTransitionProperty;
@@ -382,7 +384,6 @@ public class CategorizedPremiumList
      * @return a Builder object
      */
     public Builder updateEntry(final String sld,
-                               final String priceCategory,
                                final String futureCategory,
                                final DateTime effectiveDate) {
 
@@ -394,73 +395,50 @@ public class CategorizedPremiumList
               : ImmutableMap.<String, CategorizedListEntry>of();
 
 
-      checkState(existingEntries.containsKey(sld), "Unable to find entry for %s", sld);
+      checkState(existingEntries.containsKey(sld), "Unable to find entry for [%s]", sld);
 
-      Map<String, CategorizedListEntry> tmpMap = new HashMap<>(existingEntries);
+      // Retrieve CategorizedListEntry objects within PremiumList map
+      final CategorizedListEntry oldEntry = existingEntries.get(sld);
 
-      final CategorizedListEntry oldEntry = tmpMap.get(sld);
+      CategorizedListEntry updatedEntry;
 
-      CategorizedListEntry updatedEntry=null;
-
-      // Determine if we only have a transition of START_OF_TIME and add new effective date to end
-      if(oldEntry.getNextTransitionDateTime() == null) {
+      // Determine if we only have a transition of START_OF_TIME and add new
+      // effective date as a new CategoryTransition
+      if (oldEntry.getNextTransitionDateTime() == null) {
         updatedEntry = oldEntry.asBuilder()
             .setPricingCategoryTransitions(ImmutableSortedMap.of(
                 START_OF_TIME, oldEntry.getValueAtTime(START_OF_TIME).getName(),
                 effectiveDate, futureCategory)).build();
       } else {
-        DateTime tmpDate = oldEntry.getNextTransitionDateTime();
-        if (tmpDate.getMillis() <= effectiveDate.getMillis()) {
+        // Retrieve existing category transitions
+        ImmutableSortedMap<DateTime, String> existingCategoryTransition =
+            oldEntry.categoryTransitions.toValueMap();
 
-          ImmutableSortedMap<DateTime, String> existingCategoryTransition =
-              oldEntry.categoryTransitions.toValueMap();
+        // Create a new map in order to inject new CategoryTransitions
+        final Map<DateTime, String> newCategoryTransition =
+            new HashMap<>(existingCategoryTransition);
 
-          Map<DateTime, String> newCategoryTransition = new HashMap<>(existingCategoryTransition);
-          DateTime key = existingCategoryTransition.lastKey();
+        // Returns the DateTime which needs to be removed
+        final DateTime keyToRemove = existingCategoryTransition.lastKey();
 
-          newCategoryTransition.remove(key);
-          newCategoryTransition.put(effectiveDate, futureCategory);
+        // Remove transition that will be replaced
+        newCategoryTransition.remove(keyToRemove);
+        // Add in new transition
+        newCategoryTransition.put(effectiveDate, futureCategory);
 
-
-
-          // Remove entry from existing PremiumListMap
-//          Map<String, CategorizedListEntry> tmpMap = new HashMap<>(existingEntries);
-//          tmpMap.remove(sld);
-
-//          final ImmutableSortedMap<DateTime, String> newEntries =
-//              ImmutableSortedMap.<DateTime, String>builder()
-//                  .putAll(newMap)
-//                  .build();
-
-          updatedEntry = oldEntry.asBuilder().setPricingCategoryTransitions(
-              ImmutableSortedMap.copyOf(newCategoryTransition)
-          ).build();
-
-
-          int x=1;
-//          updatedEntry = oldEntry.asBuilder()
-//              .setPricingCategoryTransitions(ImmutableSortedMap.<DateTime, String>of().putAll(newMap));
-        }
-        int x = 1;
+        // Add the new map of Category Transitions into a new CategorizedListEntry object
+        updatedEntry = oldEntry.asBuilder().setPricingCategoryTransitions(
+            ImmutableSortedMap.copyOf(newCategoryTransition)
+        ).build();
       }
 
-      // Remove the existing entry
-//      tmpMap.remove(sld);
-//      tmpMap.put(sld, updatedEntry);
-      Map<String, CategorizedListEntry> newEntries = new HashMap<>();
+      // Remove the existing CategorizedListEntry and replace with the updated entry
+      final Map<String, CategorizedListEntry> newEntries = new HashMap<>();
       newEntries.putAll(existingEntries); // copy over old entries
-      newEntries.remove(updatedEntry); // remove old one
+      newEntries.remove(oldEntry); // remove old one
       newEntries.put(updatedEntry.getLabel(), updatedEntry); // add new one
 
-
-
-
-//
-//      final ImmutableMap<String, CategorizedListEntry> newEntries2 =
-//          ImmutableMap.<String, CategorizedListEntry>builder()
-//              .put(updatedEntry.getLabel(), updatedEntry)
-//              .build();
-
+      // Returns the PremiumList based upon new entries
       return setPremiumListMap(ImmutableMap.copyOf(newEntries));
     }
 

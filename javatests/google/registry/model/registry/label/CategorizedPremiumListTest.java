@@ -3,11 +3,7 @@ package google.registry.model.registry.label;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
-import google.registry.model.pricing.PricingCategory;
-import google.registry.model.registry.Registry;
-import google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry;
-import google.registry.testing.AppEngineRule;
-import google.registry.testing.ExceptionRule;
+
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
@@ -24,12 +20,9 @@ import google.registry.testing.ExceptionRule;
 
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry.createEntry;
-import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistCategorizedPremiumList;
 import static google.registry.testing.DatastoreHelper.persistPricingCategory;
-import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
-import static org.joda.money.CurrencyUnit.USD;
 
 /** Unit tests for {@link CategorizedPremiumList} */
 public class CategorizedPremiumListTest {
@@ -353,7 +346,6 @@ public class CategorizedPremiumListTest {
         threeCamps.asBuilder()
             .updateEntry(
                 paradise_sld, // Paradise only has one transition date (START_OF_TIME)
-                pricingCategory_AA.getName(),
                 pricingCategory_AA_Plus.getName(),
                 FIVE_DAYS_AHEAD_UTC)
             .build();
@@ -363,6 +355,36 @@ public class CategorizedPremiumListTest {
         .isEqualTo(FIVE_DAYS_AHEAD_UTC);
 
     assertThat(twoCamps.getPremiumListEntries().containsKey(kachess_sld)).isTrue();
+  }
+
+  @Test
+  public void testUpdateEntry_Invalid_UnableToFindEntry() throws Exception {
+
+    // Test case verifies that when we pass an invalid second level domain
+    // that an IllegalStateException gets thrown
+
+    final String sausage_sld = "sausage";
+    final String pizza_tld = "pizza";
+
+    // create a pre-loaded premium list and then add an entry
+    final CategorizedPremiumList pizzaPremiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                FIVE_DAYS_AHEAD_UTC, pricingCategory_AA.getName(),
+                START_OF_TIME, pricingCategory_CCCC.getName(),
+                THREE_DAYS_AHEAD_UTC, pricingCategory_BB.getName()),
+            pizza_tld,
+            sausage_sld);  // sausage.pizza
+
+    thrown.expect(IllegalStateException.class, "Unable to find entry for [invalid]");
+
+    // This should throw an IllegalStateException
+    pizzaPremiumList.asBuilder()
+            .updateEntry(
+                "invalid",
+                pricingCategory_B.getName(),
+                FIVE_DAYS_AHEAD_UTC)
+            .build();
   }
 
   @Test
@@ -398,7 +420,6 @@ public class CategorizedPremiumListTest {
         threeMovies.asBuilder()
             .updateEntry(
                 action_sld, // Action has two transitions
-                pricingCategory_AA.getName(),
                 pricingCategory_AA_Plus.getName(),
                 SIX_MONTHS_AHEAD_UTC)
             .build();
@@ -439,43 +460,5 @@ public class CategorizedPremiumListTest {
     newPremiumList.asBuilder()
         .deleteEntry(sapphire)  // Sapphire does NOT exist
         .build();
-  }
-
-  /**
-   * Class is used to support the creation of temporary TLDs and dependent entities used
-   * for specific test cases that require a TLD to be created and then deleted during
-   * test case run
-   */
-  private static class TldCreator {
-    private static String pricingCategoryName = "pricingCategory";
-    private static PricingCategory pc;
-    private static CategorizedPremiumList.CategorizedListEntry entry;
-
-    public static PricingCategory getPricingCategory() {
-      return pc;
-    }
-
-    public static CategorizedPremiumList.CategorizedListEntry getEntry() {
-      return entry;
-    }
-
-    public static void build(String sld, String tld) {
-      createTld(tld);
-
-      pc = new PricingCategory.Builder().setName(pricingCategoryName).setPrice(Money.zero(USD)).build();
-      persistResource(pc);
-
-      entry =
-          new CategorizedPremiumList.CategorizedListEntry.Builder()
-              .setLabel(sld)
-              .setPricingCategoryTransitions(ImmutableSortedMap.of(START_OF_TIME, pc.getName()))
-              .build();
-
-      new CategorizedPremiumList.Builder()
-          .setName(tld)
-          .setPremiumListMap(ImmutableMap.of(sld, entry))
-          .build()
-          .saveAndUpdateEntries();
-    }
   }
 }
