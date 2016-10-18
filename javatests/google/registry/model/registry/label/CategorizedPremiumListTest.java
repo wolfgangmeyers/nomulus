@@ -1,18 +1,9 @@
 package google.registry.model.registry.label;
 
-import static com.google.common.truth.Truth.assertThat;
-import static google.registry.testing.DatastoreHelper.persistCategorizedPremiumList;
-import static google.registry.testing.DatastoreHelper.persistPricingCategory;
-import static google.registry.util.DateTimeUtils.START_OF_TIME;
-
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
-import google.registry.model.pricing.PricingCategory;
-import google.registry.model.registry.Registry;
-import google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry;
-import google.registry.testing.AppEngineRule;
-import google.registry.testing.ExceptionRule;
+
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
@@ -20,34 +11,64 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 
+import google.registry.model.pricing.PricingCategory;
+import google.registry.model.registry.Registry;
+import google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry;
+import google.registry.testing.AppEngineRule;
+import google.registry.testing.ExceptionRule;
+
+import static com.google.common.truth.Truth.assertThat;
+import static google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry.createEntry;
+import static google.registry.testing.DatastoreHelper.createTld;
+import static google.registry.testing.DatastoreHelper.persistCategorizedPremiumList;
+import static google.registry.testing.DatastoreHelper.persistPricingCategory;
+import static google.registry.testing.DatastoreHelper.persistResource;
+import static google.registry.util.DateTimeUtils.START_OF_TIME;
+import static org.joda.money.CurrencyUnit.USD;
+
 /** Unit tests for {@link CategorizedPremiumList} */
 public class CategorizedPremiumListTest {
 
   private static final String US_PRICE_CATEGORY = "US_PRICE_CATEGORY";
   private static final String EURO_PRICE_CATEGORY = "EURO_PRICE_CATEGORY";
   private static final String JAPANESE_PRICE_CATEGORY = "JAPANESE_PRICE_CATEGORY";
-
-  private final DateTime THREE_DAYS = DateTime.now().plusDays(3);
-  private final DateTime FIVE_DAYS = DateTime.now().plusDays(5);
+  private static final String SWISS_PRICE_CATEGORY = "SWISS_PRICE_CATEGORY";
   private static final String JAPANESE_PRICE = CurrencyUnit.JPY + " 511";
   private static final String USD_PRICE = CurrencyUnit.USD + " 5.00";
   private static final String EURO_PRICE = CurrencyUnit.EUR + " 4.48";
+  private static final String SWISS_PRICE = CurrencyUnit.CHF + "4.95";
   private static final String LABEL_ONE = "label_one";
   private static final String LABEL_TWO = "label_two";
   private static final String TLD_ONE = "tld_one";
   private static final String TLD_TWO = "tld_two";
+
+  private final DateTime THREE_DAYS = DateTime.now().plusDays(3);
+  private final DateTime FIVE_DAYS = DateTime.now().plusDays(5);
 
   @Rule public final ExceptionRule thrown = new ExceptionRule();
   @Rule public final AppEngineRule appEngine = AppEngineRule.builder().withDatastore().build();
 
   private CategorizedPremiumList premiumList;
   private CategorizedPremiumList nullablePremiumList;
+  private PricingCategory swissPriceCategory;
+  private PricingCategory pricingCategory_AA;
+  private PricingCategory pricingCategory_AA_Plus;
+  private PricingCategory pricingCategory_B;
+  private PricingCategory pricingCategory_BB;
+  private PricingCategory pricingCategory_CCCC;
 
   @Before
   public void before() throws Exception {
     PricingCategory pc = persistPricingCategory(US_PRICE_CATEGORY, USD_PRICE);
     PricingCategory pc2 = persistPricingCategory(EURO_PRICE_CATEGORY, EURO_PRICE);
     PricingCategory pc3 = persistPricingCategory(JAPANESE_PRICE_CATEGORY, JAPANESE_PRICE);
+    swissPriceCategory = persistPricingCategory(SWISS_PRICE_CATEGORY, SWISS_PRICE);
+    pricingCategory_AA_Plus = persistPricingCategory("AA+", USD_PRICE);
+    pricingCategory_AA = persistPricingCategory("AA", USD_PRICE);
+    pricingCategory_B = persistPricingCategory("B", USD_PRICE);
+    pricingCategory_BB = persistPricingCategory("BB", USD_PRICE);
+    pricingCategory_CCCC = persistPricingCategory("CCCC", USD_PRICE);
+
 
     // Adding three pricing categories with three different dates purposely to verify date
     // ordering for testing method 'getNextTransitionDateTime'
@@ -143,4 +164,205 @@ public class CategorizedPremiumListTest {
         .isEqualTo(premiumList.getPremiumListEntries().size() + 1);
   }
 
+  @Test
+  public void testAddEntry_Valid() throws Exception {
+    /**
+     * Test method exercises the functionality of both 'addEntry' methods that accept the following
+     * addEntry(final String sld, final String priceCategory) and
+     * addEntry(final CategorizedListEntry entry)
+     *
+     * and verifies that the result values are correct
+     */
+    final String sld = "sld";
+    final String sld3 = "sld3";
+    final CategorizedListEntry us_entry = createEntry(sld, US_PRICE_CATEGORY);
+    final CategorizedListEntry jap_entry = createEntry(sld3, JAPANESE_PRICE_CATEGORY);
+
+
+    final CategorizedPremiumList result = new CategorizedPremiumList.Builder()
+        .setName("tld")
+        .addEntry(us_entry)
+        .addEntry(sld3, JAPANESE_PRICE_CATEGORY)
+        .build();
+
+    assertThat(result.getPremiumListEntries()).containsExactly(
+        sld,
+        us_entry.asBuilder()
+            .setParent(result.getRevisionKey())
+            .build(),
+        sld3,
+        jap_entry.asBuilder()
+            .setParent(result.getRevisionKey())
+            .build());
+  }
+
+  @Test
+  public void testAddEntry_Invalid_EntryAlreadyExists() throws Exception {
+
+    // Test case verifies that we cannot add duplicate entries
+
+    final String public_sld = "public";
+    final String private_sld = "private";
+
+    thrown.expect(IllegalStateException.class, "Entry [public] already exists");
+
+    premiumList.asBuilder()
+        .addEntry(public_sld, pricingCategory_AA.getName()) // public.institute
+        .addEntry(private_sld, pricingCategory_BB.getName()) // private.institute
+        .addEntry(public_sld, pricingCategory_AA.getName()) // public.institute
+        .build();
+  }
+
+  @Test
+  public void testAddEntry_Valid_ExistingPremiumList() {
+     // Test method exercises the functionality of both 'addEntry' methods however it is using
+     // a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
+     // the new CategorizedListEntry objects in it
+
+    final String washington_sld = "washington";
+    final String oregon_sld = "oregon";
+    final String doctor_tld = "doctor";
+
+    // create a pre-loaded premium list and then add an entry
+    final CategorizedPremiumList preloadedPremiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                FIVE_DAYS, pricingCategory_AA.getName(),
+                START_OF_TIME, pricingCategory_CCCC.getName(),
+                THREE_DAYS, pricingCategory_BB.getName()),
+            doctor_tld,
+            washington_sld);
+
+    // create a temporary entry to compare against
+    final CategorizedListEntry oregon_entry = createEntry(oregon_sld, US_PRICE_CATEGORY);
+
+    final CategorizedPremiumList result = preloadedPremiumList.asBuilder()
+        .addEntry(oregon_sld, US_PRICE_CATEGORY) // oregon.doctor
+        .build();
+
+    // Should now have two entries in map
+    assertThat(result.getPremiumListEntries().size()).isEqualTo(2);
+
+    // Verify that Oregon is one of the entries
+    assertThat(result.getPremiumListEntries().get(oregon_sld))
+        .isEquivalentAccordingToCompareTo(oregon_entry);
+  }
+
+  @Test
+  public void testDeleteEntry_Valid_UsingSld() throws Exception {
+
+     // Test method exercises the functionality of both 'deleteEntry' methods however it is using
+     // a pre-loaded CategorizedPremiumList and verifies that the result does in fact contain
+     // the new CategorizedListEntry objects in it
+
+    final String mountain_sld = "mountain";
+    final String road_sld = "road";
+    final String tandem_sld = "tandem";
+    final String bike_tld = "bike";
+
+
+    // create a pre-loaded premium list and then add an entry
+    final CategorizedPremiumList bicyclePremiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                FIVE_DAYS, pricingCategory_AA.getName(),
+                START_OF_TIME, pricingCategory_CCCC.getName(),
+                THREE_DAYS, pricingCategory_BB.getName()),
+            bike_tld,
+            mountain_sld);  // mountain.bike
+
+    // Add more CategorizedListEntry objects into PremiumList
+    final CategorizedPremiumList threeBicycles = bicyclePremiumList.asBuilder()
+        .addEntry(road_sld, US_PRICE_CATEGORY) // road.bike
+        .addEntry(tandem_sld, US_PRICE_CATEGORY) // tandem.bike
+        .build();
+
+    // Should now have two entries in map
+    assertThat(threeBicycles.getPremiumListEntries().size()).isEqualTo(3);
+
+    // Delete the road bicycle
+    CategorizedPremiumList twoBicycles =
+        threeBicycles.asBuilder()
+            .deleteEntry(road_sld)
+            .build();
+
+    // Verify that we have two bicycles left - Tandem, Mountain
+    assertThat(twoBicycles.getPremiumListEntries().size()).isEqualTo(2);
+
+    assertThat(twoBicycles.getPremiumListEntries().get(tandem_sld))
+        .isEquivalentAccordingToCompareTo(createEntry(tandem_sld, US_PRICE_CATEGORY));
+
+    assertThat(twoBicycles.getPremiumListEntries().containsKey(mountain_sld)).isTrue();
+  }
+
+  @Test
+  public void testDeleteEntry_Invalid_SldDoesNotExist() throws Exception {
+
+    // Test case verifies if a second level domain does not exist
+    final String rubies = "rubies";
+    final String pearls_sld = "pearls";
+    final String diamonds_sld = "diamonds";
+    final String jewelry = "jewelry";
+    final String sapphire = "sapphire";
+
+    // create a pre-loaded premium list and then add an entry
+    final CategorizedPremiumList premiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                FIVE_DAYS, pricingCategory_AA.getName(),
+                START_OF_TIME, pricingCategory_CCCC.getName(),
+                THREE_DAYS, pricingCategory_BB.getName()),
+            jewelry,
+            rubies);  // rubies.jewelry
+
+    // Add more CategorizedListEntry objects into PremiumList
+    final CategorizedPremiumList newPremiumList = premiumList.asBuilder()
+        .addEntry(pearls_sld, US_PRICE_CATEGORY) // pearls.jewelry
+        .addEntry(diamonds_sld, pricingCategory_BB.getName()) // diamonds.jewelry
+        .build();
+
+    thrown.expect(IllegalStateException.class, "Unable to find entry [sapphire]");
+
+    newPremiumList.asBuilder()
+        .deleteEntry(sapphire)  // Sapphire does NOT exist
+        .build();
+  }
+
+  /**
+   * Class is used to support the creation of temporary TLDs and dependent entities used
+   * for specific test cases that require a TLD to be created and then deleted during
+   * test case run
+   */
+  private static class TldCreator {
+    private static String pricingCategoryName = "pricingCategory";
+    private static PricingCategory pc;
+    private static CategorizedPremiumList.CategorizedListEntry entry;
+
+    public static PricingCategory getPricingCategory() {
+      return pc;
+    }
+
+    public static CategorizedPremiumList.CategorizedListEntry getEntry() {
+      return entry;
+    }
+
+    public static void build(String sld, String tld) {
+      createTld(tld);
+
+      pc = new PricingCategory.Builder().setName(pricingCategoryName).setPrice(Money.zero(USD)).build();
+      persistResource(pc);
+
+      entry =
+          new CategorizedPremiumList.CategorizedListEntry.Builder()
+              .setLabel(sld)
+              .setPricingCategoryTransitions(ImmutableSortedMap.of(START_OF_TIME, pc.getName()))
+              .build();
+
+      new CategorizedPremiumList.Builder()
+          .setName(tld)
+          .setPremiumListMap(ImmutableMap.of(sld, entry))
+          .build()
+          .saveAndUpdateEntries();
+    }
+  }
 }

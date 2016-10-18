@@ -7,6 +7,7 @@ import static google.registry.model.common.EntityGroupRoot.getCrossTldKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
 import static google.registry.util.CollectionUtils.nullToEmpty;
+import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
 import com.google.common.base.Function;
@@ -18,6 +19,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.UncheckedExecutionException;
+
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.VoidWork;
 import com.googlecode.objectify.Work;
@@ -32,12 +34,15 @@ import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.common.TimedTransitionProperty;
 import google.registry.model.pricing.PricingCategory;
+import google.registry.model.registry.Registry;
 import google.registry.util.DateTimeUtils;
+
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 
+import java.util.HashMap;
 import java.util.List;
-import java.util.Objects;
+import java.util.Map;
 import java.util.concurrent.ExecutionException;
 
 import javax.annotation.Nullable;
@@ -77,6 +82,27 @@ public class CategorizedPremiumList
     } catch (ExecutionException e) {
       throw new UncheckedExecutionException("Could not retrieve premium list named " + name, e);
     }
+  }
+
+  static CategorizedPremiumList savePremiumList(final String tld) {
+
+    // Build a new CategorizedPremiumList
+    final CategorizedPremiumList newPremiumList =
+        new CategorizedPremiumList.Builder().setName(tld).build().saveAndUpdateEntries();
+
+    ofy().transact(new VoidWork() {
+      @Override
+      public void vrun() {
+        ofy().save().entity(
+            Registry.get(tld)
+                .asBuilder()
+                .setPremiumList(newPremiumList)
+                .build())
+            .now();
+      }
+    });
+
+    return newPremiumList;
   }
 
   /**
@@ -134,6 +160,22 @@ public class CategorizedPremiumList
       return PricingCategory.get(pc).get();
     }
 
+    /**
+     * Method creates and returns a CategorizedListEntry object for given SLD and PriceCategory
+     * @param sld second level domain
+     * @param priceCategory PriceCategory
+     * @return a CategorizedListEntry
+     */
+    static CategorizedListEntry createEntry(String sld, String priceCategory) {
+      return new CategorizedListEntry.Builder()
+          .setLabel(sld)
+          .setPricingCategoryTransitions(
+              ImmutableSortedMap.of(
+                  START_OF_TIME,
+                  priceCategory))
+          .build();
+    }
+
     public static class Builder extends DomainLabelEntry.Builder<CategorizedListEntry, Builder> {
       public Builder() {}
 
@@ -146,6 +188,9 @@ public class CategorizedPremiumList
         return this;
       }
 
+      /**
+       * Method sets the Pricing Category Transitions
+       */
       public Builder setPricingCategoryTransitions(
           ImmutableSortedMap<DateTime, String> pricingCategoryTransitions) {
         getInstance().categoryTransitions =
@@ -253,6 +298,12 @@ public class CategorizedPremiumList
       super(instance);
     }
 
+    /**
+     * Method assigns the ImmutableMap of CategorizedListEntry objects into the PremiumListMap
+     * for this given instance of CategorizedPremiumList
+     * @param premiumListMap an ImmutableMap of CategorizedListEntry objects to be assigned
+     * @return a Builder object
+     */
     public Builder setPremiumListMap(ImmutableMap<String, CategorizedListEntry> premiumListMap) {
       getInstance().entriesWereUpdated = true;
       getInstance().premiumListMap = premiumListMap;
@@ -261,6 +312,71 @@ public class CategorizedPremiumList
 
     public Builder setPremiumListFromLines(Iterable<String> lines) {
       return setPremiumListMap(getInstance().parse(lines));
+    }
+
+    /**
+     * Method accepts a second-level domain name and a price category and is to create a
+     * CategorizedListEntry object and then add it to the CategorizedPremiumList map
+     * @param sld a second-level domain
+     * @param priceCategory a price category
+     * @return
+     */
+    public Builder addEntry(final String sld, final String priceCategory) {
+      return addEntry(CategorizedListEntry.createEntry(sld, priceCategory));
+    }
+
+    /**
+     * Method accepts a CategorizedListEntry and determines if it has a list of PremiumListEntries
+     * and if it does then it retrieves then otherwise it creates a new ImmutableMap to store
+     * @param entry a CategorizedListEntry to load into the PremiumListMap
+     * @return a Builder object
+     */
+    public Builder addEntry(final CategorizedListEntry entry) {
+      // Determines if we have a list of PremiumListEntries or not and if
+      // not creates an ImmutableMap
+      final Map<String, CategorizedListEntry> existingEntries =
+          (getInstance().getPremiumListEntries() != null)
+              ? getInstance().getPremiumListEntries()
+              : ImmutableMap.<String, CategorizedListEntry>of();
+
+      checkState(!existingEntries.containsKey(entry.getLabel()),
+          "Entry [%s] already exists", entry.getLabel());
+
+      // Create a new ImmutableMap based upon the SLD and PricingCategory
+      final ImmutableMap<String, CategorizedListEntry> newEntries =
+          ImmutableMap.<String, CategorizedListEntry>builder()
+              .putAll(existingEntries) // Adds entries regardless if it has entries or is empty
+              .put(entry.getLabel(), entry)
+              .build();
+
+      // Loads the new entries into the PremiumListMap and then returns PremiumListMap to caller
+      // of this method
+      return setPremiumListMap(newEntries);
+    }
+
+    /**
+     * Method deletes an CategorizedListEntry from the PremiumListMap based upon the
+     * second level domain (sld)
+     * @param sld a string value representing a second level domain
+     * @return
+     */
+    public Builder deleteEntry(final String sld) {
+
+      final Map<String, CategorizedListEntry> existingEntries =
+          getInstance().getPremiumListEntries();
+
+      checkState(existingEntries.containsKey(sld), "Unable to find entry [%s]", sld);
+
+      // Remove entry from existing PremiumListMap
+      Map<String, CategorizedListEntry> tmpMap = new HashMap<>(existingEntries);
+      tmpMap.remove(sld);
+
+      final ImmutableMap<String, CategorizedListEntry> newEntries =
+          ImmutableMap.<String, CategorizedListEntry>builder()
+              .putAll(tmpMap)
+              .build();
+
+      return setPremiumListMap(ImmutableMap.copyOf(newEntries));
     }
 
     @Override
