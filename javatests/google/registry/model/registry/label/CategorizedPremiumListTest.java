@@ -354,7 +354,7 @@ public class CategorizedPremiumListTest {
     assertThat(twoCamps.getPremiumListEntries().get(paradise_sld).getNextTransitionDateTime())
         .isEqualTo(FIVE_DAYS_AHEAD_UTC);
 
-    assertThat(twoCamps.getPremiumListEntries().containsKey(kachess_sld)).isTrue();
+    assertThat(twoCamps.getPremiumListEntries()).containsKey(kachess_sld);
   }
 
   @Test
