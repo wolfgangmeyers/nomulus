@@ -17,7 +17,7 @@
               value="WEB-INF/logging.properties"/>
     <property name="google.registry.environment"
               value="crash"/>
-    <property name="com.google.domain.registry.config"
+    <property name="google.registry.config"
               value="domains.donuts.config.DonutsRegistryConfig"/>
   </system-properties>
 
