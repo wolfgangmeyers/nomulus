@@ -414,7 +414,7 @@ public class CategorizedPremiumListTest {
         .addEntry(romantic_sld, pricingCategory_BB.getName()) // romantic.movie
         .build();
 
-    assertThat(threeMovies.getPremiumListEntries().size()).isEqualTo(3);
+    assertThat(threeMovies.getPremiumListEntries()).hasSize(3);
 
     CategorizedPremiumList result =
         threeMovies.asBuilder()
