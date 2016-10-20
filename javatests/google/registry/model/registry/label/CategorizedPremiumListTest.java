@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableSortedMap;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
@@ -19,12 +20,9 @@ import google.registry.testing.ExceptionRule;
 
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry.createEntry;
-import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistCategorizedPremiumList;
 import static google.registry.testing.DatastoreHelper.persistPricingCategory;
-import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
-import static org.joda.money.CurrencyUnit.USD;
 
 /** Unit tests for {@link CategorizedPremiumList} */
 public class CategorizedPremiumListTest {
@@ -42,8 +40,25 @@ public class CategorizedPremiumListTest {
   private static final String TLD_ONE = "tld_one";
   private static final String TLD_TWO = "tld_two";
 
-  private final DateTime THREE_DAYS = DateTime.now().plusDays(3);
-  private final DateTime FIVE_DAYS = DateTime.now().plusDays(5);
+  // Create three future dates
+  private final DateTime THREE_DAYS_AHEAD_UTC = DateTime.now()
+      .withTimeAtStartOfDay()
+      .plusDays(3)
+      .toDateTime(DateTimeZone.UTC);
+  private final DateTime FIVE_DAYS_AHEAD_UTC = DateTime.now()
+      .withTimeAtStartOfDay()
+      .plusDays(5)
+      .toDateTime(DateTimeZone.UTC);
+
+  private final DateTime EIGHT_MONTHS_PRIOR_UTC = DateTime.now()
+      .withTimeAtStartOfDay()
+      .minusMonths(8)
+      .toDateTime(DateTimeZone.UTC);
+
+  private final DateTime SIX_MONTHS_AHEAD_UTC = DateTime.now()
+      .withTimeAtStartOfDay()
+      .plusMonths(6)
+      .toDateTime(DateTimeZone.UTC);
 
   @Rule public final ExceptionRule thrown = new ExceptionRule();
   @Rule public final AppEngineRule appEngine = AppEngineRule.builder().withDatastore().build();
@@ -75,7 +90,7 @@ public class CategorizedPremiumListTest {
     premiumList =
         persistCategorizedPremiumList(
             ImmutableSortedMap.of(
-                FIVE_DAYS, pc.getName(), START_OF_TIME, pc2.getName(), THREE_DAYS, pc3.getName()),
+                FIVE_DAYS_AHEAD_UTC, pc.getName(), START_OF_TIME, pc2.getName(), THREE_DAYS_AHEAD_UTC, pc3.getName()),
             TLD_ONE,
             LABEL_ONE);
 
@@ -111,7 +126,7 @@ public class CategorizedPremiumListTest {
     DateTime nextTransitionDateTime = entry.getNextTransitionDateTime();
     PricingCategory futurePriceCategory = entry.getValueAtTime(nextTransitionDateTime);
 
-    assertThat(nextTransitionDateTime).isEqualTo(THREE_DAYS);
+    assertThat(nextTransitionDateTime).isEqualTo(THREE_DAYS_AHEAD_UTC);
     assertThat(futurePriceCategory.getName()).isEqualTo(JAPANESE_PRICE_CATEGORY);
     assertThat(futurePriceCategory.getPrice().toString()).isEqualTo(JAPANESE_PRICE);
   }
@@ -227,9 +242,9 @@ public class CategorizedPremiumListTest {
     final CategorizedPremiumList preloadedPremiumList =
         persistCategorizedPremiumList(
             ImmutableSortedMap.of(
-                FIVE_DAYS, pricingCategory_AA.getName(),
+                FIVE_DAYS_AHEAD_UTC, pricingCategory_AA.getName(),
                 START_OF_TIME, pricingCategory_CCCC.getName(),
-                THREE_DAYS, pricingCategory_BB.getName()),
+                THREE_DAYS_AHEAD_UTC, pricingCategory_BB.getName()),
             doctor_tld,
             washington_sld);
 
@@ -265,9 +280,9 @@ public class CategorizedPremiumListTest {
     final CategorizedPremiumList bicyclePremiumList =
         persistCategorizedPremiumList(
             ImmutableSortedMap.of(
-                FIVE_DAYS, pricingCategory_AA.getName(),
+                FIVE_DAYS_AHEAD_UTC, pricingCategory_AA.getName(),
                 START_OF_TIME, pricingCategory_CCCC.getName(),
-                THREE_DAYS, pricingCategory_BB.getName()),
+                THREE_DAYS_AHEAD_UTC, pricingCategory_BB.getName()),
             bike_tld,
             mountain_sld);  // mountain.bike
 
@@ -296,6 +311,171 @@ public class CategorizedPremiumListTest {
   }
 
   @Test
+  public void testUpdateEntry_Valid_NoFutureDateExists() throws Exception {
+
+    // Test case verifies that for a entry that has only START_OF_TIME that it should add only
+    // one transition for given effective date
+
+    final String kachess_sld = "kachess";
+    final String paradise_sld = "paradise";
+    final String longmire_sld = "longmire";
+    final String camp_tld = "camp";
+
+
+    // create a pre-loaded premium list and then add an entry
+    final CategorizedPremiumList campsPremiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                FIVE_DAYS_AHEAD_UTC, pricingCategory_AA.getName(),
+                START_OF_TIME, pricingCategory_CCCC.getName(),
+                THREE_DAYS_AHEAD_UTC, pricingCategory_BB.getName()),
+            camp_tld,
+            kachess_sld);  // kachess.camp
+
+    // Add more CategorizedListEntry objects into PremiumList
+    final CategorizedPremiumList threeCamps = campsPremiumList.asBuilder()
+        .addEntry(paradise_sld, pricingCategory_AA.getName()) // paradise.camp
+        .addEntry(longmire_sld, pricingCategory_BB.getName()) // longmire.camp
+        .build();
+
+    // Should now have two entries in map
+    assertThat(threeCamps.getPremiumListEntries().size()).isEqualTo(3);
+
+    // Delete the road bicycle
+    CategorizedPremiumList twoCamps =
+        threeCamps.asBuilder()
+            .updateEntry(
+                paradise_sld, // Paradise only has one transition date (START_OF_TIME)
+                pricingCategory_AA_Plus.getName(),
+                FIVE_DAYS_AHEAD_UTC)
+            .build();
+
+    // Verify that we have the new transition date
+    assertThat(twoCamps.getPremiumListEntries().get(paradise_sld).getNextTransitionDateTime())
+        .isEqualTo(FIVE_DAYS_AHEAD_UTC);
+
+    assertThat(twoCamps.getPremiumListEntries()).containsKey(kachess_sld);
+  }
+
+  @Test
+  public void testUpdateEntry_Invalid_UnableToFindEntry() throws Exception {
+
+    // Test case verifies that when we pass an invalid second level domain
+    // that an IllegalStateException gets thrown
+
+    final String sausage_sld = "sausage";
+    final String pizza_tld = "pizza";
+
+    // create a pre-loaded premium list and then add an entry
+    final CategorizedPremiumList pizzaPremiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                FIVE_DAYS_AHEAD_UTC, pricingCategory_AA.getName(),
+                START_OF_TIME, pricingCategory_CCCC.getName(),
+                THREE_DAYS_AHEAD_UTC, pricingCategory_BB.getName()),
+            pizza_tld,
+            sausage_sld);  // sausage.pizza
+
+    thrown.expect(IllegalStateException.class, "Unable to find entry for [invalid]");
+
+    // This should throw an IllegalStateException
+    pizzaPremiumList.asBuilder()
+            .updateEntry(
+                "invalid",
+                pricingCategory_B.getName(),
+                FIVE_DAYS_AHEAD_UTC)
+            .build();
+  }
+
+  @Test
+  public void testUpdateEntry_Valid_FutureCategoryAlreadyExists() throws Exception {
+
+    // Test case verifies that if a SLD already has a future category
+
+    final String action_sld = "action";
+    final String horror_sld = "horror";
+    final String romantic_sld = "romantic";
+    final String movie_tld = "movie";
+
+
+    // create a pre-loaded premium list and then add an entry
+    final CategorizedPremiumList premiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                FIVE_DAYS_AHEAD_UTC, pricingCategory_AA.getName(),
+                START_OF_TIME, pricingCategory_CCCC.getName(),
+                EIGHT_MONTHS_PRIOR_UTC, pricingCategory_CCCC.getName()),
+            movie_tld,
+            action_sld);  // action.movie
+
+    // Add more CategorizedListEntry objects into PremiumList
+    final CategorizedPremiumList threeMovies = premiumList.asBuilder()
+        .addEntry(horror_sld, pricingCategory_AA.getName())   // horror.movie
+        .addEntry(romantic_sld, pricingCategory_BB.getName()) // romantic.movie
+        .build();
+
+    assertThat(threeMovies.getPremiumListEntries()).hasSize(3);
+
+    CategorizedPremiumList result =
+        threeMovies.asBuilder()
+            .updateEntry(
+                action_sld, // Action has two transitions
+                pricingCategory_AA_Plus.getName(),
+                SIX_MONTHS_AHEAD_UTC)
+            .build();
+
+    // Verify that we have the new transition date
+    assertThat(result.getPremiumListEntries().get(action_sld).getNextTransitionDateTime())
+        .isEqualTo(SIX_MONTHS_AHEAD_UTC);
+  }
+
+  @Test
+  public void testUpdateEntry_Valid_UnableToAddFutureDates() throws Exception {
+
+    // Test case verifies that by updating multiple times that the effective
+    // future date is being overwritten - and is not adding a new transition
+
+    final String california_sld = "california";
+    final String capital_tld = "capital";
+
+    final CategorizedPremiumList localPremiumList =
+        persistCategorizedPremiumList(
+            ImmutableSortedMap.of(
+                START_OF_TIME, pricingCategory_CCCC.getName()),
+            capital_tld,
+            california_sld);  // california.capital
+
+    // Purposely set the Effective Date to five days ahead in time
+    CategorizedPremiumList resultFiveDaysAhead =
+        localPremiumList.asBuilder()
+            .updateEntry(
+                california_sld,
+                pricingCategory_AA_Plus.getName(),
+                FIVE_DAYS_AHEAD_UTC)
+            .build();
+
+    // Verify that we have the new transition date
+    assertThat(resultFiveDaysAhead.getPremiumListEntries()
+        .get(california_sld).getNextTransitionDateTime())
+        .isEqualTo(FIVE_DAYS_AHEAD_UTC);
+
+
+    // Purposely set the Effective Date to six months ahead in time
+    CategorizedPremiumList resultSixMonthAhead =
+        localPremiumList.asBuilder()
+            .updateEntry(
+                california_sld,
+                pricingCategory_CCCC.getName(),
+                SIX_MONTHS_AHEAD_UTC)
+            .build();
+
+    // Verify that we have the new transition date
+    assertThat(resultSixMonthAhead.getPremiumListEntries()
+        .get(california_sld).getNextTransitionDateTime())
+        .isEqualTo(SIX_MONTHS_AHEAD_UTC);
+  }
+
+  @Test
   public void testDeleteEntry_Invalid_SldDoesNotExist() throws Exception {
 
     // Test case verifies if a second level domain does not exist
@@ -309,9 +489,9 @@ public class CategorizedPremiumListTest {
     final CategorizedPremiumList premiumList =
         persistCategorizedPremiumList(
             ImmutableSortedMap.of(
-                FIVE_DAYS, pricingCategory_AA.getName(),
+                FIVE_DAYS_AHEAD_UTC, pricingCategory_AA.getName(),
                 START_OF_TIME, pricingCategory_CCCC.getName(),
-                THREE_DAYS, pricingCategory_BB.getName()),
+                THREE_DAYS_AHEAD_UTC, pricingCategory_BB.getName()),
             jewelry,
             rubies);  // rubies.jewelry
 
@@ -326,43 +506,5 @@ public class CategorizedPremiumListTest {
     newPremiumList.asBuilder()
         .deleteEntry(sapphire)  // Sapphire does NOT exist
         .build();
-  }
-
-  /**
-   * Class is used to support the creation of temporary TLDs and dependent entities used
-   * for specific test cases that require a TLD to be created and then deleted during
-   * test case run
-   */
-  private static class TldCreator {
-    private static String pricingCategoryName = "pricingCategory";
-    private static PricingCategory pc;
-    private static CategorizedPremiumList.CategorizedListEntry entry;
-
-    public static PricingCategory getPricingCategory() {
-      return pc;
-    }
-
-    public static CategorizedPremiumList.CategorizedListEntry getEntry() {
-      return entry;
-    }
-
-    public static void build(String sld, String tld) {
-      createTld(tld);
-
-      pc = new PricingCategory.Builder().setName(pricingCategoryName).setPrice(Money.zero(USD)).build();
-      persistResource(pc);
-
-      entry =
-          new CategorizedPremiumList.CategorizedListEntry.Builder()
-              .setLabel(sld)
-              .setPricingCategoryTransitions(ImmutableSortedMap.of(START_OF_TIME, pc.getName()))
-              .build();
-
-      new CategorizedPremiumList.Builder()
-          .setName(tld)
-          .setPremiumListMap(ImmutableMap.of(sld, entry))
-          .build()
-          .saveAndUpdateEntries();
-    }
   }
 }

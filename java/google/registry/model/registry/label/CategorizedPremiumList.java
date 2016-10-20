@@ -30,6 +30,7 @@ import com.googlecode.objectify.annotation.Ignore;
 import com.googlecode.objectify.annotation.Mapify;
 import com.googlecode.objectify.annotation.Parent;
 import com.googlecode.objectify.cmd.Query;
+
 import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.common.TimedTransitionProperty;
@@ -342,15 +343,12 @@ public class CategorizedPremiumList
       checkState(!existingEntries.containsKey(entry.getLabel()),
           "Entry [%s] already exists", entry.getLabel());
 
-      // Create a new ImmutableMap based upon the SLD and PricingCategory
       final ImmutableMap<String, CategorizedListEntry> newEntries =
           ImmutableMap.<String, CategorizedListEntry>builder()
               .putAll(existingEntries) // Adds entries regardless if it has entries or is empty
               .put(entry.getLabel(), entry)
               .build();
 
-      // Loads the new entries into the PremiumListMap and then returns PremiumListMap to caller
-      // of this method
       return setPremiumListMap(newEntries);
     }
 
@@ -376,6 +374,71 @@ public class CategorizedPremiumList
               .putAll(tmpMap)
               .build();
 
+      return setPremiumListMap(ImmutableMap.copyOf(newEntries));
+    }
+
+    /**
+     * Method updates a CategorizedListEntry from the PremiumListMap based upon the second
+     * level domain
+     * @param sld a string value representing a second level domain
+     * @return a Builder object
+     */
+    public Builder updateEntry(final String sld,
+                               final String futureCategory,
+                               final DateTime effectiveDate) {
+
+      // Determines if we have a list of PremiumListEntries or not and if
+      // not creates an ImmutableMap
+      final Map<String, CategorizedListEntry> existingEntries =
+          (getInstance().getPremiumListEntries() != null)
+              ? getInstance().getPremiumListEntries()
+              : ImmutableMap.<String, CategorizedListEntry>of();
+
+
+      checkState(existingEntries.containsKey(sld), "Unable to find entry for [%s]", sld);
+
+      // Retrieve CategorizedListEntry objects within PremiumList map
+      final CategorizedListEntry oldEntry = existingEntries.get(sld);
+
+      CategorizedListEntry updatedEntry;
+
+      // Determine if we only have a transition of START_OF_TIME and add new
+      // effective date as a new CategoryTransition
+      if (oldEntry.getNextTransitionDateTime() == null) {
+        updatedEntry = oldEntry.asBuilder()
+            .setPricingCategoryTransitions(ImmutableSortedMap.of(
+                START_OF_TIME, oldEntry.getValueAtTime(START_OF_TIME).getName(),
+                effectiveDate, futureCategory)).build();
+      } else {
+        // Retrieve existing category transitions
+        ImmutableSortedMap<DateTime, String> existingCategoryTransition =
+            oldEntry.categoryTransitions.toValueMap();
+
+        // Create a new map in order to inject new CategoryTransitions
+        final Map<DateTime, String> newCategoryTransition =
+            new HashMap<>(existingCategoryTransition);
+
+        // Returns the DateTime which needs to be removed
+        final DateTime keyToRemove = existingCategoryTransition.lastKey();
+
+        // Remove transition that will be replaced
+        newCategoryTransition.remove(keyToRemove);
+        // Add in new transition
+        newCategoryTransition.put(effectiveDate, futureCategory);
+
+        // Add the new map of Category Transitions into a new CategorizedListEntry object
+        updatedEntry = oldEntry.asBuilder().setPricingCategoryTransitions(
+            ImmutableSortedMap.copyOf(newCategoryTransition)
+        ).build();
+      }
+
+      // Remove the existing CategorizedListEntry and replace with the updated entry
+      final Map<String, CategorizedListEntry> newEntries = new HashMap<>();
+      newEntries.putAll(existingEntries); // copy over old entries
+      newEntries.remove(oldEntry); // remove old one
+      newEntries.put(updatedEntry.getLabel(), updatedEntry); // add new one
+
+      // Returns the PremiumList based upon new entries
       return setPremiumListMap(ImmutableMap.copyOf(newEntries));
     }
 
