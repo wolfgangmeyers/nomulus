@@ -31,7 +31,9 @@ import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.LrpTokenEntity;
 import google.registry.model.export.LogsExportCursor;
 import google.registry.model.host.HostResource;
-import google.registry.model.icann.IcannReportField;
+import google.registry.model.icann.IcannDnsReportingFields;
+import google.registry.model.icann.IcannRegistrarReportingFields;
+import google.registry.model.icann.IcannTldReportingFields;
 import google.registry.model.index.DomainApplicationIndex;
 import google.registry.model.index.EppResourceIndex;
 import google.registry.model.index.EppResourceIndexBucket;
@@ -100,7 +102,9 @@ public final class EntityClasses {
           GaeUserIdConverter.class,
           HistoryEntry.class,
           HostResource.class,
-          IcannReportField.class,
+          IcannDnsReportingFields.class,
+          IcannRegistrarReportingFields.class,
+          IcannTldReportingFields.class,
           Lock.class,
           LogsExportCursor.class,
           LrpTokenEntity.class,

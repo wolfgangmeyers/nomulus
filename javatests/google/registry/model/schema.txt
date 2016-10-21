@@ -406,20 +406,38 @@ class google.registry.model.host.HostResource {
   org.joda.time.DateTime lastSuperordinateChange;
   org.joda.time.DateTime lastTransferTime;
 }
-class google.registry.model.icann.IcannReportField {
-  @Id java.lang.String id;
+class google.registry.model.icann.IcannDnsReportingFields {
+  @Id java.lang.String tld;
   @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
-  google.registry.model.icann.IcannReportField$Type type;
-  java.lang.Integer count;
-  java.lang.String month;
-  java.lang.String name;
-  java.lang.String tld;
-  java.lang.String year;
+  int dnsTcpQueriesReceivedCount;
+  int dnsTcpQueriesRespondedCount;
+  int dnsUdpQueriesReceivedCount;
+  int dnsUdpQueriesRespondedCount;
+  java.lang.String dnsTcpQueriesReceived;
+  java.lang.String dnsTcpQueriesResponded;
+  java.lang.String dnsUdpQueriesReceived;
+  java.lang.String dnsUdpQueriesResponded;
+  org.joda.time.YearMonth yearMonth;
 }
-enum google.registry.model.icann.IcannReportField$Type {
-  DNS;
-  REGISTRAR;
-  TLD;
+class google.registry.model.icann.IcannRegistrarReportingFields {
+  @Id java.lang.String clientId;
+  @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
+  int preRampUpRegistrarsCount;
+  int rampUpRegistrarsCount;
+  int zfaPasswordsCount;
+  java.lang.String tld;
+  org.joda.time.YearMonth yearMonth;
+}
+class google.registry.model.icann.IcannTldReportingFields {
+  @Id java.lang.String tld;
+  @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
+  int agpExemptedDomainsCount;
+  int agpExemptionRequestsCount;
+  int agpExemptionsGrantedCount;
+  int transferDisputedLostCount;
+  int transferDisputedNondecisionCount;
+  int transferDisputedWonCount;
+  org.joda.time.YearMonth yearMonth;
 }
 class google.registry.model.index.DomainApplicationIndex {
   @Id java.lang.String fullyQualifiedDomainName;

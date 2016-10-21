@@ -78,7 +78,7 @@ ext {
     mockitoVersion = '1.9.5'
     ftpServerCoreVersion = '1.0.6'
     fastUtilVersion = '6.4.3'
-    jacksonVersion = '2.5.1'
+    jacksonVersion = '2.8.3'
     minaCoreVersion = '2.0.0'
     slf4jVersion = '1.7.14'
 }

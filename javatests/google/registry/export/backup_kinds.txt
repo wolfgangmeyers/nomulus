@@ -12,7 +12,9 @@ ForeignKeyDomainIndex
 ForeignKeyHostIndex
 HistoryEntry
 HostResource
-IcannReportField
+IcannDnsReportingFields
+IcannRegistrarReportingFields
+IcannTldReportingFields
 LogsExportCursor
 LrpTokenEntity
 Modification
