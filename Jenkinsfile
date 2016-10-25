@@ -9,7 +9,7 @@ node {
     sh './gradlew clean test'
 
     // Publish the results of the tests
-    junit 'build/test-results/*.xml'
+    junit 'build/test-results/**/*.xml'
 
 // TODO: Enable when Jenkins supports disabling build on CI commit
 //    def currentBranch = sh(script: "git show -s --pretty=%d HEAD", returnStdout: true)
