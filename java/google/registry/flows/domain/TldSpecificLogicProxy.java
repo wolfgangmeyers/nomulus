@@ -17,17 +17,19 @@ package google.registry.flows.domain;
 import static com.google.common.base.Preconditions.checkArgument;
 import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
-import static google.registry.pricing.PricingEngineProxy.getPricesForDomainName;
+import static google.registry.pricing.PricingEngineProxy.getDomainCreateCost;
+import static google.registry.pricing.PricingEngineProxy.getDomainFeeClass;
+import static google.registry.pricing.PricingEngineProxy.getDomainRenewCost;
 import static google.registry.util.CollectionUtils.nullToEmpty;
 import static google.registry.util.PreconditionsUtils.checkArgumentNotNull;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
+import com.google.common.net.InternetDomainName;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
 import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.model.ImmutableObject;
-import google.registry.model.domain.DomainCommand.Create;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.LrpTokenEntity;
 import google.registry.model.domain.fee.BaseFee;
@@ -35,7 +37,6 @@ import google.registry.model.domain.fee.BaseFee.FeeType;
 import google.registry.model.domain.fee.Credit;
 import google.registry.model.domain.fee.Fee;
 import google.registry.model.eppinput.EppInput;
-import google.registry.model.pricing.PremiumPricingEngine.DomainPrices;
 import google.registry.model.registry.Registry;
 import java.util.List;
 import org.joda.money.CurrencyUnit;
@@ -152,9 +153,8 @@ public final class TldSpecificLogicProxy {
       createFeeOrCredit = extraFlowLogic.get()
           .getCreateFeeOrCredit(domainName, clientId, date, years, eppInput);
     } else {
-      DomainPrices prices = getPricesForDomainName(domainName, date);
       createFeeOrCredit =
-          Fee.create(prices.getCreateCost().multipliedBy(years).getAmount(), FeeType.CREATE);
+          Fee.create(getDomainCreateCost(domainName, date, years).getAmount(), FeeType.CREATE);
     }
 
     // Create fees for the cost and the EAP fee, if any.
@@ -188,8 +188,7 @@ public final class TldSpecificLogicProxy {
       return
           extraFlowLogic.get().getRenewFeeOrCredit(domain, clientId, date, years, eppInput);
     } else {
-      DomainPrices prices = getPricesForDomainName(domainName, date);
-      return Fee.create(prices.getRenewCost().multipliedBy(years).getAmount(), FeeType.RENEW);
+      return Fee.create(getDomainRenewCost(domainName, date, years).getAmount(), FeeType.RENEW);
     }
   }
 
@@ -262,27 +261,29 @@ public final class TldSpecificLogicProxy {
 
   /** Returns the fee class for a given domain and date. */
   public static Optional<String> getFeeClass(String domainName, DateTime date) {
-    return getPricesForDomainName(domainName, date).getFeeClass();
+    return getDomainFeeClass(domainName, date);
   }
 
   /**
-   * Checks whether a {@link Create} command has a valid {@link LrpTokenEntity} for a particular
-   * TLD, and return that token (wrapped in an {@link Optional}) if one exists.
+   * Checks whether an LRP token String maps to a valid {@link LrpTokenEntity} for the domain name's
+   * TLD, and return that entity (wrapped in an {@link Optional}) if one exists.
    *
    * <p>This method has no knowledge of whether or not an auth code (interpreted here as an LRP
    * token) has already been checked against the reserved list for QLP (anchor tenant), as auth
    * codes are used for both types of registrations.
    */
-  public static Optional<LrpTokenEntity> getMatchingLrpToken(Create createCommand, String tld) {
+  public static Optional<LrpTokenEntity> getMatchingLrpToken(
+      String lrpToken, InternetDomainName domainName) {
     // Note that until the actual per-TLD logic is built out, what's being done here is a basic
     // domain-name-to-assignee match.
-    String lrpToken = createCommand.getAuthInfo().getPw().getValue();
-    LrpTokenEntity token = ofy().load().key(Key.create(LrpTokenEntity.class, lrpToken)).now();
-    if (token != null) {
-      if (token.getAssignee().equalsIgnoreCase(createCommand.getFullyQualifiedDomainName())
-          && token.getRedemptionHistoryEntry() == null
-          && token.getValidTlds().contains(tld)) {
-        return Optional.of(token);
+    if (!lrpToken.isEmpty()) {
+      LrpTokenEntity token = ofy().load().key(Key.create(LrpTokenEntity.class, lrpToken)).now();
+      if (token != null) {
+        if (token.getAssignee().equalsIgnoreCase(domainName.toString())
+            && token.getRedemptionHistoryEntry() == null
+            && token.getValidTlds().contains(domainName.parent().toString())) {
+          return Optional.of(token);
+        }
       }
     }
     return Optional.<LrpTokenEntity>absent();

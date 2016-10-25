@@ -332,12 +332,12 @@ def FIELD_EXPOSERS = [
         "permission/FieldExposer.java",
         "poll/FieldExposer.java",
         "pricing/FieldExposer.java",
+        "rde/FieldExposer.java",
         "registrar/FieldExposer.java",
         "registry/FieldExposer.java",
         "registry/label/FieldExposer.java",
         "reporting/FieldExposer.java",
         "server/FieldExposer.java",
-        "rde/FieldExposer.java",
         "smd/FieldExposer.java",
         "tmch/FieldExposer.java",
         "transfer/FieldExposer.java",
@@ -373,7 +373,8 @@ task genFieldExposerRegistry << {
     def stdout = new ByteArrayOutputStream()
     exec {
         workingDir "$projectDir/java/google/registry/model/"
-        commandLine './generate_field_exposer_registry.sh', FIELD_EXPOSERS.join(", "),');'
+        def exposers = FIELD_EXPOSERS.collect { '/java/google/registry/model/' + it }.join(' ')
+        commandLine './generate_field_exposer_registry.sh', exposers
         standardOutput = stdout
     }
 

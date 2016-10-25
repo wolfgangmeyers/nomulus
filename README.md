@@ -24,6 +24,8 @@ running system:
 
 *   [Install
     guide](https://github.com/google/nomulus/blob/master/docs/install.md)
+*   View the source code in
+    [java/google/registry/](https://github.com/google/nomulus/tree/master/java/google/registry)
 *   [Other docs](https://github.com/google/nomulus/tree/master/docs)
 *   [Javadoc](https://nomulus.foo/javadoc/latest/)
 *   [Nomulus discussion
@@ -104,15 +106,17 @@ additional components that are not provided out of the box.
 
 **Additional functionality**
 
-*   An invoicing/payments system in order to charge registrars for domain name
-    registrations and accept payments.
-*   Fully automated reporting to meet ICANN's requirements for gTLDs.  Nomulus
+*   A way to invoice registrars for domain name registrations and accept
+    payments. Nomulus records the information required to generate invoices in
+    [billing
+    events](https://github.com/google/nomulus/blob/master/docs/code-structure.md#billing-events).
+*   Fully automated reporting to meet ICANN's requirements for gTLDs. Nomulus
     includes substantial reporting functionality but some additional work will
     be required by the operator in this area.
-*   A secure method for storing cryptographic keys.  A keyring interface is
-    provided for plugging in your own implementation (see [configuration doc](
-    https://github.com/google/nomulus/blob/master/docs/configuration.md) for
-    details).
+*   A secure method for storing cryptographic keys. A keyring interface is
+    provided for plugging in your own implementation (see [configuration
+    doc](https://github.com/google/nomulus/blob/master/docs/configuration.md)
+    for details).
 *   System status and uptime monitoring.
 
 ## Outside references
