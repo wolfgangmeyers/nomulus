@@ -13,7 +13,7 @@ java_library(
         "//java/com/google/common/base",
         "//java/com/google/common/collect",
         "//java/com/google/common/net",
-        "//java/domains/donuts/keyring",
+        "//java/domains/donuts",
         "//third_party/java/bouncycastle",
         "//third_party/java/dagger",
         "//third_party/java/joda_time",
@@ -54,7 +54,7 @@ java_binary(
     create_executable = 0,
     runtime_deps = [
         ":backend",
-        "//java/domains/donuts/config",  # DonutsRegistryConfig
+        "//java/domains/donuts",  # DonutsRegistryConfig
         "//java/google/registry/monitoring/whitebox",  # MetricsTaskServlet
     ],
 )
