@@ -10,11 +10,13 @@ import static google.registry.util.CollectionUtils.nullToEmpty;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static java.util.concurrent.TimeUnit.MILLISECONDS;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Function;
 import com.google.common.base.Optional;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
+import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
@@ -35,7 +37,6 @@ import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.common.TimedTransitionProperty;
 import google.registry.model.pricing.PricingCategory;
-import google.registry.model.registry.Registry;
 import google.registry.util.DateTimeUtils;
 
 import org.joda.money.Money;
@@ -85,27 +86,6 @@ public class CategorizedPremiumList
     }
   }
 
-  static CategorizedPremiumList savePremiumList(final String tld) {
-
-    // Build a new CategorizedPremiumList
-    final CategorizedPremiumList newPremiumList =
-        new CategorizedPremiumList.Builder().setName(tld).build().saveAndUpdateEntries();
-
-    ofy().transact(new VoidWork() {
-      @Override
-      public void vrun() {
-        ofy().save().entity(
-            Registry.get(tld)
-                .asBuilder()
-                .setPremiumList(newPremiumList)
-                .build())
-            .now();
-      }
-    });
-
-    return newPremiumList;
-  }
-
   /**
    * A categorized list entry entity, persisted to Datastore. Each instance represents the price
    * category of a single label on a TLD at a given time.
@@ -139,6 +119,14 @@ public class CategorizedPremiumList
     TimedTransitionProperty<String, PricingCategoryTransition> categoryTransitions =
         TimedTransitionProperty.forMapify(
             PricingCategory.UNINITIALIZED, PricingCategoryTransition.class);
+
+    /**
+     * Returns date transitions over a time period such as (AA -> AA+)
+     * @return
+     */
+    public ImmutableSortedMap<DateTime, String> getCategoryTransitions() {
+      return categoryTransitions.toValueMap();
+    }
 
     @Override
     public Builder asBuilder() {
@@ -242,6 +230,7 @@ public class CategorizedPremiumList
           }});
       }
     }
+
     // Save the new PremiumList itself.
     final CategorizedPremiumList updated = ofy().transactNew(new Work<CategorizedPremiumList>() {
         @Override
@@ -252,17 +241,64 @@ public class CategorizedPremiumList
               .setCreationTime(
                   oldPremiumList.isPresent() ? oldPremiumList.get().creationTime : now)
               .build();
+
+          saveAll(getPricingCategories(newList));
+
           ofy().save().entity(newList);
           return newList;
         }});
+
     // Update the cache.
     CategorizedPremiumList.cache.put(name, updated);
+
     // If needed and there are any, delete the entities under the old PremiumList.
     if (entriesToUpdate && oldPremiumList.isPresent()) {
       oldPremiumList.get().deleteEntries();
     }
     return updated;
   }
+
+  private void saveAll(List<PricingCategory> pricingCategories) {
+    for(PricingCategory pricingCategory : pricingCategories) {
+      ofy().save().entity(
+          pricingCategory.asBuilder()
+              .activate()
+              .build())
+          .now();
+    }
+  }
+
+  /**
+   * Method retrieves the unique list of PriceCategory objects extracted from the
+   * CategorizedPremiumList.CategorizedListEntry objects themselves
+   * @param categorizedPremiumList a CategorizedPremiumList
+   */
+  @VisibleForTesting
+  static List<PricingCategory> getPricingCategories(CategorizedPremiumList categorizedPremiumList) {
+    return FluentIterable.from(
+        categorizedPremiumList.getPremiumListEntries().values())
+        .transform(new Function<CategorizedListEntry, List<String>>() {
+          @Nullable
+          @Override
+          public List<String> apply(@Nullable CategorizedListEntry entry) {
+            return (List<String>) entry.getCategoryTransitions().values();
+          }
+        })
+        .transformAndConcat(new Function<List<String>, Iterable<String>>() {
+          @Nullable
+          @Override
+          public Iterable<String> apply(@Nullable List<String> pricingCategoryNames) {
+            return pricingCategoryNames;
+          }
+        }).transform(new Function<String, PricingCategory>() {
+          @Nullable
+          @Override
+          public PricingCategory apply(@Nullable String pricingCategoryName) {
+            return PricingCategory.get(pricingCategoryName).orNull();
+          }
+        }).toSet().asList(); // .toSet eliminates duplicate entries
+  }
+
 
   @Override
   public Optional<Money> getPremiumPrice(String label) {

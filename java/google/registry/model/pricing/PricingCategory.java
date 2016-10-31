@@ -36,7 +36,10 @@ import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.ImmutableObject;
 import google.registry.model.common.EntityGroupRoot;
+
 import org.joda.money.Money;
+import org.joda.time.DateTime;
+import org.joda.time.DateTimeZone;
 
 import java.util.concurrent.ExecutionException;
 
@@ -59,6 +62,9 @@ public class PricingCategory extends ImmutableObject
 
   Money price;
   String comment;
+
+  // Used to track when this PriceCategory has been assigned to a CategorizedListEntry or TLD
+  DateTime activationDate;
 
   public static Optional<PricingCategory> get(String name) {
     try {
@@ -102,6 +108,11 @@ public class PricingCategory extends ImmutableObject
     return comment;
   }
 
+  public DateTime getActivationDate() {
+    return activationDate;
+  }
+
+
   @Override
   public Builder asBuilder() {
     return new Builder(clone(this));
@@ -131,6 +142,19 @@ public class PricingCategory extends ImmutableObject
 
     public Builder setComment(String comment) {
       getInstance().comment = comment;
+      return this;
+    }
+
+    /**
+     * Activate this category, setting its activation date to now.  A category is activated
+     * the first time it is associated with a premium name or a TLD in order to prevent
+     * updates after that.
+     * @return a Builder object
+     */
+    public Builder activate() {
+      getInstance().activationDate = (getInstance().activationDate == null)
+          ? DateTime.now(DateTimeZone.UTC)
+          : getInstance().activationDate;
       return this;
     }
 

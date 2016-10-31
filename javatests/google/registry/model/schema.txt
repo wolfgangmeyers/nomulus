@@ -649,6 +649,7 @@ class google.registry.model.pricing.PricingCategory {
   @Parent com.googlecode.objectify.Key<google.registry.model.common.EntityGroupRoot> parent;
   java.lang.String comment;
   org.joda.money.Money price;
+  org.joda.time.DateTime activationDate;
 }
 class google.registry.model.rde.RdeRevision {
   @Id java.lang.String id;
