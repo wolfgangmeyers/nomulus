@@ -169,7 +169,7 @@ registry_ear_file(
     name = "registry_alpha_ear",
     out = "registry_alpha.ear",
     configs = {
-        "env/common/META-INF/appengine-application.xml": "META-INF/appengine-application.xml",
+        "env/alpha/META-INF/appengine-application.xml": "META-INF/appengine-application.xml",
         "env/common/META-INF/application.xml": "META-INF/application.xml",
     },
     wars = {

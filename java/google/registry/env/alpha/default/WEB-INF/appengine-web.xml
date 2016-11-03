@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <appengine-web-app xmlns="http://appengine.google.com/ns/1.0">
 
-  <application>domain-registry</application>
-  <version>1</version>
+  <application>domain-registry-alpha</application>
+  <version>alpha</version>
   <module>default</module>
   <threadsafe>true</threadsafe>
   <sessions-enabled>true</sessions-enabled>
@@ -17,6 +17,8 @@
               value="WEB-INF/logging.properties"/>
     <property name="google.registry.environment"
               value="alpha"/>
+    <property name="google.registry.config"
+              value="domains.donuts.config.DonutsRegistryConfig"/>
   </system-properties>
 
   <static-files>
@@ -26,4 +28,9 @@
     <include path="/assets/images/**" expiration="1m"/>
     <include path="/assets/sources/**" expiration="1m"/>
   </static-files>
+
+  <!-- Prevent uncaught servlet errors from leaking a stack trace. -->
+  <static-error-handlers>
+    <handler file="error.html"/>
+  </static-error-handlers>
 </appengine-web-app>
