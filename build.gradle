@@ -34,7 +34,7 @@ configurations { soyGenerator }
 
 ext {
     // Dependency Versions
-    daggerVersion = '2.5'
+    daggerVersion = '2.7'
 
     autoCommonVersion = '0.7'
     autoFactoryVersion = '1.0-beta3'

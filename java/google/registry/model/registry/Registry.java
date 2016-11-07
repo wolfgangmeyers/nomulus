@@ -237,6 +237,11 @@ public class Registry extends ImmutableObject implements Buildable {
     return registry;
   }
 
+  /** Returns true if the given TLD exists */
+  public static boolean exists(String tld) {
+    return CACHE.getUnchecked(tld).orNull() != null;
+  }
+
   /** Whenever a registry is saved, invalidate the cache entry. */
   @OnSave
   void updateCache() {

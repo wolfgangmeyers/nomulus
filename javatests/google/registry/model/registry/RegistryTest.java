@@ -75,6 +75,18 @@ public class RegistryTest extends EntityTestCase {
   }
 
   @Test
+  public void testSuccess_registryDoesNotExist() throws Exception {
+    createTld("foo");
+    assertThat(Registry.exists("baz")).isFalse();
+  }
+
+  @Test
+  public void testSuccess_registryExist() throws Exception {
+    createTld("foo");
+    assertThat(Registry.exists("foo")).isTrue();
+  }
+
+  @Test
   public void testIndexing() throws Exception {
     verifyIndexing(Registry.get("tld"));
   }
