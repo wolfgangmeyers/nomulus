@@ -12,13 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package google.registry.flows.exceptions;
+package google.registry.flows;
 
-import google.registry.flows.EppException.ParameterValuePolicyErrorException;
+import google.registry.flows.EppException.CommandUseErrorException;
 
-/** Cannot add and remove the same value. */
-public class AddRemoveSameValueEppException extends ParameterValuePolicyErrorException {
-  public AddRemoveSameValueEppException() {
-    super("Cannot add and remove the same value");
+/** Static utility functions for flows. */
+public final class FlowUtils {
+
+  private FlowUtils() {}
+
+  /** Validate that there is a logged in client. */
+  public static void validateClientIsLoggedIn(String clientId) throws EppException {
+    if (clientId.isEmpty()) {
+      throw new NotLoggedInException();
+    }
+  }
+
+  /** Registrar is not logged in. */
+  public static class NotLoggedInException extends CommandUseErrorException {
+    public NotLoggedInException() {
+      super("Registrar is not logged in.");
+    }
   }
 }

@@ -47,7 +47,6 @@ import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DesignatedContact.Type;
 import google.registry.model.domain.launch.LaunchNotice;
 import google.registry.model.domain.secdns.DelegationSignerData;
-import google.registry.model.eppcommon.AuthInfo;
 import google.registry.model.host.HostResource;
 import java.util.Set;
 import javax.xml.bind.annotation.XmlElement;
@@ -183,11 +182,7 @@ public abstract class DomainBase extends EppResource {
   }
 
   public ImmutableSet<Key<HostResource>> getNameservers() {
-    ImmutableSet.Builder<Key<HostResource>> builder = new ImmutableSet.Builder<>();
-    for (ReferenceUnion<HostResource> union : nullToEmptyImmutableCopy(nameservers)) {
-      builder.add(union.getLinked());
-    }
-    return builder.build();
+    return nullToEmptyImmutableCopy(nsHosts);
   }
 
   /** Loads and returns the fully qualified host names of all linked nameservers. */
@@ -221,7 +216,7 @@ public abstract class DomainBase extends EppResource {
         .toSet();
   }
 
-  public AuthInfo getAuthInfo() {
+  public DomainAuthInfo getAuthInfo() {
     return authInfo;
   }
 
@@ -242,13 +237,13 @@ public abstract class DomainBase extends EppResource {
   @OnSave
   void dualSaveReferenceUnions() {
     for (DesignatedContact contact : nullToEmptyImmutableCopy(allContacts)) {
-      contact.contact = contact.contactId.getLinked();
+      contact.contactId = ReferenceUnion.create(contact.contact);
     }
-    ImmutableSet.Builder<Key<HostResource>> hostKeys = new ImmutableSet.Builder<>();
-    for (ReferenceUnion<HostResource> refUnion : nullToEmptyImmutableCopy(nameservers)) {
-      hostKeys.add(refUnion.getLinked());
+    ImmutableSet.Builder<ReferenceUnion<HostResource>> hosts = new ImmutableSet.Builder<>();
+    for (Key<HostResource> hostKey : nullToEmptyImmutableCopy(nsHosts)) {
+      hosts.add(ReferenceUnion.create(hostKey));
     }
-    nsHosts = hostKeys.build();
+    nameservers = hosts.build();
   }
 
   /** Predicate to determine if a given {@link DesignatedContact} is the registrant. */
@@ -307,11 +302,7 @@ public abstract class DomainBase extends EppResource {
     }
 
     public B setNameservers(ImmutableSet<Key<HostResource>> nameservers) {
-      ImmutableSet.Builder<ReferenceUnion<HostResource>> builder = new ImmutableSet.Builder<>();
-      for (Key<HostResource> key : nullToEmpty(nameservers)) {
-        builder.add(ReferenceUnion.create(key));
-      }
-      getInstance().nameservers = builder.build();
+      getInstance().nsHosts = nameservers;
       return thisCastToDerived();
     }
 

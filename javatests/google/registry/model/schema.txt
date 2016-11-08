@@ -203,6 +203,7 @@ class google.registry.model.domain.DomainApplication {
   google.registry.model.CreateAutoTimestamp creationTime;
   google.registry.model.UpdateAutoTimestamp updateTimestamp;
   google.registry.model.domain.DomainAuthInfo authInfo;
+  google.registry.model.domain.Period period;
   google.registry.model.domain.launch.ApplicationStatus applicationStatus;
   google.registry.model.domain.launch.LaunchNotice launchNotice;
   google.registry.model.domain.launch.LaunchPhase phase;

@@ -28,14 +28,11 @@ import google.registry.flows.FlowModule.InputXml;
 import google.registry.flows.FlowModule.Superuser;
 import google.registry.flows.FlowModule.Transactional;
 import google.registry.model.eppcommon.Trid;
-import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppoutput.EppOutput;
 import google.registry.monitoring.whitebox.EppMetric;
-import google.registry.util.Clock;
 import google.registry.util.FormattingLogger;
 import javax.inject.Inject;
 import javax.inject.Provider;
-import org.joda.time.DateTime;
 import org.json.simple.JSONValue;
 
 /** Run a flow, either transactionally or not, with logging and retrying as needed. */
@@ -56,9 +53,7 @@ public class FlowRunner {
   private static final FormattingLogger logger = FormattingLogger.getLoggerForCallerClass();
 
   @Inject @ClientId String clientId;
-  @Inject Clock clock;
   @Inject TransportCredentials credentials;
-  @Inject EppInput eppInput;
   @Inject EppRequestSource eppRequestSource;
   @Inject Provider<Flow> flowProvider;
   @Inject @InputXml byte[] inputXmlBytes;
@@ -99,92 +94,31 @@ public class FlowRunner {
             "xmlBytes", xmlBase64)));
     if (!isTransactional) {
       metric.incrementAttempts();
-      return createAndInitFlow(clock.nowUtc()).run();
+      return EppOutput.create(flowProvider.get().run());
     }
-    // We log the command in a structured format. Note that we do this before the transaction;
-    // if we did it after, we might miss a transaction that committed successfully but then crashed
-    // before it could log.
-    logger.info("EPP_Mutation " + new JsonLogStatement(trid)
-        .add("client", clientId)
-        .add("privileges", isSuperuser ? "SUPERUSER" : "NORMAL")
-        .add("xmlBytes", xmlBase64));
     try {
-      EppOutput flowResult =
-          ofy()
-              .transact(
-                  new Work<EppOutput>() {
-                    @Override
-                    public EppOutput run() {
-                      metric.incrementAttempts();
-                      try {
-                        EppOutput output = createAndInitFlow(ofy().getTransactionTime()).run();
-                        if (isDryRun) {
-                          throw new DryRunException(output);
-                        }
-                        return output;
-                      } catch (EppException e) {
-                        throw new RuntimeException(e);
-                      }
-                    }
-                  });
-      logger.info("EPP_Mutation_Committed " + new JsonLogStatement(trid)
-          .add("executionTime", flowResult.getResponse().getExecutionTime().getMillis()));
-      return flowResult;
+      return ofy().transact(new Work<EppOutput>() {
+        @Override
+        public EppOutput run() {
+          metric.incrementAttempts();
+          try {
+            EppOutput output = EppOutput.create(flowProvider.get().run());
+            if (isDryRun) {
+              throw new DryRunException(output);
+            }
+            return output;
+          } catch (EppException e) {
+            throw new RuntimeException(e);
+          }
+        }});
     } catch (DryRunException e) {
       return e.output;
     } catch (RuntimeException e) {
-      logger.warning("EPP_Mutation_Failed " + new JsonLogStatement(trid));
       logger.warning(getStackTraceAsString(e));
       if (e.getCause() instanceof EppException) {
         throw (EppException) e.getCause();
       }
       throw e;
-    }
-  }
-
-  private Flow createAndInitFlow(DateTime now) throws EppException {
-      return flowProvider.get().init(
-          eppInput,
-          trid,
-          sessionMetadata,
-          credentials,
-          isSuperuser,
-          now);
-  }
-
-  /**
-   * Helper for logging in json format.
-   *
-   * <p>This is needed because the usual json outputters perform normalizations that we don't want
-   * or need, since we know that our values never need to be escaped - there are only strings and
-   * numbers, and the strings are not allowed to contain quote characters.
-   *
-   * <p>An example output for an EPP_Mutation: {"trid":"abc-123", "client":"some_registrar",
-   * "tld":"com", "xmlBytes":"abc123DEF"}
-   *
-   * <p>An example output for an EPP_Mutation_Committed that doesn't create a new resource:
-   * {"trid":"abc-123", "executionTime":123456789}
-   */
-  private static class JsonLogStatement {
-
-    StringBuilder message;
-
-    JsonLogStatement(Trid trid) {
-      message =
-          new StringBuilder("{\"trid\":\"").append(trid.getServerTransactionId()).append('\"');
-    }
-
-    JsonLogStatement add(String key, Object value) {
-      if (value != null) {
-        String quote = value instanceof String ? "\"" : "";
-        message.append(String.format(", \"%s\":%s%s%s", key, quote, value, quote));
-      }
-      return this;
-    }
-
-    @Override
-    public String toString() {
-      return message + "}";
     }
   }
 

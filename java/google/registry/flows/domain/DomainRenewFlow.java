@@ -14,6 +14,7 @@
 
 package google.registry.flows.domain;
 
+import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyNoDisallowedStatuses;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
@@ -27,7 +28,6 @@ import static google.registry.flows.domain.DomainFlowUtils.verifyUnitIsYears;
 import static google.registry.model.domain.DomainResource.MAX_REGISTRATION_YEARS;
 import static google.registry.model.domain.DomainResource.extendRegistrationWithCap;
 import static google.registry.model.domain.fee.Fee.FEE_RENEW_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
-import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.util.DateTimeUtils.leapSafeAddYears;
 
@@ -38,9 +38,10 @@ import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ObjectPendingTransferException;
 import google.registry.flows.EppException.ParameterValueRangeErrorException;
+import google.registry.flows.ExtensionManager;
 import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.FlowModule.Superuser;
 import google.registry.flows.FlowModule.TargetId;
-import google.registry.flows.LoggedInFlow;
 import google.registry.flows.TransactionalFlow;
 import google.registry.flows.domain.TldSpecificLogicProxy.EppCommandOperations;
 import google.registry.model.billing.BillingEvent;
@@ -58,8 +59,9 @@ import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.eppcommon.AuthInfo;
 import google.registry.model.eppcommon.StatusValue;
+import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppinput.ResourceCommand;
-import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.registry.Registry;
 import google.registry.model.reporting.HistoryEntry;
@@ -95,7 +97,7 @@ import org.joda.time.DateTime;
  * @error {@link DomainRenewFlow.ExceedsMaxRegistrationYearsException}
  * @error {@link DomainRenewFlow.IncorrectCurrentExpirationDateException}
  */
-public final class DomainRenewFlow extends LoggedInFlow implements TransactionalFlow {
+public final class DomainRenewFlow implements TransactionalFlow {
 
   private static final ImmutableSet<StatusValue> RENEW_DISALLOWED_STATUSES = ImmutableSet.of(
       StatusValue.CLIENT_RENEW_PROHIBITED,
@@ -103,20 +105,23 @@ public final class DomainRenewFlow extends LoggedInFlow implements Transactional
       StatusValue.SERVER_RENEW_PROHIBITED);
 
   @Inject ResourceCommand resourceCommand;
+  @Inject ExtensionManager extensionManager;
+  @Inject EppInput eppInput;
   @Inject Optional<AuthInfo> authInfo;
   @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
+  @Inject @Superuser boolean isSuperuser;
   @Inject HistoryEntry.Builder historyBuilder;
+  @Inject EppResponse.Builder responseBuilder;
   @Inject DomainRenewFlow() {}
 
   @Override
-  protected final void initLoggedInFlow() throws EppException {
-    registerExtensions(MetadataExtension.class);
-    registerExtensions(FEE_RENEW_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
-  }
-
-  @Override
-  public final EppOutput run() throws EppException {
+  public final EppResponse run() throws EppException {
+    extensionManager.register(MetadataExtension.class);
+    extensionManager.registerAsGroup(FEE_RENEW_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
+    extensionManager.validate();
+    validateClientIsLoggedIn(clientId);
+    DateTime now = ofy().getTransactionTime();
     Renew command = (Renew) resourceCommand;
     // Loads the target resource if it exists
     DomainResource existingDomain = loadAndVerifyExistence(DomainResource.class, targetId, now);
@@ -142,7 +147,7 @@ public final class DomainRenewFlow extends LoggedInFlow implements Transactional
     String tld = existingDomain.getTld();
     // Bill for this explicit renew itself.
     BillingEvent.OneTime explicitRenewEvent =
-        createRenewBillingEvent(tld, commandOperations.getTotalCost(), years, historyEntry);
+        createRenewBillingEvent(tld, commandOperations.getTotalCost(), years, historyEntry, now);
     // Create a new autorenew billing event and poll message starting at the new expiration time.
     BillingEvent.Recurring newAutorenewEvent = newAutorenewBillingEvent(existingDomain)
         .setEventTime(newExpirationTime)
@@ -160,7 +165,6 @@ public final class DomainRenewFlow extends LoggedInFlow implements Transactional
     if (extraFlowLogic.isPresent()) {
       extraFlowLogic.get().performAdditionalDomainRenewLogic(
           existingDomain, clientId, now, years, eppInput, historyEntry);
-      extraFlowLogic.get().commitAdditionalLogicChanges();
     }
     DomainResource newDomain = existingDomain.asBuilder()
         .setRegistrationExpirationTime(newExpirationTime)
@@ -170,10 +174,10 @@ public final class DomainRenewFlow extends LoggedInFlow implements Transactional
         .build();
     ofy().save().<Object>entities(
         newDomain, historyEntry, explicitRenewEvent, newAutorenewEvent, newAutorenewPollMessage);
-    return createOutput(
-        SUCCESS,
-        DomainRenewData.create(targetId, newExpirationTime),
-        createResponseExtensions(commandOperations.getTotalCost(), feeRenew));
+    return responseBuilder
+        .setResData(DomainRenewData.create(targetId, newExpirationTime))
+        .setExtensions(createResponseExtensions(commandOperations.getTotalCost(), feeRenew))
+        .build();
   }
 
   private void verifyRenewAllowed(
@@ -185,7 +189,7 @@ public final class DomainRenewFlow extends LoggedInFlow implements Transactional
     if (!isSuperuser) {
       verifyResourceOwnership(clientId, existingDomain);
     }
-    checkAllowedAccessToTld(getAllowedTlds(), existingDomain.getTld());
+    checkAllowedAccessToTld(clientId, existingDomain.getTld());
     // Verify that the resource does not have a pending transfer on it.
     if (existingDomain.getTransferData().getTransferStatus() == TransferStatus.PENDING) {
       throw new DomainHasPendingTransferException(targetId);
@@ -199,7 +203,7 @@ public final class DomainRenewFlow extends LoggedInFlow implements Transactional
   }
 
   private OneTime createRenewBillingEvent(
-      String tld, Money renewCost, int years, HistoryEntry historyEntry) {
+      String tld, Money renewCost, int years, HistoryEntry historyEntry, DateTime now) {
     return new BillingEvent.OneTime.Builder()
         .setReason(Reason.RENEW)
         .setTargetId(targetId)

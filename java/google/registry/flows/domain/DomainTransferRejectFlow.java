@@ -14,6 +14,7 @@
 
 package google.registry.flows.domain;
 
+import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.denyPendingTransfer;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyHasPendingTransfer;
@@ -23,25 +24,25 @@ import static google.registry.flows.domain.DomainFlowUtils.checkAllowedAccessToT
 import static google.registry.flows.domain.DomainFlowUtils.createGainingTransferPollMessage;
 import static google.registry.flows.domain.DomainFlowUtils.createTransferResponse;
 import static google.registry.flows.domain.DomainFlowUtils.updateAutorenewRecurrenceEndTime;
-import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
 
 import com.google.common.base.Optional;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
+import google.registry.flows.ExtensionManager;
 import google.registry.flows.FlowModule.ClientId;
 import google.registry.flows.FlowModule.TargetId;
-import google.registry.flows.LoggedInFlow;
 import google.registry.flows.TransactionalFlow;
 import google.registry.model.ImmutableObject;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.eppcommon.AuthInfo;
-import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.transfer.TransferStatus;
 import javax.inject.Inject;
+import org.joda.time.DateTime;
 
 /**
  * An EPP flow that rejects a pending transfer on a domain.
@@ -61,21 +62,22 @@ import javax.inject.Inject;
  * @error {@link google.registry.flows.exceptions.NotPendingTransferException}
  * @error {@link DomainFlowUtils.NotAuthorizedForTldException}
  */
-public final class DomainTransferRejectFlow extends LoggedInFlow implements TransactionalFlow {
+public final class DomainTransferRejectFlow implements TransactionalFlow {
 
+  @Inject ExtensionManager extensionManager;
   @Inject Optional<AuthInfo> authInfo;
   @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
   @Inject HistoryEntry.Builder historyBuilder;
+  @Inject EppResponse.Builder responseBuilder;
   @Inject DomainTransferRejectFlow() {}
 
   @Override
-  protected final void initLoggedInFlow() throws EppException {
-    registerExtensions(MetadataExtension.class);
-  }
-
-  @Override
-  public final EppOutput run() throws EppException {
+  public final EppResponse run() throws EppException {
+    extensionManager.register(MetadataExtension.class);
+    extensionManager.validate();
+    validateClientIsLoggedIn(clientId);
+    DateTime now = ofy().getTransactionTime();
     DomainResource existingDomain = loadAndVerifyExistence(DomainResource.class, targetId, now);
     HistoryEntry historyEntry = historyBuilder
         .setType(HistoryEntry.Type.DOMAIN_TRANSFER_REJECT)
@@ -85,7 +87,7 @@ public final class DomainTransferRejectFlow extends LoggedInFlow implements Tran
     verifyOptionalAuthInfoForResource(authInfo, existingDomain);
     verifyHasPendingTransfer(existingDomain);
     verifyResourceOwnership(clientId, existingDomain);
-    checkAllowedAccessToTld(getAllowedTlds(), existingDomain.getTld());
+    checkAllowedAccessToTld(clientId, existingDomain.getTld());
     DomainResource newDomain =
         denyPendingTransfer(existingDomain, TransferStatus.CLIENT_REJECTED, now);
     ofy().save().<ImmutableObject>entities(
@@ -99,8 +101,8 @@ public final class DomainTransferRejectFlow extends LoggedInFlow implements Tran
     // Delete the billing event and poll messages that were written in case the transfer would have
     // been implicitly server approved.
     ofy().delete().keys(existingDomain.getTransferData().getServerApproveEntities());
-    return createOutput(
-        SUCCESS,
-        createTransferResponse(targetId, newDomain.getTransferData(), null));
+    return responseBuilder
+        .setResData(createTransferResponse(targetId, newDomain.getTransferData(), null))
+        .build();
   }
 }

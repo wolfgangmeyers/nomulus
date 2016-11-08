@@ -16,6 +16,11 @@ package google.registry.flows.domain;
 
 import static com.google.common.base.CaseFormat.LOWER_CAMEL;
 import static com.google.common.base.CaseFormat.UPPER_UNDERSCORE;
+import static com.google.common.base.MoreObjects.firstNonNull;
+import static com.google.common.collect.Sets.union;
+import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
+import static google.registry.flows.ResourceFlowUtils.checkSameValuesNotAddedAndRemoved;
+import static google.registry.flows.ResourceFlowUtils.verifyAllStatusesAreClientSettable;
 import static google.registry.flows.ResourceFlowUtils.verifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyNoDisallowedStatuses;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
@@ -33,10 +38,8 @@ import static google.registry.flows.domain.DomainFlowUtils.validateRequiredConta
 import static google.registry.flows.domain.DomainFlowUtils.verifyApplicationDomainMatchesTargetId;
 import static google.registry.flows.domain.DomainFlowUtils.verifyClientUpdateNotProhibited;
 import static google.registry.flows.domain.DomainFlowUtils.verifyNotInPendingDelete;
-import static google.registry.flows.domain.DomainFlowUtils.verifyStatusChangesAreClientSettable;
 import static google.registry.model.EppResourceUtils.loadDomainApplication;
 import static google.registry.model.domain.fee.Fee.FEE_UPDATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER;
-import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 
 import com.google.common.base.Optional;
@@ -45,27 +48,29 @@ import com.google.common.collect.Sets;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
+import google.registry.flows.ExtensionManager;
 import google.registry.flows.FlowModule.ApplicationId;
 import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.FlowModule.Superuser;
 import google.registry.flows.FlowModule.TargetId;
-import google.registry.flows.LoggedInFlow;
 import google.registry.flows.TransactionalFlow;
-import google.registry.flows.exceptions.AddRemoveSameValueEppException;
 import google.registry.model.ImmutableObject;
 import google.registry.model.domain.DomainApplication;
-import google.registry.model.domain.DomainApplication.Builder;
 import google.registry.model.domain.DomainCommand.Update;
+import google.registry.model.domain.DomainCommand.Update.AddRemove;
+import google.registry.model.domain.DomainCommand.Update.Change;
 import google.registry.model.domain.launch.ApplicationStatus;
 import google.registry.model.domain.launch.LaunchUpdateExtension;
 import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.domain.secdns.SecDnsUpdateExtension;
 import google.registry.model.eppcommon.AuthInfo;
 import google.registry.model.eppcommon.StatusValue;
+import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppinput.ResourceCommand;
-import google.registry.model.eppinput.ResourceCommand.AddRemoveSameValueException;
-import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.reporting.HistoryEntry;
 import javax.inject.Inject;
+import org.joda.time.DateTime;
 
 /**
  * An EPP flow that updates a domain application.
@@ -74,12 +79,12 @@ import javax.inject.Inject;
  * cannot change the domain name that is being applied for.
  *
  * @error {@link google.registry.flows.EppException.UnimplementedExtensionException}
+ * @error {@link google.registry.flows.ResourceFlowUtils.AddRemoveSameValueException}
  * @error {@link google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException}
  * @error {@link google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException}
- * @error {@link google.registry.flows.exceptions.AddRemoveSameValueEppException}
+ * @error {@link google.registry.flows.ResourceFlowUtils.StatusNotClientSettableException}
  * @error {@link google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException}
  * @error {@link google.registry.flows.exceptions.ResourceStatusProhibitsOperationException}
- * @error {@link google.registry.flows.exceptions.StatusNotClientSettableException}
  * @error {@link DomainFlowUtils.ApplicationDomainNameMismatchException}
  * @error {@link DomainFlowUtils.DuplicateContactForRoleException}
  * @error {@link DomainFlowUtils.EmptySecDnsUpdateException}
@@ -97,7 +102,7 @@ import javax.inject.Inject;
  * @error {@link DomainFlowUtils.UrgentAttributeNotSupportedException}
  * @error {@link DomainApplicationUpdateFlow.ApplicationStatusProhibitsUpdateException}
  */
-public class DomainApplicationUpdateFlow extends LoggedInFlow implements TransactionalFlow {
+public class DomainApplicationUpdateFlow implements TransactionalFlow {
 
   /**
    * Note that CLIENT_UPDATE_PROHIBITED is intentionally not in this list. This is because it
@@ -116,22 +121,27 @@ public class DomainApplicationUpdateFlow extends LoggedInFlow implements Transac
           ApplicationStatus.ALLOCATED);
 
   @Inject ResourceCommand resourceCommand;
+  @Inject ExtensionManager extensionManager;
+  @Inject EppInput eppInput;
   @Inject Optional<AuthInfo> authInfo;
   @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
   @Inject @ApplicationId String applicationId;
+  @Inject @Superuser boolean isSuperuser;
   @Inject HistoryEntry.Builder historyBuilder;
+  @Inject EppResponse.Builder responseBuilder;
   @Inject DomainApplicationUpdateFlow() {}
 
   @Override
-  protected final void initLoggedInFlow() throws EppException {
-    registerExtensions(FEE_UPDATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
-    registerExtensions(
-        MetadataExtension.class, LaunchUpdateExtension.class, SecDnsUpdateExtension.class);
-  }
-
-  @Override
-  public final EppOutput run() throws EppException {
+  public final EppResponse run() throws EppException {
+    extensionManager.register(
+        LaunchUpdateExtension.class,
+        MetadataExtension.class,
+        SecDnsUpdateExtension.class);
+    extensionManager.registerAsGroup(FEE_UPDATE_COMMAND_EXTENSIONS_IN_PREFERENCE_ORDER);
+    extensionManager.validate();
+    validateClientIsLoggedIn(clientId);
+    DateTime now = ofy().getTransactionTime();
     Update command = cloneAndLinkReferences((Update) resourceCommand, now);
     DomainApplication existingApplication = verifyExistence(
         DomainApplication.class, applicationId, loadDomainApplication(applicationId, now));
@@ -139,39 +149,41 @@ public class DomainApplicationUpdateFlow extends LoggedInFlow implements Transac
     verifyNoDisallowedStatuses(existingApplication, UPDATE_DISALLOWED_STATUSES);
     verifyOptionalAuthInfoForResource(authInfo, existingApplication);
     verifyUpdateAllowed(existingApplication, command);
-    HistoryEntry historyEntry = buildHistory(existingApplication);
-    DomainApplication newApplication = updateApplication(existingApplication, command);
+    HistoryEntry historyEntry = buildHistory(existingApplication, now);
+    DomainApplication newApplication = updateApplication(existingApplication, command, now);
     validateNewApplication(newApplication);
     ofy().save().<ImmutableObject>entities(newApplication, historyEntry);
-    return createOutput(SUCCESS);
+    return responseBuilder.build();
   }
 
   protected final void verifyUpdateAllowed(
       DomainApplication existingApplication, Update command) throws EppException {
+    AddRemove add = command.getInnerAdd();
+    AddRemove remove = command.getInnerRemove();
     if (!isSuperuser) {
       verifyResourceOwnership(clientId, existingApplication);
       verifyClientUpdateNotProhibited(command, existingApplication);
-      verifyStatusChangesAreClientSettable(command);
+      verifyAllStatusesAreClientSettable(union(add.getStatusValues(), remove.getStatusValues()));
     }
     String tld = existingApplication.getTld();
-    checkAllowedAccessToTld(getAllowedTlds(), tld);
+    checkAllowedAccessToTld(clientId, tld);
     if (UPDATE_DISALLOWED_APPLICATION_STATUSES
         .contains(existingApplication.getApplicationStatus())) {
       throw new ApplicationStatusProhibitsUpdateException(
           existingApplication.getApplicationStatus());
     }
     verifyNotInPendingDelete(
-        command.getInnerAdd().getContacts(),
+        add.getContacts(),
         command.getInnerChange().getRegistrant(),
-        command.getInnerAdd().getNameservers());
-    validateContactsHaveTypes(command.getInnerAdd().getContacts());
-    validateContactsHaveTypes(command.getInnerRemove().getContacts());
+        add.getNameservers());
+    validateContactsHaveTypes(add.getContacts());
+    validateContactsHaveTypes(remove.getContacts());
     validateRegistrantAllowedOnTld(tld, command.getInnerChange().getRegistrantContactId());
     validateNameserversAllowedOnTld(
-        tld, command.getInnerAdd().getNameserverFullyQualifiedHostNames());
+        tld, add.getNameserverFullyQualifiedHostNames());
   }
 
-  private HistoryEntry buildHistory(DomainApplication existingApplication) {
+  private HistoryEntry buildHistory(DomainApplication existingApplication, DateTime now) {
     return historyBuilder
         .setType(HistoryEntry.Type.DOMAIN_APPLICATION_UPDATE)
         .setModificationTime(now)
@@ -180,20 +192,30 @@ public class DomainApplicationUpdateFlow extends LoggedInFlow implements Transac
   }
 
   private DomainApplication updateApplication(
-      DomainApplication existingApplication, Update command) throws EppException {
-    Builder builder = existingApplication.asBuilder();
-    try {
-      command.applyTo(builder);
-    } catch (AddRemoveSameValueException e) {
-      throw new AddRemoveSameValueEppException();
-    }
-    builder.setLastEppUpdateTime(now).setLastEppUpdateClientId(clientId);
-    // Handle the secDNS extension.
+      DomainApplication application, Update command, DateTime now) throws EppException {
+    AddRemove add = command.getInnerAdd();
+    AddRemove remove = command.getInnerRemove();
+    checkSameValuesNotAddedAndRemoved(add.getNameservers(), remove.getNameservers());
+    checkSameValuesNotAddedAndRemoved(add.getContacts(), remove.getContacts());
+    checkSameValuesNotAddedAndRemoved(add.getStatusValues(), remove.getStatusValues());
+    Change change = command.getInnerChange();
     SecDnsUpdateExtension secDnsUpdate = eppInput.getSingleExtension(SecDnsUpdateExtension.class);
-    if (secDnsUpdate != null) {
-      builder.setDsData(updateDsData(existingApplication.getDsData(), secDnsUpdate));
-    }
-    return builder.build();
+    return application.asBuilder()
+        // Handle the secDNS extension.
+        .setDsData(secDnsUpdate != null
+            ? updateDsData(application.getDsData(), secDnsUpdate)
+            : application.getDsData())
+        .setLastEppUpdateTime(now)
+        .setLastEppUpdateClientId(clientId)
+        .addStatusValues(add.getStatusValues())
+        .removeStatusValues(remove.getStatusValues())
+        .addNameservers(add.getNameservers())
+        .removeNameservers(remove.getNameservers())
+        .addContacts(add.getContacts())
+        .removeContacts(remove.getContacts())
+        .setRegistrant(firstNonNull(change.getRegistrant(), application.getRegistrant()))
+        .setAuthInfo(firstNonNull(change.getAuthInfo(), application.getAuthInfo()))
+        .build();
   }
 
   private void validateNewApplication(DomainApplication newApplication) throws EppException {

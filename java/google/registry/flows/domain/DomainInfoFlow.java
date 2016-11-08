@@ -14,11 +14,11 @@
 
 package google.registry.flows.domain;
 
+import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
 import static google.registry.flows.domain.DomainFlowUtils.addSecDnsExtensionIfPresent;
 import static google.registry.flows.domain.DomainFlowUtils.handleFeeRequest;
-import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 import static google.registry.util.CollectionUtils.forceEmptyToNull;
 
 import com.google.common.base.Optional;
@@ -26,9 +26,10 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InternetDomainName;
 import google.registry.flows.EppException;
+import google.registry.flows.ExtensionManager;
+import google.registry.flows.Flow;
 import google.registry.flows.FlowModule.ClientId;
 import google.registry.flows.FlowModule.TargetId;
-import google.registry.flows.LoggedInFlow;
 import google.registry.model.domain.DomainCommand.Info;
 import google.registry.model.domain.DomainCommand.Info.HostsRequest;
 import google.registry.model.domain.DomainResource;
@@ -39,11 +40,14 @@ import google.registry.model.domain.flags.FlagsInfoResponseExtension;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.domain.rgp.RgpInfoExtension;
 import google.registry.model.eppcommon.AuthInfo;
+import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppinput.ResourceCommand;
-import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.eppoutput.EppResponse.ResponseExtension;
+import google.registry.util.Clock;
 import java.util.Set;
 import javax.inject.Inject;
+import org.joda.time.DateTime;
 
 /**
  * An EPP flow that returns information about a domain.
@@ -59,27 +63,30 @@ import javax.inject.Inject;
  * @error {@link DomainFlowUtils.FeeChecksDontSupportPhasesException}
  * @error {@link DomainFlowUtils.RestoresAreAlwaysForOneYearException}
  */
-public final class DomainInfoFlow extends LoggedInFlow {
+public final class DomainInfoFlow implements Flow {
 
+  @Inject ExtensionManager extensionManager;
+  @Inject ResourceCommand resourceCommand;
+  @Inject EppInput eppInput;
   @Inject Optional<AuthInfo> authInfo;
   @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
-  @Inject ResourceCommand resourceCommand;
+  @Inject Clock clock;
+  @Inject EppResponse.Builder responseBuilder;
   @Inject DomainInfoFlow() {}
 
   @Override
-  protected void initLoggedInFlow() throws EppException {
-    registerExtensions(FeeInfoCommandExtensionV06.class);
-  }
-
-  @Override
-  public final EppOutput run() throws EppException {
+  public final EppResponse run() throws EppException {
+    extensionManager.register(FeeInfoCommandExtensionV06.class);
+    extensionManager.validate();
+    validateClientIsLoggedIn(clientId);
+    DateTime now = clock.nowUtc();
     DomainResource domain = loadAndVerifyExistence(DomainResource.class, targetId, now);
     verifyOptionalAuthInfoForResource(authInfo, domain);
-    return createOutput(
-        SUCCESS,
-        getResourceInfo(domain),
-        getDomainResponseExtensions(domain));
+    return responseBuilder
+        .setResData(getResourceInfo(domain))
+        .setExtensions(getDomainResponseExtensions(domain, now))
+        .build();
   }
 
   private DomainResource getResourceInfo(DomainResource domain) {
@@ -110,8 +117,8 @@ public final class DomainInfoFlow extends LoggedInFlow {
     return info.build();
   }
 
-  private ImmutableList<ResponseExtension> getDomainResponseExtensions(DomainResource domain)
-      throws EppException {
+  private ImmutableList<ResponseExtension> getDomainResponseExtensions(
+      DomainResource domain, DateTime now) throws EppException {
     ImmutableList.Builder<ResponseExtension> extensions = new ImmutableList.Builder<>();
     addSecDnsExtensionIfPresent(extensions, domain.getDsData());
     ImmutableSet<GracePeriodStatus> gracePeriodStatuses = domain.getGracePeriodStatuses();
