@@ -76,6 +76,20 @@ public class PricingCategory extends ImmutableObject
     }
   }
 
+  /** Returns a PricingCategory that has not been locally cached. */
+  public static Optional<PricingCategory> getUncached(final String name) {
+    return Optional.fromNullable(ofy().doTransactionless(new Work<PricingCategory>() {
+      @Override
+      public PricingCategory run() {
+        return ofy()
+                   .load()
+                   .type(PricingCategory.class)
+                   .parent(getCrossTldKey())
+                   .id(name)
+                   .now();
+      }}));
+  }
+
   private static LoadingCache<String, PricingCategory> cache =
     CacheBuilder.newBuilder()
       .expireAfterWrite(

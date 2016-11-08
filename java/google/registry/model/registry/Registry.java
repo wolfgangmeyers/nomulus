@@ -237,6 +237,18 @@ public class Registry extends ImmutableObject implements Buildable {
     return registry;
   }
 
+  /** Returns a version of the registry that has not been locally cached. */
+  public static Optional<Registry> getUncached(final String tld) {
+    return Optional.fromNullable(ofy().doTransactionless(new Work<Registry>() {
+      @Override
+      public Registry run() {
+        return ofy()
+                   .load()
+                   .key(Key.create(getCrossTldKey(), Registry.class, tld))
+                   .now();
+      }}));
+  }
+
   /** Returns true if the given TLD exists */
   public static boolean exists(String tld) {
     return CACHE.getUnchecked(tld).orNull() != null;

@@ -86,6 +86,20 @@ public class CategorizedPremiumList
     }
   }
 
+  /** Returns a CategorizedPremiumList that has not been locally cached. */
+  public static Optional<CategorizedPremiumList> getUncached(final String name) {
+    return Optional.fromNullable(ofy().doTransactionless(new Work<CategorizedPremiumList>() {
+      @Override
+      public CategorizedPremiumList run() {
+        return ofy()
+                   .load()
+                   .type(CategorizedPremiumList.class)
+                   .parent(getCrossTldKey())
+                   .id(name)
+                   .now();
+      }}));
+  }
+
   /**
    * A categorized list entry entity, persisted to Datastore. Each instance represents the price
    * category of a single label on a TLD at a given time.

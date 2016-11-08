@@ -156,6 +156,21 @@ public final class ReservedList
     return getFromCache(listName, cache);
   }
 
+  /**
+   * Gets a ReservedList that has not been locally cached by name.
+   *
+   * @return An Optional<ReservedList> that has a value if a reserved list exists by the given name,
+   *     or absent if not.
+   */
+  public static Optional<ReservedList> getUncached(String listName) {
+    return Optional.fromNullable(ofy()
+               .load()
+               .type(ReservedList.class)
+               .parent(getCrossTldKey())
+               .id(listName)
+               .now());
+  }
+
   /** Loads a ReservedList from its Objectify key. */
   public static Optional<ReservedList> load(Key<ReservedList> key) {
     return get(key.getName());
