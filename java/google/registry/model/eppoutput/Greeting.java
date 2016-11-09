@@ -31,7 +31,7 @@ import org.joda.time.DateTime;
  */
 public class Greeting extends ImmutableObject implements ResponseOrGreeting {
 
-  String svID = "Charleston Road Registry";
+  String svID = "Donuts, Inc";
   DateTime svDate;
 
   /** This is never changed, so it might as well be static for efficiency. */
