@@ -14,6 +14,7 @@
 
 package google.registry.flows.domain;
 
+import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.verifyTargetIdCount;
 import static google.registry.flows.domain.DomainFlowUtils.checkAllowedAccessToTld;
 import static google.registry.flows.domain.DomainFlowUtils.validateDomainName;
@@ -21,7 +22,6 @@ import static google.registry.flows.domain.DomainFlowUtils.validateDomainNameWit
 import static google.registry.flows.domain.DomainFlowUtils.verifyClaimsPeriodNotEnded;
 import static google.registry.flows.domain.DomainFlowUtils.verifyNotInPredelegation;
 import static google.registry.model.domain.launch.LaunchPhase.CLAIMS;
-import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -29,21 +29,26 @@ import com.google.common.net.InternetDomainName;
 import google.registry.config.ConfigModule.Config;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.CommandUseErrorException;
-import google.registry.flows.LoggedInFlow;
+import google.registry.flows.ExtensionManager;
+import google.registry.flows.Flow;
+import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.FlowModule.Superuser;
 import google.registry.model.domain.DomainCommand.Check;
 import google.registry.model.domain.launch.LaunchCheckExtension;
 import google.registry.model.domain.launch.LaunchCheckResponseExtension;
 import google.registry.model.domain.launch.LaunchCheckResponseExtension.LaunchCheck;
 import google.registry.model.domain.launch.LaunchCheckResponseExtension.LaunchCheckName;
 import google.registry.model.eppinput.ResourceCommand;
-import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.tmch.ClaimsListShard;
+import google.registry.util.Clock;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import javax.inject.Inject;
+import org.joda.time.DateTime;
 
 /**
  * An EPP flow that checks whether strings are trademarked.
@@ -55,19 +60,22 @@ import javax.inject.Inject;
  * @error {@link DomainFlowUtils.TldDoesNotExistException}
  * @error {@link ClaimsCheckNotAllowedInSunrise}
  */
-public final class ClaimsCheckFlow extends LoggedInFlow {
+public final class ClaimsCheckFlow implements Flow {
 
+  @Inject ExtensionManager extensionManager;
   @Inject ResourceCommand resourceCommand;
+  @Inject @ClientId String clientId;
+  @Inject @Superuser boolean isSuperuser;
+  @Inject Clock clock;
   @Inject @Config("maxChecks") int maxChecks;
+  @Inject EppResponse.Builder responseBuilder;
   @Inject ClaimsCheckFlow() {}
 
   @Override
-  protected final void initLoggedInFlow() throws EppException {
-    registerExtensions(LaunchCheckExtension.class);
-  }
-
-  @Override
-  public EppOutput run() throws EppException {
+  public EppResponse run() throws EppException {
+    extensionManager.register(LaunchCheckExtension.class);
+    extensionManager.validate();
+    validateClientIsLoggedIn(clientId);
     List<String> targetIds = ((Check) resourceCommand).getTargetIds();
     verifyTargetIdCount(targetIds, maxChecks);
     Set<String> seenTlds = new HashSet<>();
@@ -78,9 +86,10 @@ public final class ClaimsCheckFlow extends LoggedInFlow {
       String tld = domainName.parent().toString();
       // Only validate access to a TLD the first time it is encountered.
       if (seenTlds.add(tld)) {
-        checkAllowedAccessToTld(getAllowedTlds(), tld);
+        checkAllowedAccessToTld(clientId, tld);
         Registry registry = Registry.get(tld);
         if (!isSuperuser) {
+          DateTime now = clock.nowUtc();
           verifyNotInPredelegation(registry, now);
           if (registry.getTldState(now) == TldState.SUNRISE) {
             throw new ClaimsCheckNotAllowedInSunrise();
@@ -93,10 +102,9 @@ public final class ClaimsCheckFlow extends LoggedInFlow {
           LaunchCheck.create(
               LaunchCheckName.create(claimKey != null, targetId), claimKey));
     }
-    return createOutput(
-        SUCCESS,
-        null,
-        ImmutableList.of(LaunchCheckResponseExtension.create(CLAIMS, launchChecksBuilder.build())));
+    return responseBuilder
+        .setOnlyExtension(LaunchCheckResponseExtension.create(CLAIMS, launchChecksBuilder.build()))
+        .build();
   }
 
   /** Claims checks are not allowed during sunrise. */

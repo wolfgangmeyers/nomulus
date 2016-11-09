@@ -27,7 +27,8 @@ import javax.xml.bind.annotation.XmlValue;
 /**
  * XML type for contact identifiers associated with a domain.
  *
- * @see "http://tools.ietf.org/html/rfc5731#section-2.2"
+ * @see <a href="http://tools.ietf.org/html/rfc5731#section-2.2">
+ *     RFC 5731 - EPP Domain Name Mapping- Contact and Client Identifiers</a>
  */
 @Embed
 public class DesignatedContact extends ImmutableObject {
@@ -72,6 +73,6 @@ public class DesignatedContact extends ImmutableObject {
   }
 
   public Key<ContactResource> getContactKey() {
-    return contactId.getLinked();
+    return contact;
   }
 }

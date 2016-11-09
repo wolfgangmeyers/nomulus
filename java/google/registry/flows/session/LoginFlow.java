@@ -27,15 +27,18 @@ import google.registry.flows.EppException.ParameterValuePolicyErrorException;
 import google.registry.flows.EppException.UnimplementedExtensionException;
 import google.registry.flows.EppException.UnimplementedObjectServiceException;
 import google.registry.flows.EppException.UnimplementedOptionException;
+import google.registry.flows.ExtensionManager;
 import google.registry.flows.Flow;
 import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.SessionMetadata;
+import google.registry.flows.TransportCredentials;
 import google.registry.model.eppcommon.ProtocolDefinition;
 import google.registry.model.eppcommon.ProtocolDefinition.ServiceExtension;
+import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppinput.EppInput.Login;
 import google.registry.model.eppinput.EppInput.Options;
 import google.registry.model.eppinput.EppInput.Services;
-import google.registry.model.eppoutput.EppOutput;
-import google.registry.model.eppoutput.Result.Code;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.registrar.Registrar;
 import google.registry.util.FormattingLogger;
 import java.util.Set;
@@ -61,19 +64,24 @@ import javax.inject.Inject;
  * @error {@link LoginFlow.RegistrarAccountNotActiveException}
  * @error {@link LoginFlow.UnsupportedLanguageException}
  */
-public class LoginFlow extends Flow {
+public class LoginFlow implements Flow {
 
   private static final FormattingLogger logger = FormattingLogger.getLoggerForCallerClass();
 
   /** Maximum number of failed login attempts allowed per connection. */
   private static final int MAX_FAILED_LOGIN_ATTEMPTS_PER_CONNECTION = 3;
 
+  @Inject ExtensionManager extensionManager;
+  @Inject EppInput eppInput;
+  @Inject SessionMetadata sessionMetadata;
+  @Inject TransportCredentials credentials;
   @Inject @ClientId String clientId;
+  @Inject EppResponse.Builder responseBuilder;
   @Inject LoginFlow() {}
 
   /** Run the flow and log errors. */
   @Override
-  public final EppOutput run() throws EppException {
+  public final EppResponse run() throws EppException {
     try {
       return runWithoutLogging();
     } catch (EppException e) {
@@ -83,7 +91,8 @@ public class LoginFlow extends Flow {
   }
 
   /** Run the flow without bothering to log errors. The {@link #run} method will do that for us. */
-  public final EppOutput runWithoutLogging() throws EppException {
+  public final EppResponse runWithoutLogging() throws EppException {
+    extensionManager.validate();  // There are no legal extensions for this flow.
     Login login = (Login) eppInput.getCommandWrapper().getCommand();
     if (!clientId.isEmpty()) {
       throw new AlreadyLoggedInException();
@@ -134,7 +143,7 @@ public class LoginFlow extends Flow {
     sessionMetadata.resetFailedLoginAttempts();
     sessionMetadata.setClientId(login.getClientId());
     sessionMetadata.setServiceExtensionUris(serviceExtensionUrisBuilder.build());
-    return createOutput(Code.SUCCESS);
+    return responseBuilder.build();
   }
 
   /** Registrar with this client ID could not be found. */

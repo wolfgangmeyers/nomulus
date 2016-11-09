@@ -14,6 +14,7 @@
 
 package google.registry.flows.domain;
 
+import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.handlePendingTransferOnDelete;
 import static google.registry.flows.ResourceFlowUtils.prepareDeletedResourceAsBuilder;
 import static google.registry.flows.ResourceFlowUtils.updateForeignKeyIndexDeletionTime;
@@ -25,28 +26,30 @@ import static google.registry.flows.domain.DomainFlowUtils.verifyApplicationDoma
 import static google.registry.flows.domain.DomainFlowUtils.verifyLaunchPhaseMatchesRegistryPhase;
 import static google.registry.flows.domain.DomainFlowUtils.verifyRegistryStateAllowsLaunchFlows;
 import static google.registry.model.EppResourceUtils.loadDomainApplication;
-import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 
 import com.google.common.base.Optional;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
+import google.registry.flows.ExtensionManager;
 import google.registry.flows.FlowModule.ApplicationId;
 import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.FlowModule.Superuser;
 import google.registry.flows.FlowModule.TargetId;
-import google.registry.flows.LoggedInFlow;
 import google.registry.flows.TransactionalFlow;
 import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.launch.LaunchDeleteExtension;
 import google.registry.model.domain.launch.LaunchPhase;
 import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.eppcommon.AuthInfo;
-import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.eppinput.EppInput;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
 import google.registry.model.reporting.HistoryEntry;
 import javax.inject.Inject;
+import org.joda.time.DateTime;
 
 /**
  * An EPP flow that deletes a domain application.
@@ -60,29 +63,31 @@ import javax.inject.Inject;
  * @error {@link DomainFlowUtils.LaunchPhaseMismatchException}
  * @error {@link DomainFlowUtils.NotAuthorizedForTldException}
  */
-public final class DomainApplicationDeleteFlow extends LoggedInFlow implements TransactionalFlow {
+public final class DomainApplicationDeleteFlow implements TransactionalFlow {
 
+  @Inject ExtensionManager extensionManager;
+  @Inject EppInput eppInput;
   @Inject Optional<AuthInfo> authInfo;
   @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
   @Inject @ApplicationId String applicationId;
+  @Inject @Superuser boolean isSuperuser;
   @Inject HistoryEntry.Builder historyBuilder;
+  @Inject EppResponse.Builder responseBuilder;
   @Inject DomainApplicationDeleteFlow() {}
 
   @Override
-  protected final void initLoggedInFlow() throws EppException {
-    registerExtensions(MetadataExtension.class);
-    registerExtensions(LaunchDeleteExtension.class);
-  }
-
-  @Override
-  public final EppOutput run() throws EppException {
+  public final EppResponse run() throws EppException {
+    extensionManager.register(MetadataExtension.class, LaunchDeleteExtension.class);
+    extensionManager.validate();
+    validateClientIsLoggedIn(clientId);
+    DateTime now = ofy().getTransactionTime();
     DomainApplication existingApplication = verifyExistence(
         DomainApplication.class, applicationId, loadDomainApplication(applicationId, now));
     verifyApplicationDomainMatchesTargetId(existingApplication, targetId);
     verifyOptionalAuthInfoForResource(authInfo, existingApplication);
     String tld = existingApplication.getTld();
-    checkAllowedAccessToTld(getAllowedTlds(), tld);
+    checkAllowedAccessToTld(clientId, tld);
     if (!isSuperuser) {
       Registry registry = Registry.get(tld);
       verifyRegistryStateAllowsLaunchFlows(registry, now);
@@ -105,7 +110,7 @@ public final class DomainApplicationDeleteFlow extends LoggedInFlow implements T
     updateForeignKeyIndexDeletionTime(newApplication);
     handlePendingTransferOnDelete(existingApplication, newApplication, now, historyEntry);
     ofy().save().<Object>entities(newApplication, historyEntry);
-    return createOutput(SUCCESS);
+    return responseBuilder.build();
   }
 
   /** A sunrise application cannot be deleted during landrush. */

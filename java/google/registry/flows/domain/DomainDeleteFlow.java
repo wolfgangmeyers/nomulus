@@ -15,6 +15,7 @@
 package google.registry.flows.domain;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.handlePendingTransferOnDelete;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.prepareDeletedResourceAsBuilder;
@@ -38,9 +39,11 @@ import com.googlecode.objectify.Key;
 import google.registry.dns.DnsQueue;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.AssociationProhibitsOperationException;
+import google.registry.flows.ExtensionManager;
 import google.registry.flows.FlowModule.ClientId;
+import google.registry.flows.FlowModule.Superuser;
 import google.registry.flows.FlowModule.TargetId;
-import google.registry.flows.LoggedInFlow;
+import google.registry.flows.SessionMetadata;
 import google.registry.flows.TransactionalFlow;
 import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingEvent;
@@ -55,11 +58,13 @@ import google.registry.model.domain.fee11.FeeDeleteResponseExtensionV11;
 import google.registry.model.domain.fee12.FeeDeleteResponseExtensionV12;
 import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.domain.rgp.GracePeriodStatus;
-import google.registry.model.domain.secdns.SecDnsUpdateExtension;
+import google.registry.model.domain.secdns.SecDnsCreateExtension;
 import google.registry.model.eppcommon.AuthInfo;
 import google.registry.model.eppcommon.ProtocolDefinition.ServiceExtension;
 import google.registry.model.eppcommon.StatusValue;
-import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.eppcommon.Trid;
+import google.registry.model.eppinput.EppInput;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.poll.PendingActionNotificationResponse.DomainPendingActionNotificationResponse;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.poll.PollMessage.OneTime;
@@ -82,7 +87,7 @@ import org.joda.time.DateTime;
  * @error {@link DomainFlowUtils.BadCommandForRegistryPhaseException}
  * @error {@link DomainFlowUtils.NotAuthorizedForTldException}
  */
-public final class DomainDeleteFlow extends LoggedInFlow implements TransactionalFlow {
+public final class DomainDeleteFlow implements TransactionalFlow {
 
   private static final ImmutableSet<StatusValue> DISALLOWED_STATUSES = ImmutableSet.of(
       StatusValue.LINKED,
@@ -90,27 +95,30 @@ public final class DomainDeleteFlow extends LoggedInFlow implements Transactiona
       StatusValue.PENDING_DELETE,
       StatusValue.SERVER_DELETE_PROHIBITED);
 
+  @Inject ExtensionManager extensionManager;
+  @Inject EppInput eppInput;
+  @Inject SessionMetadata sessionMetadata;
   @Inject Optional<AuthInfo> authInfo;
   @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
+  @Inject @Superuser boolean isSuperuser;
   @Inject HistoryEntry.Builder historyBuilder;
   @Inject DnsQueue dnsQueue;
+  @Inject Trid trid;
+  @Inject EppResponse.Builder responseBuilder;
   @Inject DomainDeleteFlow() {}
 
   @Override
-  @SuppressWarnings("unchecked")
-  protected final void initLoggedInFlow() throws EppException {
-    registerExtensions(MetadataExtension.class);
-    registerExtensions(SecDnsUpdateExtension.class);
-  }
-
-  @Override
-  public final EppOutput run() throws EppException {
+  public final EppResponse run() throws EppException {
+    extensionManager.register(MetadataExtension.class, SecDnsCreateExtension.class);
+    extensionManager.validate();
+    validateClientIsLoggedIn(clientId);
+    DateTime now = ofy().getTransactionTime();
     // Loads the target resource if it exists
     DomainResource existingDomain = loadAndVerifyExistence(DomainResource.class, targetId, now);
     Registry registry = Registry.get(existingDomain.getTld());
-    verifyDeleteAllowed(existingDomain, registry);
-    HistoryEntry historyEntry = buildHistoryEntry(existingDomain);
+    verifyDeleteAllowed(existingDomain, registry, now);
+    HistoryEntry historyEntry = buildHistoryEntry(existingDomain, now);
     Builder builder = (Builder) prepareDeletedResourceAsBuilder(existingDomain, now);
     // If the domain is in the Add Grace Period, we delete it immediately, which is already
     // reflected in the builder we just prepared. Otherwise we give it a PENDING_DELETE status.
@@ -132,7 +140,7 @@ public final class DomainDeleteFlow extends LoggedInFlow implements Transactiona
               clientId)))
           .setDeletePollMessage(Key.create(deletePollMessage));
     }
-    handleExtraFlowLogic(existingDomain, historyEntry);
+    handleExtraFlowLogic(existingDomain, historyEntry, now);
     DomainResource newDomain = builder.build();
     updateForeignKeyIndexDeletionTime(newDomain);
     handlePendingTransferOnDelete(existingDomain, newDomain, now, historyEntry);
@@ -151,13 +159,14 @@ public final class DomainDeleteFlow extends LoggedInFlow implements Transactiona
       }
     }
     ofy().save().<ImmutableObject>entities(newDomain, historyEntry);
-    return createOutput(
-        newDomain.getDeletionTime().isAfter(now) ? SUCCESS_WITH_ACTION_PENDING : SUCCESS,
-        null,
-        getResponseExtensions(existingDomain));
+    return responseBuilder
+        .setResultFromCode(
+            newDomain.getDeletionTime().isAfter(now) ? SUCCESS_WITH_ACTION_PENDING : SUCCESS)
+        .setExtensions(getResponseExtensions(existingDomain, now))
+        .build();
   }
 
-  private void verifyDeleteAllowed(DomainResource existingDomain, Registry registry)
+  private void verifyDeleteAllowed(DomainResource existingDomain, Registry registry, DateTime now)
       throws EppException {
     verifyNoDisallowedStatuses(existingDomain, DISALLOWED_STATUSES);
     verifyOptionalAuthInfoForResource(authInfo, existingDomain);
@@ -165,13 +174,13 @@ public final class DomainDeleteFlow extends LoggedInFlow implements Transactiona
       verifyResourceOwnership(clientId, existingDomain);
       verifyNotInPredelegation(registry, now);
     }
-    checkAllowedAccessToTld(getAllowedTlds(), registry.getTld().toString());
+    checkAllowedAccessToTld(clientId, registry.getTld().toString());
     if (!existingDomain.getSubordinateHosts().isEmpty()) {
       throw new DomainToDeleteHasHostsException();
     }
   }
 
-  private HistoryEntry buildHistoryEntry(DomainResource existingResource) {
+  private HistoryEntry buildHistoryEntry(DomainResource existingResource, DateTime now) {
     return historyBuilder
         .setType(HistoryEntry.Type.DOMAIN_DELETE)
         .setModificationTime(now)
@@ -192,20 +201,20 @@ public final class DomainDeleteFlow extends LoggedInFlow implements Transactiona
         .build();
   }
 
-  private void handleExtraFlowLogic(DomainResource existingResource, HistoryEntry historyEntry)
-      throws EppException {
+  private void handleExtraFlowLogic(
+      DomainResource existingResource, HistoryEntry historyEntry, DateTime now)
+          throws EppException {
     Optional<RegistryExtraFlowLogic> extraFlowLogic =
         RegistryExtraFlowLogicProxy.newInstanceForDomain(existingResource);
     if (extraFlowLogic.isPresent()) {
       extraFlowLogic.get().performAdditionalDomainDeleteLogic(
           existingResource, clientId, now, eppInput, historyEntry);
-      extraFlowLogic.get().commitAdditionalLogicChanges();
     }
   }
 
   @Nullable
   private ImmutableList<FeeTransformResponseExtension> getResponseExtensions(
-      DomainResource existingDomain) {
+      DomainResource existingDomain, DateTime now) {
     FeeTransformResponseExtension.Builder feeResponseBuilder = getDeleteResponseBuilder();
     if (feeResponseBuilder == null) {
       return null;
@@ -213,7 +222,7 @@ public final class DomainDeleteFlow extends LoggedInFlow implements Transactiona
     ImmutableList.Builder<Credit> creditsBuilder = new ImmutableList.Builder<>();
     for (GracePeriod gracePeriod : existingDomain.getGracePeriods()) {
       if (gracePeriod.hasBillingEvent()) {
-        Money cost = getGracePeriodCost(gracePeriod);
+        Money cost = getGracePeriodCost(gracePeriod, now);
         creditsBuilder.add(Credit.create(
             cost.negated().getAmount(), FeeType.CREDIT, gracePeriod.getType().getXmlName()));
         feeResponseBuilder.setCurrency(checkNotNull(cost.getCurrencyUnit()));
@@ -226,7 +235,7 @@ public final class DomainDeleteFlow extends LoggedInFlow implements Transactiona
     return ImmutableList.of(feeResponseBuilder.setCredits(credits).build());
   }
 
-  private Money getGracePeriodCost(GracePeriod gracePeriod) {
+  private Money getGracePeriodCost(GracePeriod gracePeriod, DateTime now) {
     if (gracePeriod.getType() == GracePeriodStatus.AUTO_RENEW) {
       DateTime autoRenewTime =
           ofy().load().key(checkNotNull(gracePeriod.getRecurringBillingEvent())).now()

@@ -14,32 +14,33 @@
 
 package google.registry.flows.contact;
 
+import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.denyPendingTransfer;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
 import static google.registry.flows.ResourceFlowUtils.verifyResourceOwnership;
 import static google.registry.flows.contact.ContactFlowUtils.createGainingTransferPollMessage;
 import static google.registry.flows.contact.ContactFlowUtils.createTransferResponse;
-import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 
 import com.google.common.base.Optional;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
+import google.registry.flows.ExtensionManager;
 import google.registry.flows.FlowModule.ClientId;
 import google.registry.flows.FlowModule.TargetId;
-import google.registry.flows.LoggedInFlow;
 import google.registry.flows.TransactionalFlow;
 import google.registry.flows.exceptions.NotPendingTransferException;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.eppcommon.AuthInfo;
-import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.transfer.TransferData;
 import google.registry.model.transfer.TransferStatus;
 import javax.inject.Inject;
+import org.joda.time.DateTime;
 
 /**
  * An EPP flow that rejects a pending transfer on a contact.
@@ -54,21 +55,22 @@ import javax.inject.Inject;
  * @error {@link google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException}
  * @error {@link google.registry.flows.exceptions.NotPendingTransferException}
  */
-public final class ContactTransferRejectFlow extends LoggedInFlow implements TransactionalFlow {
+public final class ContactTransferRejectFlow implements TransactionalFlow {
 
+  @Inject ExtensionManager extensionManager;
   @Inject Optional<AuthInfo> authInfo;
   @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
   @Inject HistoryEntry.Builder historyBuilder;
+  @Inject EppResponse.Builder responseBuilder;
   @Inject ContactTransferRejectFlow() {}
 
   @Override
-  protected final void initLoggedInFlow() throws EppException {
-    registerExtensions(MetadataExtension.class);
-  }
-
-  @Override
-  protected final EppOutput run() throws EppException {
+  public final EppResponse run() throws EppException {
+    extensionManager.register(MetadataExtension.class);
+    extensionManager.validate();
+    validateClientIsLoggedIn(clientId);
+    DateTime now = ofy().getTransactionTime();
     ContactResource existingContact = loadAndVerifyExistence(ContactResource.class, targetId, now);
     verifyOptionalAuthInfoForResource(authInfo, existingContact);
     TransferData transferData = existingContact.getTransferData();
@@ -89,6 +91,8 @@ public final class ContactTransferRejectFlow extends LoggedInFlow implements Tra
     // Delete the billing event and poll messages that were written in case the transfer would have
     // been implicitly server approved.
     ofy().delete().keys(transferData.getServerApproveEntities());
-    return createOutput(SUCCESS, createTransferResponse(targetId, newContact.getTransferData()));
+    return responseBuilder
+        .setResData(createTransferResponse(targetId, newContact.getTransferData()))
+        .build();
   }
 }

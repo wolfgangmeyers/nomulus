@@ -17,16 +17,21 @@ package google.registry.ui.server.registrar;
 import static google.registry.security.JsonHttpTestUtils.createJsonPayload;
 import static google.registry.security.JsonHttpTestUtils.createJsonResponseSupplier;
 import static google.registry.security.XsrfTokenManager.generateToken;
+import static google.registry.util.ResourceUtils.readResourceUtf8;
 import static org.mockito.Matchers.eq;
 import static org.mockito.Mockito.when;
 
 import com.google.appengine.api.modules.ModulesService;
 import com.google.common.base.Supplier;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import google.registry.export.sheet.SyncRegistrarsSheetAction;
 import google.registry.model.ofy.Ofy;
+import google.registry.model.registrar.Registrar;
+import google.registry.request.JsonActionRunner;
+import google.registry.request.JsonResponse;
+import google.registry.request.ResponseImpl;
 import google.registry.testing.AppEngineRule;
-import google.registry.testing.ExceptionRule;
 import google.registry.testing.FakeClock;
 import google.registry.testing.InjectRule;
 import google.registry.util.SendEmailService;
@@ -41,15 +46,17 @@ import javax.mail.internet.MimeMessage;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import org.joda.time.DateTime;
+import org.json.simple.JSONValue;
+import org.json.simple.parser.ParseException;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.runner.RunWith;
 import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
-/** Base class for tests using {@link RegistrarServlet}. */
+/** Base class for tests using {@link RegistrarSettingsAction}. */
 @RunWith(MockitoJUnitRunner.class)
-public class RegistrarServletTestCase {
+public class RegistrarSettingsActionTestCase {
 
   static final String CLIENT_ID = "TheRegistrar";
 
@@ -62,9 +69,6 @@ public class RegistrarServletTestCase {
   @Rule
   public final InjectRule inject = new InjectRule();
 
-  @Rule
-  public final ExceptionRule thrown = new ExceptionRule();
-
   @Mock
   HttpServletRequest req;
 
@@ -72,25 +76,31 @@ public class RegistrarServletTestCase {
   HttpServletResponse rsp;
 
   @Mock
-  SessionUtils sessionUtils;
-
-  @Mock
   SendEmailService emailService;
 
   @Mock
   ModulesService modulesService;
 
+  @Mock
+  SessionUtils sessionUtils;
+
   Message message;
 
-  final RegistrarServlet servlet = new RegistrarServlet();
+  final RegistrarSettingsAction action = new RegistrarSettingsAction();
   final StringWriter writer = new StringWriter();
   final Supplier<Map<String, Object>> json = createJsonResponseSupplier(writer);
   final FakeClock clock = new FakeClock(DateTime.parse("2014-01-01T00:00:00Z"));
 
   @Before
   public void setUp() throws Exception {
+    action.request = req;
+    action.sessionUtils = sessionUtils;
+    action.initialRegistrar = Registrar.loadByClientId(CLIENT_ID);
+    action.jsonActionRunner = new JsonActionRunner(
+        ImmutableMap.<String, Object>of(), new JsonResponse(new ResponseImpl(rsp)));
+    action.registrarChangesNotificationEmailAddresses = ImmutableList.of(
+        "notification@test.example", "notification2@test.example");
     inject.setStaticField(Ofy.class, "clock", clock);
-    inject.setStaticField(ResourceServlet.class, "sessionUtils", sessionUtils);
     inject.setStaticField(SendEmailUtils.class, "emailService", emailService);
     inject.setStaticField(SyncRegistrarsSheetAction.class, "modulesService", modulesService);
     message = new MimeMessage(Session.getDefaultInstance(new Properties(), null));
@@ -104,5 +114,16 @@ public class RegistrarServletTestCase {
     when(sessionUtils.checkRegistrarConsoleLogin(req)).thenReturn(true);
     when(sessionUtils.getRegistrarClientId(req)).thenReturn(CLIENT_ID);
     when(modulesService.getVersionHostname("backend", null)).thenReturn("backend.hostname");
+  }
+
+  protected Map<String, Object> readJsonFromFile(String filename) {
+    String contents = readResourceUtf8(getClass(), filename);
+    try {
+      @SuppressWarnings("unchecked")
+      Map<String, Object> json = (Map<String, Object>) JSONValue.parseWithException(contents);
+      return json;
+    } catch (ParseException ex) {
+      throw new RuntimeException(ex);
+    }
   }
 }

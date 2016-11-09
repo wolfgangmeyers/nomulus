@@ -68,9 +68,7 @@ import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElementRef;
 import javax.xml.bind.annotation.XmlElementRefs;
 import javax.xml.bind.annotation.XmlElementWrapper;
-import javax.xml.bind.annotation.XmlTransient;
 import javax.xml.bind.annotation.XmlType;
-import org.joda.time.DateTime;
 
 /**
  * The EppResponse class represents an EPP response message.
@@ -79,7 +77,8 @@ import org.joda.time.DateTime;
  * client.  EPP commands are atomic, so a command will either succeed completely or fail completely.
  * Success and failure results MUST NOT be mixed."
  *
- * @see "http://tools.ietf.org/html/rfc5730#section-2.6"
+ * @see <a href="http://tools.ietf.org/html/rfc5730#section-2.6">
+ *     RFC 5730 - EPP - Response Format</a>
  */
 @XmlType(propOrder = {"result", "messageQueueInfo", "resData", "extensions", "trid"})
 public class EppResponse extends ImmutableObject implements ResponseOrGreeting {
@@ -90,14 +89,6 @@ public class EppResponse extends ImmutableObject implements ResponseOrGreeting {
 
   /** The command result. The RFC allows multiple failure results, but we always return one. */
   Result result;
-
-  /**
-   * The time the command that created this response was executed.
-   *
-   * <p>This is for logging purposes only and is not returned to the user.
-   */
-  @XmlTransient
-  DateTime executionTime;
 
   /**
    * Information about messages queued for retrieval. This may appear in response to any EPP message
@@ -158,10 +149,6 @@ public class EppResponse extends ImmutableObject implements ResponseOrGreeting {
   @XmlElementWrapper(name = "extension")
   ImmutableList<? extends ResponseExtension> extensions;
 
-  public DateTime getExecutionTime() {
-    return executionTime;
-  }
-
   public ImmutableList<? extends ResponseData> getResponseData() {
     return resData;
   }
@@ -211,6 +198,10 @@ public class EppResponse extends ImmutableObject implements ResponseOrGreeting {
       return this;
     }
 
+    public Builder setResultFromCode(Result.Code resultCode) {
+      return setResult(Result.create(resultCode));
+    }
+
     public Builder setResult(Result result) {
       getInstance().result = result;
       return this;
@@ -221,14 +212,17 @@ public class EppResponse extends ImmutableObject implements ResponseOrGreeting {
       return this;
     }
 
-    public Builder setExecutionTime(DateTime executionTime) {
-      getInstance().executionTime = executionTime;
+    public Builder setResData(ResponseData onlyResData) {
+      return setMultipleResData(ImmutableList.of(onlyResData));
+    }
+
+    public Builder setMultipleResData(@Nullable ImmutableList<? extends ResponseData> resData) {
+      getInstance().resData = resData;
       return this;
     }
 
-    public Builder setResData(@Nullable ImmutableList<? extends ResponseData> resData) {
-      getInstance().resData = resData;
-      return this;
+    public Builder setOnlyExtension(ResponseExtension onlyExtension) {
+      return setExtensions(ImmutableList.of(onlyExtension));
     }
 
     public Builder setExtensions(@Nullable ImmutableList<? extends ResponseExtension> extensions) {

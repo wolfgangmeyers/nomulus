@@ -14,6 +14,7 @@
 
 package google.registry.flows.contact;
 
+import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyNoDisallowedStatuses;
 import static google.registry.flows.ResourceFlowUtils.verifyRequiredAuthInfoForResourceTransfer;
@@ -28,9 +29,9 @@ import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
 import google.registry.config.ConfigModule.Config;
 import google.registry.flows.EppException;
+import google.registry.flows.ExtensionManager;
 import google.registry.flows.FlowModule.ClientId;
 import google.registry.flows.FlowModule.TargetId;
-import google.registry.flows.LoggedInFlow;
 import google.registry.flows.TransactionalFlow;
 import google.registry.flows.exceptions.AlreadyPendingTransferException;
 import google.registry.flows.exceptions.ObjectAlreadySponsoredException;
@@ -38,7 +39,8 @@ import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.eppcommon.AuthInfo;
 import google.registry.model.eppcommon.StatusValue;
-import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.eppcommon.Trid;
+import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.transfer.TransferData;
@@ -62,27 +64,29 @@ import org.joda.time.Duration;
  * @error {@link google.registry.flows.exceptions.MissingTransferRequestAuthInfoException}
  * @error {@link google.registry.flows.exceptions.ObjectAlreadySponsoredException}
  */
-public final class ContactTransferRequestFlow extends LoggedInFlow implements TransactionalFlow {
+public final class ContactTransferRequestFlow implements TransactionalFlow {
 
   private static final ImmutableSet<StatusValue> DISALLOWED_STATUSES = ImmutableSet.of(
       StatusValue.CLIENT_TRANSFER_PROHIBITED,
       StatusValue.PENDING_DELETE,
       StatusValue.SERVER_TRANSFER_PROHIBITED);
 
+  @Inject ExtensionManager extensionManager;
   @Inject Optional<AuthInfo> authInfo;
   @Inject @ClientId String gainingClientId;
   @Inject @TargetId String targetId;
   @Inject @Config("contactAutomaticTransferLength") Duration automaticTransferLength;
   @Inject HistoryEntry.Builder historyBuilder;
+  @Inject Trid trid;
+  @Inject EppResponse.Builder responseBuilder;
   @Inject ContactTransferRequestFlow() {}
 
   @Override
-  protected final void initLoggedInFlow() throws EppException {
-    registerExtensions(MetadataExtension.class);
-  }
-
-  @Override
-  protected final EppOutput run() throws EppException {
+  public final EppResponse run() throws EppException {
+    extensionManager.register(MetadataExtension.class);
+    extensionManager.validate();
+    validateClientIsLoggedIn(gainingClientId);
+    DateTime now = ofy().getTransactionTime();
     ContactResource existingContact = loadAndVerifyExistence(ContactResource.class, targetId, now);
     verifyRequiredAuthInfoForResourceTransfer(authInfo, existingContact);
     // Verify that the resource does not already have a pending transfer.
@@ -137,9 +141,10 @@ public final class ContactTransferRequestFlow extends LoggedInFlow implements Tr
         requestPollMessage,
         serverApproveGainingPollMessage,
         serverApproveLosingPollMessage);
-    return createOutput(
-        SUCCESS_WITH_ACTION_PENDING,
-        createTransferResponse(targetId, newContact.getTransferData()));
+    return responseBuilder
+        .setResultFromCode(SUCCESS_WITH_ACTION_PENDING)
+        .setResData(createTransferResponse(targetId, newContact.getTransferData()))
+        .build();
   }
 }
 

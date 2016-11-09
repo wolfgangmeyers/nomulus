@@ -105,6 +105,8 @@ import google.registry.flows.exceptions.ResourceAlreadyExistsException;
 import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.LrpTokenEntity;
+import google.registry.model.domain.TestExtraLogicManager;
+import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.launch.ApplicationStatus;
 import google.registry.model.domain.launch.LaunchNotice;
 import google.registry.model.domain.launch.LaunchPhase;
@@ -155,6 +157,10 @@ public class DomainApplicationCreateFlowTest
     setEppInput("domain_create_sunrise_encoded_signed_mark.xml");
     createTld("tld", TldState.SUNRISE);
     persistResource(Registry.get("tld").asBuilder().setReservedLists(createReservedList()).build());
+    createTld("flags", TldState.LANDRUSH);
+    RegistryExtraFlowLogicProxy.setOverride("flags", TestExtraLogicManager.class);
+    persistResource(
+        Registry.get("flags").asBuilder().setReservedLists(createReservedList()).build());
     inject.setStaticField(TmchCertificateAuthority.class, "clock", clock);
     clock.setTo(DateTime.parse("2014-09-09T09:09:09Z"));
   }
@@ -214,6 +220,7 @@ public class DomainApplicationCreateFlowTest
     assertAboutApplications().that(getLast(applications))
         .hasFullyQualifiedDomainName(getUniqueIdFromCommand()).and()
         .hasNumEncodedSignedMarks(sunriseApplication ? 1 : 0).and()
+        .hasPeriodYears(years).and()
         .hasOnlyOneHistoryEntryWhich()
         .hasType(HistoryEntry.Type.DOMAIN_APPLICATION_CREATE).and()
         .hasPeriodYears(years);
@@ -893,18 +900,6 @@ public class DomainApplicationCreateFlowTest
   }
 
   @Test
-  public void testSuccess_landrush_duringLrpWithMissingToken() throws Exception {
-    createTld("tld", TldState.LANDRUSH);
-    persistResource(Registry.get("tld").asBuilder()
-        .setLrpPeriod(new Interval(clock.nowUtc().minusDays(1), clock.nowUtc().plusDays(1)))
-        .build());
-    setEppInput("domain_create_landrush.xml");
-    persistContactsAndHosts();
-    clock.advanceOneMilli();
-    doSuccessfulTest("domain_create_landrush_response.xml", false);
-  }
-
-  @Test
   public void testSuccess_landrushLrpApplication_superuser() throws Exception {
     // Using an LRP token as superuser should still mark the token as redeemed (i.e. same effect
     // as non-superuser).
@@ -1025,6 +1020,19 @@ public class DomainApplicationCreateFlowTest
     doSuccessfulTest("domain_create_landrush_response.xml", false);
     // Token should not be marked as used, since this isn't an LRP state
     assertThat(ofy().load().entity(token).now().getRedemptionHistoryEntry()).isNull();
+  }
+
+  @Test
+  public void testFailure_landrush_duringLrpWithMissingToken() throws Exception {
+    createTld("tld", TldState.LANDRUSH);
+    persistResource(Registry.get("tld").asBuilder()
+        .setLrpPeriod(new Interval(clock.nowUtc().minusDays(1), clock.nowUtc().plusDays(1)))
+        .build());
+    setEppInput("domain_create_landrush.xml");
+    persistContactsAndHosts();
+    clock.advanceOneMilli();
+    thrown.expect(InvalidLrpTokenException.class);
+    runFlow();
   }
 
   @Test
@@ -1683,5 +1691,21 @@ public class DomainApplicationCreateFlowTest
   public void testFailure_invalidIdnCodePoints() throws Exception {
     // ❤☀☆☂☻♞☯.tld
     doFailingDomainNameTest("xn--k3hel9n7bxlu1e.tld", InvalidIdnDomainLabelException.class);
+  }
+
+  @Test
+  public void testFailure_flags_feeMismatch() throws Exception {
+    persistContactsAndHosts();
+    setEppInput("domain_create_landrush_flags.xml", ImmutableMap.of("FEE", "12"));
+    thrown.expect(FeesMismatchException.class);
+    runFlow();
+  }
+
+  @Test
+  public void testSuccess_flags() throws Exception {
+    persistContactsAndHosts();
+    setEppInput("domain_create_landrush_flags.xml", ImmutableMap.of("FEE", "42"));
+    thrown.expect(TestExtraLogicManagerSuccessException.class, "flag1,flag2");
+    runFlow();
   }
 }

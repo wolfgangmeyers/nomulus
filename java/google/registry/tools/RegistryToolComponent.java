@@ -17,6 +17,8 @@ package google.registry.tools;
 import dagger.Component;
 import domains.donuts.keyring.DonutsKeyringModule;
 import google.registry.config.ConfigModule;
+import google.registry.dns.writer.VoidDnsWriterModule;
+import google.registry.dns.writer.clouddns.CloudDnsWriterModule;
 import google.registry.dns.writer.dnsupdate.DnsUpdateWriterModule;
 import google.registry.keyring.api.KeyModule;
 import google.registry.request.Modules.DatastoreServiceModule;
@@ -34,6 +36,7 @@ import google.registry.util.SystemClock.SystemClockModule;
   modules = {
     ConfigModule.class,
     DatastoreServiceModule.class,
+    CloudDnsWriterModule.class,
     DnsUpdateWriterModule.class,
     DonutsKeyringModule.class,
     Jackson2Module.class,
@@ -41,6 +44,7 @@ import google.registry.util.SystemClock.SystemClockModule;
     RegistryToolModule.class,
     SystemClockModule.class,
     URLFetchServiceModule.class,
+    VoidDnsWriterModule.class,
   }
 )
 interface RegistryToolComponent {

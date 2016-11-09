@@ -15,6 +15,7 @@
 package google.registry.config;
 
 import com.google.common.base.Optional;
+import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
 import org.joda.money.CurrencyUnit;
@@ -154,6 +155,16 @@ public final class ConfigModule {
   @Config("supportPhoneNumber")
   public static String provideSupportPhoneNumber(RegistryEnvironment environment) {
     return "+1 (888) 555 0123";
+  }
+
+  /**
+   * The URL for technical support docs.  Used in the "contact-us" section of the registrar console.
+   */
+  @Provides
+  @Config("technicalDocsUrl")
+  public static String provideTechnicalDocsUrl(RegistryEnvironment environment) {
+    // Change this to your support docs link.
+    return "http://example.com/your_support_docs/";
   }
 
   /** @see RegistryConfig#getZoneFilesBucket() */
@@ -328,6 +339,13 @@ public final class ConfigModule {
       default:
         return "admin@domainregistry-sandbox.co";
     }
+  }
+
+  @Provides
+  @Config("registrarChangesNotificationEmailAddresses")
+  public static ImmutableList<String> provideRegistrarChangesNotificationEmailAddresses(
+      RegistryConfig config) {
+    return config.getRegistrarChangesNotificationEmailAddresses();
   }
 
   /**
