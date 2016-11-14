@@ -517,19 +517,4 @@ public class CategorizedPremiumListTest {
     assertThat(pricingCategories.get(1).getName()).isEqualTo(CATEGORY_NAME_TWO);
     assertThat(pricingCategories.get(1).getPrice()).isEqualTo(Money.parse(USD_PRICE));
   }
-
-  @Test
-  public void verifyCategorizedListEntryIsBeingPersisted() throws Exception {
-    final String tld = "tld";
-    final String uniquesld = "uniquesld";
-    new CategorizedPremiumList.Builder()
-        .setName(tld)
-        .addEntry(uniquesld, CATEGORY_NAME_ONE)
-        .build()
-        .saveAndUpdateEntries();
-
-    final CategorizedPremiumList result = CategorizedPremiumList.getUncached(tld).get();
-    CategorizedListEntry listEntry = result.getPremiumListEntries().get(uniquesld);
-    assertThat(listEntry.getValue()).isEqualTo(CATEGORY_NAME_ONE);
-  }
 }
