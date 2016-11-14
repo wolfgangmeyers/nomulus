@@ -884,6 +884,6 @@ public final class ConfigModule {
   @Provides
   @Config("greetingServerId")
   public static String provideGreetingServerId() {
-    return "Charleston Road Registry";
+    return "Donuts, Inc";
   }
 }
