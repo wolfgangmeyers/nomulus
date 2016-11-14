@@ -230,7 +230,7 @@ public class CategorizedPremiumList
    * old revision.
    */
   public CategorizedPremiumList saveAndUpdateEntries() {
-    final Optional<CategorizedPremiumList> oldPremiumList = get(name);
+    final Optional<CategorizedPremiumList> oldPremiumList = getUncached(name);
     // Only update entries if there's actually changes to the entries
     boolean entriesToUpdate = !oldPremiumList.isPresent() || entriesWereUpdated;
     // If needed, save the new child entities in a series of transactions.
@@ -265,10 +265,6 @@ public class CategorizedPremiumList
     // Update the cache.
     CategorizedPremiumList.cache.put(name, updated);
 
-    // If needed and there are any, delete the entities under the old PremiumList.
-    if (entriesToUpdate && oldPremiumList.isPresent()) {
-      oldPremiumList.get().deleteEntries();
-    }
     return updated;
   }
 
