@@ -516,6 +516,5 @@ public class CategorizedPremiumListTest {
     assertThat(pricingCategories.size()).isEqualTo(3);
     assertThat(pricingCategories.get(1).getName()).isEqualTo(CATEGORY_NAME_TWO);
     assertThat(pricingCategories.get(1).getPrice()).isEqualTo(Money.parse(USD_PRICE));
-
   }
 }
