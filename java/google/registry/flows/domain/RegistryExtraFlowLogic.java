@@ -29,20 +29,15 @@ import org.joda.time.DateTime;
  */
 public interface RegistryExtraFlowLogic {
 
-  /**
-   * Gets the flags to be used in the EPP flags extension.
-   *
-   * <p>This is used for EPP info commands.
-   */
+  /** Gets the flags to be returned for application info commands. */
+  public Set<String> getApplicationExtensionFlags(
+      DomainApplication application, String clientId, DateTime asOfDate);
+
+  /** Gets the flags to be returned for domain info commands. */
   public Set<String> getExtensionFlags(
       DomainResource domainResource, String clientId, DateTime asOfDate);
 
-  /**
-   * Performs additional tasks required for an application create command.
-   *
-   * <p>Any changes should not be persisted to Datastore until commitAdditionalLogicChanges is
-   * called.
-   */
+  /** Performs additional tasks required for an application create command. */
   public void performAdditionalApplicationCreateLogic(
       DomainApplication application,
       String clientId,
@@ -51,11 +46,39 @@ public interface RegistryExtraFlowLogic {
       EppInput eppInput,
       HistoryEntry historyEntry) throws EppException;
 
-  /**
-   * Computes the expected creation fee.
-   *
-   * <p>For use in fee challenges and the like.
-   */
+  /** Performs additional tasks required for an application delete command. */
+  public void performAdditionalApplicationDeleteLogic(
+      DomainApplication application,
+      String clientId,
+      DateTime asOfDate,
+      EppInput eppInput,
+      HistoryEntry historyEntry) throws EppException;
+
+  /** Computes the expected application update fee. */
+  public BaseFee getApplicationUpdateFeeOrCredit(
+      DomainApplication application,
+      String clientId,
+      DateTime asOfDate,
+      EppInput eppInput) throws EppException;
+
+  /** Performs additional tasks required for an application update command. */
+  public void performAdditionalApplicationUpdateLogic(
+      DomainApplication application,
+      String clientId,
+      DateTime asOfDate,
+      EppInput eppInput,
+      HistoryEntry historyEntry) throws EppException;
+
+  /** Performs additional tasks required for an allocate command. */
+  public void performAdditionalDomainAllocateLogic(
+      DomainResource domain,
+      String clientId,
+      DateTime asOfDate,
+      int years,
+      EppInput eppInput,
+      HistoryEntry historyEntry) throws EppException;
+
+  /** Computes the expected creation fee. */
   public BaseFee getCreateFeeOrCredit(
       String domainName,
       String clientId,
@@ -80,11 +103,7 @@ public interface RegistryExtraFlowLogic {
       EppInput eppInput,
       HistoryEntry historyEntry) throws EppException;
 
-  /**
-   * Computes the expected renewal fee.
-   *
-   * <p>For use in fee challenges and the like.
-   */
+  /** Computes the expected renewal fee. */
   public BaseFee getRenewFeeOrCredit(
       DomainResource domain,
       String clientId,
@@ -118,11 +137,7 @@ public interface RegistryExtraFlowLogic {
       EppInput eppInput,
       HistoryEntry historyEntry) throws EppException;
 
-  /**
-   * Computes the expected update fee.
-   *
-   * <p>For use in fee challenges and the like.
-   */
+  /** Computes the expected update fee. */
   public BaseFee getUpdateFeeOrCredit(
       DomainResource domain,
       String clientId,

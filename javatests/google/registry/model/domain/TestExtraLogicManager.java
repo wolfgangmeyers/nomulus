@@ -66,13 +66,30 @@ public class TestExtraLogicManager implements RegistryExtraFlowLogic {
    */
   @Override
   public Set<String> getExtensionFlags(
-      DomainResource domainResource, String clientId, DateTime asOfDate) {
+      DomainResource domain, String clientId, DateTime asOfDate) {
     // Take the part before the period, split by dashes, and treat each part after the first as
     // a flag.
     List<String> components =
         Splitter.on('-').splitToList(
             Iterables.getFirst(
-                Splitter.on('.').split(domainResource.getFullyQualifiedDomainName()), ""));
+                Splitter.on('.').split(domain.getFullyQualifiedDomainName()), ""));
+    return ImmutableSet.copyOf(components.subList(1, components.size()));
+  }
+
+  /**
+   * Gets the flags to be used in the EPP flags extension for application info commands.
+   *
+   * <p>This method works the same way as getExtensionFlags().
+   */
+  @Override
+  public Set<String> getApplicationExtensionFlags(
+      DomainApplication application, String clientId, DateTime asOfDate) {
+    // Take the part before the period, split by dashes, and treat each part after the first as
+    // a flag.
+    List<String> components =
+        Splitter.on('-').splitToList(
+            Iterables.getFirst(
+                Splitter.on('.').split(application.getFullyQualifiedDomainName()), ""));
     return ImmutableSet.copyOf(components.subList(1, components.size()));
   }
 
@@ -96,10 +113,7 @@ public class TestExtraLogicManager implements RegistryExtraFlowLogic {
     }
   }
 
-  /**
-   * Performs additional tasks required for an application create command. Any changes should not be
-   * persisted to Datastore until commitAdditionalLogicChanges is called.
-   */
+  /** Performs additional tasks required for an application create command. */
   @Override
   public void performAdditionalApplicationCreateLogic(
       DomainApplication application,
@@ -116,6 +130,47 @@ public class TestExtraLogicManager implements RegistryExtraFlowLogic {
     throw new TestExtraLogicManagerSuccessException(Joiner.on(',').join(flags.getFlags()));
   }
 
+  /** Performs additional tasks required for an application create command. */
+  @Override
+  public void performAdditionalApplicationDeleteLogic(
+      DomainApplication application,
+      String clientId,
+      DateTime asOfDate,
+      EppInput eppInput,
+      HistoryEntry historyEntry) throws EppException {
+    throw new TestExtraLogicManagerSuccessException("application deleted");
+  }
+
+  /** Computes the expected application update cost, for use in fee challenges and the like. */
+  @Override
+  public BaseFee getApplicationUpdateFeeOrCredit(
+      DomainApplication application,
+      String clientId,
+      DateTime asOfDate,
+      EppInput eppInput) throws EppException {
+    return domainNameToFeeOrCredit(application.getFullyQualifiedDomainName());
+  }
+
+  /** Performs additional tasks required for an application update command. */
+  @Override
+  public void performAdditionalApplicationUpdateLogic(
+      DomainApplication application,
+      String clientId,
+      DateTime asOfDate,
+      EppInput eppInput,
+      HistoryEntry historyEntry) throws EppException {
+    FlagsUpdateCommandExtension flags =
+        eppInput.getSingleExtension(FlagsUpdateCommandExtension.class);
+    if (flags == null) {
+      return;
+    }
+    throw new TestExtraLogicManagerSuccessException(
+        "add:"
+        + Joiner.on(',').join(flags.getAddFlags().getFlags())
+        + ";remove:"
+        + Joiner.on(',').join(flags.getRemoveFlags().getFlags()));
+  }
+
   /** Computes the expected create cost, for use in fee challenges and the like. */
   @Override
   public BaseFee getCreateFeeOrCredit(
@@ -125,6 +180,18 @@ public class TestExtraLogicManager implements RegistryExtraFlowLogic {
       int years,
       EppInput eppInput) throws EppException {
     return domainNameToFeeOrCredit(domainName);
+  }
+
+  /** Performs additional tasks required for an allocate command. */
+  @Override
+  public void performAdditionalDomainAllocateLogic(
+      DomainResource domain,
+      String clientId,
+      DateTime asOfDate,
+      int years,
+      EppInput eppInput,
+      HistoryEntry historyEntry) throws EppException {
+    throw new TestExtraLogicManagerSuccessException("allocated");
   }
 
   /** Performs additional tasks required for a create command. */

@@ -18,13 +18,12 @@ import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.failfastForAsyncDelete;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyNoDisallowedStatuses;
-import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
 import static google.registry.flows.ResourceFlowUtils.verifyResourceOwnership;
+import static google.registry.flows.host.HostFlowUtils.validateHostName;
 import static google.registry.model.eppoutput.Result.Code.SUCCESS_WITH_ACTION_PENDING;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
 import google.registry.flows.EppException;
@@ -36,7 +35,6 @@ import google.registry.flows.TransactionalFlow;
 import google.registry.flows.async.AsyncFlowEnqueuer;
 import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.metadata.MetadataExtension;
-import google.registry.model.eppcommon.AuthInfo;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.eppoutput.EppResponse;
 import google.registry.model.host.HostResource;
@@ -57,6 +55,9 @@ import org.joda.time.DateTime;
  * @error {@link google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException}
  * @error {@link google.registry.flows.exceptions.ResourceStatusProhibitsOperationException}
  * @error {@link google.registry.flows.exceptions.ResourceToDeleteIsReferencedException}
+ * @error {@link HostFlowUtils.HostNameNotLowerCaseException}
+ * @error {@link HostFlowUtils.HostNameNotNormalizedException}
+ * @error {@link HostFlowUtils.HostNameNotPunyCodedException}
  */
 public final class HostDeleteFlow implements TransactionalFlow {
 
@@ -74,7 +75,6 @@ public final class HostDeleteFlow implements TransactionalFlow {
         }};
 
   @Inject ExtensionManager extensionManager;
-  @Inject Optional<AuthInfo> authInfo;
   @Inject @ClientId String clientId;
   @Inject @TargetId String targetId;
   @Inject @Superuser boolean isSuperuser;
@@ -89,10 +89,10 @@ public final class HostDeleteFlow implements TransactionalFlow {
     extensionManager.validate();
     validateClientIsLoggedIn(clientId);
     DateTime now = ofy().getTransactionTime();
+    validateHostName(targetId);
     failfastForAsyncDelete(targetId, now, HostResource.class, GET_NAMESERVERS);
     HostResource existingHost = loadAndVerifyExistence(HostResource.class, targetId, now);
     verifyNoDisallowedStatuses(existingHost, DISALLOWED_STATUSES);
-    verifyOptionalAuthInfoForResource(authInfo, existingHost);
     if (!isSuperuser) {
       verifyResourceOwnership(clientId, existingHost);
     }

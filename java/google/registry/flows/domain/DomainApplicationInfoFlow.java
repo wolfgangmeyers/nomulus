@@ -17,7 +17,7 @@ package google.registry.flows.domain;
 import static google.registry.flows.EppXmlTransformer.unmarshal;
 import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.verifyExistence;
-import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfoForResource;
+import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfo;
 import static google.registry.flows.ResourceFlowUtils.verifyResourceOwnership;
 import static google.registry.flows.domain.DomainFlowUtils.addSecDnsExtensionIfPresent;
 import static google.registry.flows.domain.DomainFlowUtils.verifyApplicationDomainMatchesTargetId;
@@ -35,6 +35,7 @@ import google.registry.flows.FlowModule.ClientId;
 import google.registry.flows.FlowModule.TargetId;
 import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainCommand.Info;
+import google.registry.model.domain.flags.FlagsInfoResponseExtension;
 import google.registry.model.domain.launch.LaunchInfoExtension;
 import google.registry.model.domain.launch.LaunchInfoResponseExtension;
 import google.registry.model.eppcommon.AuthInfo;
@@ -46,7 +47,9 @@ import google.registry.model.mark.Mark;
 import google.registry.model.smd.EncodedSignedMark;
 import google.registry.model.smd.SignedMark;
 import google.registry.util.Clock;
+import java.util.Set;
 import javax.inject.Inject;
+import org.joda.time.DateTime;
 
 /**
  * An EPP flow that returns information about a domain application.
@@ -78,6 +81,7 @@ public final class DomainApplicationInfoFlow implements Flow {
     extensionManager.register(LaunchInfoExtension.class);
     extensionManager.validate();
     validateClientIsLoggedIn(clientId);
+    DateTime now = clock.nowUtc();
     if (applicationId.isEmpty()) {
       throw new MissingApplicationIdException();
     }
@@ -86,7 +90,7 @@ public final class DomainApplicationInfoFlow implements Flow {
         applicationId,
         loadDomainApplication(applicationId, clock.nowUtc()));
     verifyApplicationDomainMatchesTargetId(application, targetId);
-    verifyOptionalAuthInfoForResource(authInfo, application);
+    verifyOptionalAuthInfo(authInfo, application);
     LaunchInfoExtension launchInfo = eppInput.getSingleExtension(LaunchInfoExtension.class);
     if (!application.getPhase().equals(launchInfo.getPhase())) {
       throw new ApplicationLaunchPhaseMismatchException();
@@ -95,7 +99,7 @@ public final class DomainApplicationInfoFlow implements Flow {
     verifyResourceOwnership(clientId, application);
     return responseBuilder
         .setResData(getResourceInfo(application))
-        .setExtensions(getDomainResponseExtensions(application, launchInfo))
+        .setExtensions(getDomainResponseExtensions(application, launchInfo, now))
         .build();
   }
 
@@ -111,8 +115,8 @@ public final class DomainApplicationInfoFlow implements Flow {
     return application;
   }
 
-  ImmutableList<ResponseExtension> getDomainResponseExtensions(
-      DomainApplication application, LaunchInfoExtension launchInfo) {
+  ImmutableList<ResponseExtension> getDomainResponseExtensions(DomainApplication application,
+      LaunchInfoExtension launchInfo, DateTime now) throws EppException {
     ImmutableList.Builder<Mark> marksBuilder = new ImmutableList.Builder<>();
     if (Boolean.TRUE.equals(launchInfo.getIncludeMark())) {  // Default to false.
       for (EncodedSignedMark encodedMark : application.getEncodedSignedMarks()) {
@@ -132,6 +136,16 @@ public final class DomainApplicationInfoFlow implements Flow {
         .setMarks(marksBuilder.build())
         .build());
     addSecDnsExtensionIfPresent(extensions, application.getDsData());
+    // If the TLD uses the flags extension, add it to the info response.
+    Optional<RegistryExtraFlowLogic> extraLogicManager =
+        RegistryExtraFlowLogicProxy.newInstanceForDomain(application);
+    if (extraLogicManager.isPresent()) {
+      Set<String> flags = extraLogicManager.get().getApplicationExtensionFlags(
+          application, clientId, now); // As-of date is always now for info commands.
+      if (!flags.isEmpty()) {
+        extensions.add(FlagsInfoResponseExtension.create(ImmutableList.copyOf(flags)));
+      }
+    }
     return extensions.build();
   }
 
