@@ -1,3 +1,17 @@
+// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package google.registry.model.registry.label;
 
 import com.google.common.base.Optional;
@@ -22,6 +36,8 @@ import google.registry.testing.DatastoreHelper;
 import google.registry.testing.ExceptionRule;
 
 import static com.google.common.truth.Truth.assertThat;
+import static google.registry.model.common.EntityGroupRoot.getCrossTldKey;
+import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.registry.label.CategorizedPremiumList.CategorizedListEntry.createEntry;
 import static google.registry.testing.DatastoreHelper.persistCategorizedPremiumList;
 import static google.registry.testing.DatastoreHelper.persistPricingCategory;
@@ -516,5 +532,78 @@ public class CategorizedPremiumListTest {
     assertThat(pricingCategories.size()).isEqualTo(3);
     assertThat(pricingCategories.get(1).getName()).isEqualTo(CATEGORY_NAME_TWO);
     assertThat(pricingCategories.get(1).getPrice()).isEqualTo(Money.parse(USD_PRICE));
+  }
+
+  @Test
+  public void verifyEntriesAreBeingDeletedInDatastore() {
+    final String sld1 = "brown1";
+    final String sld2 = "brown2";
+    final String sld3 = "brown3";
+    final String tld = "cow";
+
+    new CategorizedPremiumList.Builder()
+        .setName(tld)
+        .addEntry(sld1, CATEGORY_NAME_ONE)
+        .build()
+        .saveAndUpdateEntries();
+
+    final CategorizedPremiumList premiumListAfterFirstSave = ofy()
+        .load()
+        .type(CategorizedPremiumList.class)
+        .parent(getCrossTldKey())
+        .id(tld)
+        .now();
+
+    assertThat(premiumListAfterFirstSave.getPremiumListEntries())
+        .containsKey(sld1);
+
+    premiumListAfterFirstSave
+        .asBuilder()
+        .deleteEntry(sld1)
+        .addEntry(sld2, CATEGORY_NAME_TWO)
+        .addEntry(sld3, CATEGORY_NAME_THREE)
+        .build()
+        .saveAndUpdateEntries();
+
+    final CategorizedPremiumList premiumListAfterSecondSave = ofy()
+        .load()
+        .type(CategorizedPremiumList.class)
+        .parent(getCrossTldKey())
+        .id(tld)
+        .now();
+
+    assertThat(premiumListAfterSecondSave.getPremiumListEntries())
+        .doesNotContainKey(sld1);
+
+    final CategorizedListEntry cle = ofy()
+        .load()
+        .type(CategorizedListEntry.class)
+        .parent(premiumListAfterFirstSave.getRevisionKey())
+        .id(sld1)
+        .now();
+
+    assertThat(cle).isNull();
+  }
+
+  @Test
+  public void verifySaveNewPremiumList() {
+    final String sld1 = "brown1";
+    final String tld = "cow";
+
+    new CategorizedPremiumList.Builder()
+        .setName(tld)
+        .addEntry(sld1, CATEGORY_NAME_ONE)
+        .build()
+        .saveNewPremiumList();
+
+    final CategorizedPremiumList result =
+        ofy()
+        .load()
+        .type(CategorizedPremiumList.class)
+        .parent(getCrossTldKey())
+        .id(tld)
+        .now();
+
+    assertThat(result.getPremiumListEntries()).containsKey(sld1);
   }
 }

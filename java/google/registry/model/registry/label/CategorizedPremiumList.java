@@ -1,3 +1,17 @@
+// Copyright 2016 The Domain Registry Authors. All Rights Reserved.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package google.registry.model.registry.label;
 
 import static com.google.common.base.Preconditions.checkArgument;
@@ -231,22 +245,32 @@ public class CategorizedPremiumList
    */
   public CategorizedPremiumList saveAndUpdateEntries() {
     final Optional<CategorizedPremiumList> oldPremiumList = getUncached(name);
+
     // Only update entries if there's actually changes to the entries
     boolean entriesToUpdate = !oldPremiumList.isPresent() || entriesWereUpdated;
-    // If needed, save the new child entities in a series of transactions.
-    if (entriesToUpdate) {
-      for (final List<CategorizedListEntry> batch
-          : partition(premiumListMap.values(), TRANSACTION_BATCH_SIZE)) {
-        ofy().transactNew(new VoidWork() {
-          @Override
-          public void vrun() {
-            ofy().save().entities(batch);
-          }});
-      }
+
+    // Delete existing child entries before proceeding
+    if (entriesToUpdate && oldPremiumList.isPresent()) {
+      oldPremiumList.get().deleteEntries();
     }
 
-    // Save the new PremiumList itself.
-    final CategorizedPremiumList updated = ofy().transactNew(new Work<CategorizedPremiumList>() {
+    if (entriesToUpdate) {
+      saveCategorizedListEntry();
+    }
+
+    final CategorizedPremiumList updated = saveNewPremiumList();
+
+    CategorizedPremiumList.cache.put(name, updated);
+
+    return updated;
+  }
+
+
+  @VisibleForTesting
+  CategorizedPremiumList saveNewPremiumList() {
+    final Optional<CategorizedPremiumList> oldPremiumList = getUncached(name);
+
+    return ofy().transactNew(new Work<CategorizedPremiumList>() {
         @Override
         public CategorizedPremiumList run() {
           final DateTime now = ofy().getTransactionTime();
@@ -261,14 +285,22 @@ public class CategorizedPremiumList
           ofy().save().entity(newList);
           return newList;
         }});
-
-    // Update the cache.
-    CategorizedPremiumList.cache.put(name, updated);
-
-    return updated;
   }
 
-  private void saveAll(List<PricingCategory> pricingCategories) {
+  @VisibleForTesting
+  void saveCategorizedListEntry() {
+    for (final List<CategorizedListEntry> batch
+        : partition(premiumListMap.values(), TRANSACTION_BATCH_SIZE)) {
+      ofy().transactNew(new VoidWork() {
+        @Override
+        public void vrun() {
+          ofy().save().entities(batch).now();
+        }});
+    }
+  }
+
+  @VisibleForTesting
+  void saveAll(List<PricingCategory> pricingCategories) {
     for(PricingCategory pricingCategory : pricingCategories) {
       ofy().save().entity(
           pricingCategory.asBuilder()
