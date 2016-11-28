@@ -17,7 +17,9 @@ node {
     stage 'Test'
     parallel 'gradle test': {
         withEnv(["${java7}"]) {
-            sh './gradlew clean test'
+            ansiColor('xterm') {
+                sh './gradlew clean test'
+            }
         }
     }, 'bazel test': {
         // TODO: Migrate/create donut's tests to execute here
