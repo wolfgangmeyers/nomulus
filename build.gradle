@@ -221,11 +221,23 @@ test {
     exclude '**/*TestSuite*'
 
     testLogging.exceptionFormat = 'full'
+    
+    afterTest { desc, result ->
+        switch (result.resultType) {
+            case "SUCCESS": printTestResult("1;32", desc, result); break
+            case "SKIPPED": printTestResult("1;33", desc, result); break
+            case "FAILURE": printTestResult("1;31", desc, result); break
+        }
+    }
 
     reports {
         junitXml.enabled = true
         html.enabled = false
     }
+}
+
+def printTestResult(color, desc, result) {
+    println "\033[${color}m${result.resultType}\033[0m: [${desc.className}] ${desc.name}"
 }
 
 // Remove generated code
