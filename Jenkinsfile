@@ -17,7 +17,7 @@ node {
     stage 'Test'
     parallel 'gradle test': {
         withEnv(["${java7}"]) {
-            ansiColor('xterm') {
+            wrap(<object of type hudson.plugins.ansicolor.AnsiColorBuildWrapper>) {
                 sh './gradlew clean test'
             }
         }
