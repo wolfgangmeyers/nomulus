@@ -1,4 +1,4 @@
-node {
+node("b2-bazel") {
     def java7 = "PATH+JAVA=${tool 'java7'}/bin"
 
     stage 'Checkout'
