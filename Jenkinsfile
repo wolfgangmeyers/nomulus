@@ -1,14 +1,31 @@
 node {
+    def java7 = "PATH+JAVA=${tool 'java7'}/bin"
+
     stage 'Checkout'
     checkout scm
 
     stage 'Build'
-    sh './gradlew clean build -x test'
+    parallel 'gradle build': {
+        withEnv(["${java7}"]) {
+            sh 'java -version'
+            sh './gradlew clean build -x test'
+        }
+    }, 'bazel build': {
+        sh 'bazel build //java/domains/donuts/...'
+    }
 
     stage 'Test'
-    sh './gradlew clean test'
+    parallel 'gradle test': {
+        withEnv(["${java7}"]) {
+            sh './gradlew clean test'
+        }
+    }, 'bazel test': {
+        // TODO: Migrate/create donut's tests to execute here
+        sh 'bazel test //javatests/google/registry/... --local_resources=10000,6,1 --test_output=errors --test_summary=detailed --cache_test_results=no'
+    }
 
     // Publish the results of the tests
+    stage 'Report'
     junit 'build/test-results/**/*.xml'
 
 // TODO: Enable when Jenkins supports disabling build on CI commit

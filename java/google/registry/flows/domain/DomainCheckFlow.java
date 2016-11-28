@@ -107,7 +107,6 @@ public final class DomainCheckFlow implements Flow {
   @Inject EppInput eppInput;
   @Inject @ClientId String clientId;
   @Inject @Config("maxChecks") int maxChecks;
-  @Inject Optional<ExtraDomainValidation> extraDomainValidation;
   @Inject @Superuser boolean isSuperuser;
   @Inject Clock clock;
   @Inject EppResponse.Builder responseBuilder;
@@ -186,14 +185,6 @@ public final class DomainCheckFlow implements Flow {
         && registry.getPremiumPriceAckRequired()
         && eppInput.getSingleExtension(FeeCheckCommandExtension.class) == null) {
       return "Premium names require EPP ext.";
-    }
-    if (extraDomainValidation.isPresent()) {
-      String extraBlockValidationMessage = extraDomainValidation.get()
-          .getExtraValidationBlockMessage(
-              domainName.parts().get(0), domainName.parent().toString(), reservationType, now);
-      if (extraBlockValidationMessage != null) {
-        return extraBlockValidationMessage;
-      }
     }
     return reservationType.getMessageForCheck();
   }
