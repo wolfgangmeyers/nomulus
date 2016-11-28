@@ -18,7 +18,6 @@ import static com.google.common.base.Preconditions.checkNotNull;
 import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.handlePendingTransferOnDelete;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
-import static google.registry.flows.ResourceFlowUtils.prepareDeletedResourceAsBuilder;
 import static google.registry.flows.ResourceFlowUtils.updateForeignKeyIndexDeletionTime;
 import static google.registry.flows.ResourceFlowUtils.verifyNoDisallowedStatuses;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfo;
@@ -43,6 +42,7 @@ import google.registry.flows.ExtensionManager;
 import google.registry.flows.FlowModule.ClientId;
 import google.registry.flows.FlowModule.Superuser;
 import google.registry.flows.FlowModule.TargetId;
+import google.registry.flows.ResourceFlowUtils;
 import google.registry.flows.SessionMetadata;
 import google.registry.flows.TransactionalFlow;
 import google.registry.model.ImmutableObject;
@@ -70,6 +70,7 @@ import google.registry.model.poll.PollMessage;
 import google.registry.model.poll.PollMessage.OneTime;
 import google.registry.model.registry.Registry;
 import google.registry.model.reporting.HistoryEntry;
+import google.registry.model.transfer.TransferStatus;
 import java.util.Set;
 import javax.annotation.Nullable;
 import javax.inject.Inject;
@@ -119,7 +120,10 @@ public final class DomainDeleteFlow implements TransactionalFlow {
     Registry registry = Registry.get(existingDomain.getTld());
     verifyDeleteAllowed(existingDomain, registry, now);
     HistoryEntry historyEntry = buildHistoryEntry(existingDomain, now);
-    Builder builder = (Builder) prepareDeletedResourceAsBuilder(existingDomain, now);
+    Builder builder =
+        ResourceFlowUtils.<DomainResource, DomainResource.Builder>resolvePendingTransfer(
+            existingDomain, TransferStatus.SERVER_CANCELLED, now);
+    builder.setDeletionTime(now).setStatusValues(null);
     // If the domain is in the Add Grace Period, we delete it immediately, which is already
     // reflected in the builder we just prepared. Otherwise we give it a PENDING_DELETE status.
     if (!existingDomain.getGracePeriodStatuses().contains(GracePeriodStatus.ADD)) {
@@ -217,7 +221,7 @@ public final class DomainDeleteFlow implements TransactionalFlow {
       DomainResource existingDomain, DateTime now) {
     FeeTransformResponseExtension.Builder feeResponseBuilder = getDeleteResponseBuilder();
     if (feeResponseBuilder == null) {
-      return null;
+      return ImmutableList.of();
     }
     ImmutableList.Builder<Credit> creditsBuilder = new ImmutableList.Builder<>();
     for (GracePeriod gracePeriod : existingDomain.getGracePeriods()) {
@@ -230,7 +234,7 @@ public final class DomainDeleteFlow implements TransactionalFlow {
     }
     ImmutableList<Credit> credits = creditsBuilder.build();
     if (credits.isEmpty()) {
-      return null;
+      return ImmutableList.of();
     }
     return ImmutableList.of(feeResponseBuilder.setCredits(credits).build());
   }

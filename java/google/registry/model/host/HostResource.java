@@ -16,7 +16,6 @@ package google.registry.model.host;
 
 import static com.google.common.collect.Sets.difference;
 import static com.google.common.collect.Sets.union;
-import static google.registry.model.EppResourceUtils.projectResourceOntoBuilderAtTime;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
 import static google.registry.util.CollectionUtils.nullToEmptyImmutableCopy;
@@ -94,6 +93,14 @@ public class HostResource extends EppResource implements ForeignKeyedEppResource
   Key<DomainResource> superordinateDomain;
 
   /**
+   * The time that this resource was last transferred.
+   *
+   * <p>Can be null if the resource has never been transferred.
+   */
+  @XmlElement(name = "trDate")
+  DateTime lastTransferTime;
+
+  /**
    * The most recent time that the superordinate domain was changed, or null if this host is
    * external.
    */
@@ -114,6 +121,10 @@ public class HostResource extends EppResource implements ForeignKeyedEppResource
     return nullToEmptyImmutableCopy(inetAddresses);
   }
 
+  public DateTime getLastTransferTime() {
+    return lastTransferTime;
+  }
+
   public DateTime getLastSuperordinateChange() {
     return lastSuperordinateChange;
   }
@@ -126,15 +137,14 @@ public class HostResource extends EppResource implements ForeignKeyedEppResource
   @Override
   public HostResource cloneProjectedAtTime(DateTime now) {
     Builder builder = this.asBuilder();
-    projectResourceOntoBuilderAtTime(this, builder, now);
 
     if (superordinateDomain == null) {
       // If this was a subordinate host to a domain that was being transferred, there might be a
       // pending transfer still extant, so remove it.
-      builder.setTransferData(null).removeStatusValue(StatusValue.PENDING_TRANSFER);
+      builder.removeStatusValue(StatusValue.PENDING_TRANSFER);
     } else {
-      // For hosts with superordinate domains, the client id, last transfer time, and transfer data
-      // need to be read off the domain projected to the correct time.
+      // For hosts with superordinate domains, the client id, last transfer time, and transfer
+      // status value need to be read off the domain projected to the correct time.
       DomainResource domainAtTime = ofy().load().key(superordinateDomain).now()
           .cloneProjectedAtTime(now);
       builder.setCurrentSponsorClientId(domainAtTime.getCurrentSponsorClientId());
@@ -145,15 +155,14 @@ public class HostResource extends EppResource implements ForeignKeyedEppResource
           .isBefore(Optional.fromNullable(domainAtTime.getLastTransferTime()).or(START_OF_TIME))) {
         builder.setLastTransferTime(domainAtTime.getLastTransferTime());
       }
-      // Copy the transfer status and data from the superordinate domain onto the host, because the
-      // host's doesn't matter and the superordinate domain always has the canonical data.
-      TransferData domainTransferData = domainAtTime.getTransferData();
-      if (TransferStatus.PENDING.equals(domainTransferData.getTransferStatus())) {
+      // Copy the transfer status from the superordinate domain onto the host, because the host's
+      // doesn't matter and the superordinate domain always has the canonical data.
+      TransferStatus domainTransferStatus = domainAtTime.getTransferData().getTransferStatus();
+      if (TransferStatus.PENDING.equals(domainTransferStatus)) {
         builder.addStatusValue(StatusValue.PENDING_TRANSFER);
       } else {
         builder.removeStatusValue(StatusValue.PENDING_TRANSFER);
       }
-      builder.setTransferData(domainTransferData);
     }
     return builder.build();
   }
@@ -198,6 +207,11 @@ public class HostResource extends EppResource implements ForeignKeyedEppResource
 
     public Builder setSuperordinateDomain(Key<DomainResource> superordinateDomain) {
       getInstance().superordinateDomain = superordinateDomain;
+      return this;
+    }
+
+    public Builder setLastTransferTime(DateTime lastTransferTime) {
+      getInstance().lastTransferTime = lastTransferTime;
       return this;
     }
 

@@ -22,7 +22,9 @@ import com.google.common.truth.FailureStrategy;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.contact.PostalInfo;
 import google.registry.model.eppcommon.AuthInfo;
+import google.registry.model.transfer.TransferStatus;
 import google.registry.testing.TruthChainer.And;
+import org.joda.time.DateTime;
 
 /** Truth subject for asserting things about {@link ContactResource} instances. */
 public final class ContactResourceSubject
@@ -124,6 +126,55 @@ public final class ContactResourceSubject
     return hasValue(pw, authInfo == null ? null : authInfo.getPw().getValue(), "has auth info pw");
   }
 
+  public And<ContactResourceSubject> hasTransferStatus(TransferStatus transferStatus) {
+    return hasValue(
+        transferStatus,
+        actual().getTransferData().getTransferStatus(),
+        "has transferStatus");
+  }
+
+  public And<ContactResourceSubject> hasTransferRequestClientTrid(String clTrid) {
+    return hasValue(
+        clTrid,
+        actual().getTransferData().getTransferRequestTrid().getClientTransactionId(),
+        "has trid");
+  }
+
+  public And<ContactResourceSubject> hasPendingTransferExpirationTime(
+      DateTime pendingTransferExpirationTime) {
+    return hasValue(
+        pendingTransferExpirationTime,
+        actual().getTransferData().getPendingTransferExpirationTime(),
+        "has pendingTransferExpirationTime");
+  }
+
+  public And<ContactResourceSubject> hasTransferGainingClientId(String gainingClientId) {
+    return hasValue(
+        gainingClientId,
+        actual().getTransferData().getGainingClientId(),
+        "has transfer ga");
+  }
+
+  public And<ContactResourceSubject> hasTransferLosingClientId(String losingClientId) {
+    return hasValue(
+        losingClientId,
+        actual().getTransferData().getLosingClientId(),
+        "has transfer losingClientId");
+  }
+
+  public And<ContactResourceSubject> hasLastTransferTime(DateTime lastTransferTime) {
+    return hasValue(
+        lastTransferTime,
+        actual().getLastTransferTime(),
+        "has lastTransferTime");
+  }
+
+  public And<ContactResourceSubject> hasLastTransferTimeNotEqualTo(DateTime lastTransferTime) {
+    return doesNotHaveValue(
+        lastTransferTime,
+        actual().getLastTransferTime(),
+        "lastTransferTime");
+  }
   public static DelegatedVerb<ContactResourceSubject, ContactResource> assertAboutContacts() {
     return assertAbout(new SubjectFactory());
   }

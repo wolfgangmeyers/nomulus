@@ -18,7 +18,6 @@ import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.denyPendingTransfer;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyHasPendingTransfer;
-import static google.registry.flows.ResourceFlowUtils.verifyIsGainingRegistrar;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfo;
 import static google.registry.flows.domain.DomainFlowUtils.checkAllowedAccessToTld;
 import static google.registry.flows.domain.DomainFlowUtils.createLosingTransferPollMessage;
@@ -34,6 +33,7 @@ import google.registry.flows.ExtensionManager;
 import google.registry.flows.FlowModule.ClientId;
 import google.registry.flows.FlowModule.TargetId;
 import google.registry.flows.TransactionalFlow;
+import google.registry.flows.exceptions.NotTransferInitiatorException;
 import google.registry.model.ImmutableObject;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.metadata.MetadataExtension;
@@ -81,7 +81,9 @@ public final class DomainTransferCancelFlow implements TransactionalFlow {
     DomainResource existingDomain = loadAndVerifyExistence(DomainResource.class, targetId, now);
     verifyOptionalAuthInfo(authInfo, existingDomain);
     verifyHasPendingTransfer(existingDomain);
-    verifyIsGainingRegistrar(existingDomain, clientId);
+    if (!clientId.equals(existingDomain.getTransferData().getGainingClientId())) {
+      throw new NotTransferInitiatorException();
+    }
     checkAllowedAccessToTld(clientId, existingDomain.getTld());
     HistoryEntry historyEntry = historyBuilder
         .setType(HistoryEntry.Type.DOMAIN_TRANSFER_CANCEL)
@@ -90,6 +92,7 @@ public final class DomainTransferCancelFlow implements TransactionalFlow {
         .build();
     DomainResource newDomain =
         denyPendingTransfer(existingDomain, TransferStatus.CLIENT_CANCELLED, now);
+    handleExtraFlowLogic(existingDomain.getTld(), historyEntry, existingDomain);
     ofy().save().<ImmutableObject>entities(
         newDomain,
         historyEntry,
@@ -104,5 +107,17 @@ public final class DomainTransferCancelFlow implements TransactionalFlow {
     return responseBuilder
         .setResData(createTransferResponse(targetId, newDomain.getTransferData(), null))
         .build();
+  }
+
+  private void handleExtraFlowLogic(
+      String tld, HistoryEntry historyEntry, DomainResource existingDomain) throws EppException {
+    Optional<RegistryExtraFlowLogic> extraFlowLogic =
+        RegistryExtraFlowLogicProxy.newInstanceForTld(tld);
+    if (extraFlowLogic.isPresent()) {
+      extraFlowLogic.get().performAdditionalDomainTransferCancelLogic(
+          existingDomain,
+          clientId,
+          historyEntry);
+    }
   }
 }

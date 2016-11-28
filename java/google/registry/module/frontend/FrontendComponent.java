@@ -15,10 +15,12 @@
 package google.registry.module.frontend;
 
 import dagger.Component;
-import domains.donuts.keyring.DonutsKeyringModule;
 import google.registry.braintree.BraintreeModule;
 import google.registry.config.ConfigModule;
+import google.registry.flows.custom.CustomLogicFactoryModule;
+import google.registry.keyring.api.DummyKeyringModule;
 import google.registry.keyring.api.KeyModule;
+import google.registry.module.frontend.FrontendRequestComponent.FrontendRequestComponentModule;
 import google.registry.monitoring.metrics.MetricReporter;
 import google.registry.monitoring.whitebox.StackdriverModule;
 import google.registry.request.Modules.AppIdentityCredentialModule;
@@ -27,9 +29,9 @@ import google.registry.request.Modules.ModulesServiceModule;
 import google.registry.request.Modules.UrlFetchTransportModule;
 import google.registry.request.Modules.UseAppIdentityCredentialForGoogleApisModule;
 import google.registry.request.Modules.UserServiceModule;
-import google.registry.request.RequestModule;
 import google.registry.ui.ConsoleConfigModule;
 import google.registry.util.SystemClock.SystemClockModule;
+import google.registry.util.SystemSleeper.SystemSleeperModule;
 import javax.inject.Singleton;
 
 /** Dagger component with instance lifetime for "default" App Engine module. */
@@ -40,18 +42,21 @@ import javax.inject.Singleton;
         BraintreeModule.class,
         ConfigModule.class,
         ConsoleConfigModule.class,
+        CustomLogicFactoryModule.class,
+        DummyKeyringModule.class,
         FrontendMetricsModule.class,
+        FrontendRequestComponentModule.class,
         Jackson2Module.class,
-        DonutsKeyringModule.class,
         KeyModule.class,
         ModulesServiceModule.class,
         StackdriverModule.class,
         SystemClockModule.class,
+        SystemSleeperModule.class,
         UrlFetchTransportModule.class,
         UseAppIdentityCredentialForGoogleApisModule.class,
         UserServiceModule.class,
     })
 interface FrontendComponent {
-  FrontendRequestComponent startRequest(RequestModule requestModule);
+  FrontendRequestHandler requestHandler();
   MetricReporter metricReporter();
 }

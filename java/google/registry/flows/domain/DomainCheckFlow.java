@@ -42,6 +42,9 @@ import google.registry.flows.ExtensionManager;
 import google.registry.flows.Flow;
 import google.registry.flows.FlowModule.ClientId;
 import google.registry.flows.FlowModule.Superuser;
+import google.registry.flows.custom.DomainCheckFlowCustomLogic;
+import google.registry.flows.custom.DomainCheckFlowCustomLogic.BeforeResponseParameters;
+import google.registry.flows.custom.DomainCheckFlowCustomLogic.BeforeResponseReturnData;
 import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainCommand.Check;
 import google.registry.model.domain.DomainResource;
@@ -108,11 +111,13 @@ public final class DomainCheckFlow implements Flow {
   @Inject @Superuser boolean isSuperuser;
   @Inject Clock clock;
   @Inject EppResponse.Builder responseBuilder;
+  @Inject DomainCheckFlowCustomLogic customLogic;
   @Inject DomainCheckFlow() {}
 
   @Override
   public EppResponse run() throws EppException {
     extensionManager.register(FeeCheckCommandExtension.class, LaunchCheckExtension.class);
+    customLogic.beforeValidation();
     extensionManager.validate();
     validateClientIsLoggedIn(clientId);
     List<String> targetIds = ((Check) resourceCommand).getTargetIds();
@@ -135,15 +140,28 @@ public final class DomainCheckFlow implements Flow {
       }
     }
     ImmutableMap<String, InternetDomainName> domainNames = domains.build();
+    customLogic.afterValidation(
+        DomainCheckFlowCustomLogic.AfterValidationParameters.newBuilder()
+            .setDomainNames(domainNames)
+            // TODO: Use as of date from fee extension v0.12 instead of now, if specificed.
+            .setAsOfDate(now)
+            .build());
     Set<String> existingIds = checkResourcesExist(DomainResource.class, targetIds, now);
     ImmutableList.Builder<DomainCheck> checks = new ImmutableList.Builder<>();
     for (String targetId : targetIds) {
       String message = getMessageForCheck(domainNames.get(targetId), existingIds, now);
       checks.add(DomainCheck.create(message == null, targetId, message));
     }
+    BeforeResponseReturnData responseData =
+        customLogic.beforeResponse(
+            BeforeResponseParameters.newBuilder()
+                .setDomainChecks(checks.build())
+                .setResponseExtensions(getResponseExtensions(domainNames, now))
+                .setAsOfDate(now)
+                .build());
     return responseBuilder
-        .setResData(DomainCheckData.create(checks.build()))
-        .setExtensions(getResponseExtensions(domainNames, now))
+        .setResData(DomainCheckData.create(responseData.domainChecks()))
+        .setExtensions(responseData.responseExtensions())
         .build();
   }
 
@@ -180,14 +198,13 @@ public final class DomainCheckFlow implements Flow {
     return reservationType.getMessageForCheck();
   }
 
-
   /** Handle the fee check extension. */
   private ImmutableList<? extends ResponseExtension> getResponseExtensions(
       ImmutableMap<String, InternetDomainName> domainNames, DateTime now) throws EppException {
     FeeCheckCommandExtension<?, ?> feeCheck =
         eppInput.getSingleExtension(FeeCheckCommandExtension.class);
     if (feeCheck == null) {
-      return null;  // No fee checks were requested.
+      return ImmutableList.of();  // No fee checks were requested.
     }
     ImmutableList.Builder<FeeCheckResponseExtensionItem> responseItems =
         new ImmutableList.Builder<>();

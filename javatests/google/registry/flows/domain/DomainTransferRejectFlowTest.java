@@ -35,6 +35,8 @@ import google.registry.model.contact.ContactAuthInfo;
 import google.registry.model.domain.DomainAuthInfo;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
+import google.registry.model.domain.TestExtraLogicManager;
+import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.eppcommon.AuthInfo.PasswordAuth;
 import google.registry.model.eppcommon.Trid;
 import google.registry.model.poll.PendingActionNotificationResponse;
@@ -82,9 +84,7 @@ public class DomainTransferRejectFlowTest
     // Transfer should have been rejected. Verify correct fields were set.
     domain = reloadResourceByForeignKey();
     assertTransferFailed(domain, TransferStatus.CLIENT_REJECTED);
-    assertTransferFailed(
-        reloadResourceAndCloneAtTime(subordinateHost, clock.nowUtc()),
-        TransferStatus.CLIENT_REJECTED);
+    assertTransferFailed(reloadResourceAndCloneAtTime(subordinateHost, clock.nowUtc()));
     assertAboutDomains().that(domain)
         .hasRegistrationExpirationTime(originalExpirationTime).and()
         .hasLastTransferTimeNotEqualTo(clock.nowUtc()).and()
@@ -261,4 +261,13 @@ public class DomainTransferRejectFlowTest
 
   // NB: No need to test pending delete status since pending transfers will get cancelled upon
   // entering pending delete phase. So it's already handled in that test case.
+
+  @Test
+  public void testSuccess_extra() throws Exception {
+    setupDomainWithPendingTransfer("extra");
+    clock.advanceOneMilli();
+    RegistryExtraFlowLogicProxy.setOverride("extra", TestExtraLogicManager.class);
+    thrown.expect(TestExtraLogicManagerSuccessException.class, "transfer rejected");
+    doFailingTest("domain_transfer_reject_extra.xml");
+  }
 }
