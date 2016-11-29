@@ -14,17 +14,17 @@ node("b2-bazel") {
         sh 'bazel build //java/domains/donuts/...'
     }
 
-    stage 'Test'
-    parallel 'gradle test': {
-        withEnv(["${java7}"]) {
-            wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm']) {
-                sh './gradlew clean test'
-            }
+    // Note: Running Gradle and Bazel tests in parallel causes Bazel test timeouts
+    stage 'Gradle Test'
+    withEnv(["${java7}"]) {
+        wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm']) {
+            sh './gradlew clean test'
         }
-    }, 'bazel test': {
-        // TODO: Migrate/create donut's tests to execute here
-        sh 'bazel test //javatests/google/registry/... --local_resources=10000,6,1 --test_output=errors --test_summary=detailed --cache_test_results=no'
     }
+
+    stage 'Bazel Test'
+    // TODO: Migrate/create donut's tests to execute here
+    sh 'bazel test //javatests/google/registry/... --local_resources=10000,6,1 --test_output=errors --test_summary=detailed --cache_test_results=no --test_verbose_timeout_warnings'
 
     // Publish the results of the tests
     stage 'Report'
