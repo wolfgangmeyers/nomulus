@@ -14,12 +14,12 @@
 
 package domains.donuts.module.frontend;
 
+import domains.donuts.config.DonutsConfigModule;
 import domains.donuts.keyring.DonutsKeyringModule;
 
 import dagger.Component;
 import domains.donuts.module.frontend.FrontendRequestComponent.FrontendRequestComponentModule;
 import google.registry.braintree.BraintreeModule;
-import google.registry.config.ConfigModule;
 import google.registry.flows.custom.CustomLogicFactoryModule;
 import google.registry.keyring.api.KeyModule;
 import google.registry.monitoring.metrics.MetricReporter;
@@ -42,7 +42,7 @@ import javax.inject.Singleton;
     modules = {
         AppIdentityCredentialModule.class,
         BraintreeModule.class,
-        ConfigModule.class,
+        DonutsConfigModule.class,
         ConsoleConfigModule.class,
         CustomLogicFactoryModule.class,
         DonutsKeyringModule.class,

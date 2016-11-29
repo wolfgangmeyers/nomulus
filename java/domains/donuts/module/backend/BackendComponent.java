@@ -14,12 +14,12 @@
 
 package domains.donuts.module.backend;
 
+import domains.donuts.config.DonutsConfigModule;
 import domains.donuts.keyring.DonutsKeyringModule;
 
 import dagger.Component;
 import domains.donuts.module.backend.BackendRequestComponent.BackendRequestComponentModule;
 import google.registry.bigquery.BigqueryModule;
-import google.registry.config.ConfigModule;
 import google.registry.dns.writer.dnsupdate.DnsUpdateConfigModule;
 import google.registry.dns.writer.dnsupdate.DnsUpdateWriterModule;
 import google.registry.export.DriveModule;
@@ -53,7 +53,7 @@ import javax.inject.Singleton;
         AppIdentityCredentialModule.class,
         BackendRequestComponentModule.class,
         BigqueryModule.class,
-        ConfigModule.class,
+        DonutsConfigModule.class,
         DatastoreServiceModule.class,
         DirectoryModule.class,
         DnsUpdateConfigModule.class,

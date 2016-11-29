@@ -27,6 +27,7 @@ java_library(
         "//third_party/java/bouncycastle",
         "//third_party/java/bouncycastle_bcpg",
         "//third_party/java/dagger",
+        "//third_party/java/joda_money",
         "//third_party/java/joda_time",
         "//third_party/java/jsr305_annotations",
         "//third_party/java/servlet/servlet_api",

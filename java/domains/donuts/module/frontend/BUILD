@@ -11,7 +11,6 @@ java_library(
         "//java/com/google/common/base",
         "//java/com/google/common/collect",
         "//java/google/registry/braintree",
-        "//java/google/registry/config",
         "//java/google/registry/dns",
         "//java/google/registry/flows",
         "//java/google/registry/keyring/api",

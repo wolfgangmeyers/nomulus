@@ -14,11 +14,11 @@
 
 package domains.donuts.module.tools;
 
+import domains.donuts.config.DonutsConfigModule;
 import domains.donuts.keyring.DonutsKeyringModule;
 
 import dagger.Component;
 import domains.donuts.module.tools.ToolsRequestComponent.ToolsRequestComponentModule;
-import google.registry.config.ConfigModule;
 import google.registry.export.DriveModule;
 import google.registry.flows.custom.CustomLogicFactoryModule;
 import google.registry.gcs.GcsServiceModule;
@@ -44,8 +44,8 @@ import javax.inject.Singleton;
 @Component(
     modules = {
         AppIdentityCredentialModule.class,
-        ConfigModule.class,
         CustomLogicFactoryModule.class,
+        DonutsConfigModule.class,
         DatastoreServiceModule.class,
         DirectoryModule.class,
         DonutsKeyringModule.class,
