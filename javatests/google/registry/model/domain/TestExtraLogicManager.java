@@ -118,7 +118,6 @@ public class TestExtraLogicManager implements RegistryExtraFlowLogic {
   public void performAdditionalApplicationCreateLogic(
       DomainApplication application,
       String clientId,
-      DateTime asOfDate,
       int years,
       EppInput eppInput,
       HistoryEntry historyEntry) throws EppException {
@@ -199,7 +198,6 @@ public class TestExtraLogicManager implements RegistryExtraFlowLogic {
   public void performAdditionalDomainCreateLogic(
       DomainResource domain,
       String clientId,
-      DateTime asOfDate,
       int years,
       EppInput eppInput,
       HistoryEntry historyEntry) throws EppException {
@@ -256,9 +254,30 @@ public class TestExtraLogicManager implements RegistryExtraFlowLogic {
     throw new TestExtraLogicManagerSuccessException("restored");
   }
 
-  /** Performs additional tasks required for a transfer command. */
+  /** Performs additional tasks required for a transfer approve command. */
   @Override
-  public void performAdditionalDomainTransferLogic(
+  public void performAdditionalDomainTransferApproveLogic(
+      DomainResource domain, String clientId, HistoryEntry historyEntry) throws EppException {
+    throw new TestExtraLogicManagerSuccessException("transfer approved");
+  }
+
+  /** Performs additional tasks required for a transfer cancel command. */
+  @Override
+  public void performAdditionalDomainTransferCancelLogic(
+      DomainResource domain, String clientId, HistoryEntry historyEntry) throws EppException {
+    throw new TestExtraLogicManagerSuccessException("transfer cancelled");
+  }
+
+  /** Performs additional tasks required for a transfer reject command. */
+  @Override
+  public void performAdditionalDomainTransferRejectLogic(
+      DomainResource domain, String clientId, HistoryEntry historyEntry) throws EppException {
+    throw new TestExtraLogicManagerSuccessException("transfer rejected");
+  }
+
+  /** Performs additional tasks required for a transfer request command. */
+  @Override
+  public void performAdditionalDomainTransferRequestLogic(
       DomainResource domainResource,
       String clientId,
       DateTime asOfDate,

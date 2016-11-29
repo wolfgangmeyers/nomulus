@@ -83,37 +83,12 @@ public final class DonutsRegistryConfig implements RegistryConfig {
   }
 
   @Override
-  public String getDomainListsBucket() {
-    return getProjectId() + "-domain-lists";
-  }
-
-  @Override
-  public String getCommitsBucket() {
-    return getProjectId() + "-commits";
-  }
-
-  @Override
-  public String getZoneFilesBucket() {
-    return getProjectId() + "-zonefiles";
-  }
-
-  @Override
   public boolean getTmchCaTestingMode() {
     switch (environment) {
       case PRODUCTION:
         return false;
       default:
         return true;
-    }
-  }
-
-  @Override
-  public String getTmchMarksdbUrl() {
-    switch (environment) {
-      case PRODUCTION:
-        return "https://ry.marksdb.org";
-      default:
-        return "https://test.ry.marksdb.org";
     }
   }
 
@@ -164,16 +139,6 @@ public final class DonutsRegistryConfig implements RegistryConfig {
   }
 
   @Override
-  public ImmutableList<String> getRegistrarChangesNotificationEmailAddresses() {
-    switch (environment) {
-      case PRODUCTION:
-        return ImmutableList.of("support@donuts.email");
-      default:
-        return ImmutableList.<String>of();
-    }
-  }
-
-  @Override
   public String getRegistrarDefaultWhoisServer() {
     return "whois.donuts.co";
   }
@@ -186,11 +151,6 @@ public final class DonutsRegistryConfig implements RegistryConfig {
   @Override
   public String getDocumentationProjectTitle() {
     return "Donuts Registry";
-  }
-
-  @Override
-  public int getMaxChecks() {
-    return 50;
   }
 
   @Override

@@ -27,6 +27,7 @@ import org.joda.time.DateTime;
  * Interface for classes which provide extra registry logic for things like TLD-specific rules and
  * discounts.
  */
+@Deprecated
 public interface RegistryExtraFlowLogic {
 
   /** Gets the flags to be returned for application info commands. */
@@ -41,7 +42,6 @@ public interface RegistryExtraFlowLogic {
   public void performAdditionalApplicationCreateLogic(
       DomainApplication application,
       String clientId,
-      DateTime asOfDate,
       int years,
       EppInput eppInput,
       HistoryEntry historyEntry) throws EppException;
@@ -90,7 +90,6 @@ public interface RegistryExtraFlowLogic {
   public void performAdditionalDomainCreateLogic(
       DomainResource domain,
       String clientId,
-      DateTime asOfDate,
       int years,
       EppInput eppInput,
       HistoryEntry historyEntry) throws EppException;
@@ -128,8 +127,26 @@ public interface RegistryExtraFlowLogic {
       EppInput eppInput,
       HistoryEntry historyEntry) throws EppException;
 
-  /** Performs additional tasks required for a transfer command. */
-  public void performAdditionalDomainTransferLogic(
+  /** Performs additional tasks required for a domain transfer approve command. */
+  public void performAdditionalDomainTransferApproveLogic(
+      DomainResource domain,
+      String clientId,
+      HistoryEntry historyEntry) throws EppException;
+
+  /** Performs additional tasks required for a domain transfer cancel command. */
+  public void performAdditionalDomainTransferCancelLogic(
+      DomainResource domain,
+      String clientId,
+      HistoryEntry historyEntry) throws EppException;
+
+  /** Performs additional tasks required for a domain transfer reject command. */
+  public void performAdditionalDomainTransferRejectLogic(
+      DomainResource domain,
+      String clientId,
+      HistoryEntry historyEntry) throws EppException;
+
+  /** Performs additional tasks required for a transfer request command. */
+  public void performAdditionalDomainTransferRequestLogic(
       DomainResource domain,
       String clientId,
       DateTime asOfDate,

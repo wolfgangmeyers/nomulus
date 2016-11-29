@@ -15,12 +15,13 @@ java_library(
     deps = [
         "//java/com/google/common/base",
         "//java/com/google/common/collect",
-        "//java/com/google/common/net",
         "//java/com/google/common/io",
-        "//java/google/registry/keyring/api",
-        "//java/google/registry/flows",
-        "//java/google/registry/model",
+        "//java/com/google/common/net",
         "//java/google/registry/config",
+        "//java/google/registry/flows",
+        "//java/google/registry/keyring/api",
+        "//java/google/registry/model",
+        "//java/google/registry/pricing",
         "//java/google/registry/request",
         "//third_party/java/appengine:appengine-api",
         "//third_party/java/bouncycastle",
@@ -126,7 +127,6 @@ zip_file(
         "//java/google/registry/ui:war",
     ],
 )
-
 
 ################################################################################
 # DOMAIN REGISTRY :: SANDBOX ENVIRONMENT

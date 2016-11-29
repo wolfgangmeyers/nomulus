@@ -14,6 +14,7 @@
 
 package domains.donuts.module.backend;
 
+import dagger.Module;
 import dagger.Subcomponent;
 import google.registry.backup.BackupModule;
 import google.registry.backup.CommitLogCheckpointAction;
@@ -55,6 +56,7 @@ import google.registry.rde.RdeReportAction;
 import google.registry.rde.RdeReporter;
 import google.registry.rde.RdeStagingAction;
 import google.registry.rde.RdeUploadAction;
+import google.registry.request.RequestComponentBuilder;
 import google.registry.request.RequestModule;
 import google.registry.request.RequestScope;
 import google.registry.tmch.NordnUploadAction;
@@ -118,4 +120,13 @@ interface BackendRequestComponent {
   TmchSmdrlAction tmchSmdrlAction();
   UpdateSnapshotViewAction updateSnapshotViewAction();
   VerifyEntityIntegrityAction verifyEntityIntegrityAction();
+
+  @Subcomponent.Builder
+  abstract class Builder implements RequestComponentBuilder<BackendRequestComponent, Builder> {
+    @Override public abstract Builder requestModule(RequestModule requestModule);
+    @Override public abstract BackendRequestComponent build();
+  }
+
+  @Module(subcomponents = BackendRequestComponent.class)
+  class BackendRequestComponentModule {}
 }

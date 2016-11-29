@@ -15,8 +15,6 @@
 package domains.donuts.module.backend;
 
 import google.registry.monitoring.metrics.MetricReporter;
-import google.registry.request.RequestHandler;
-import google.registry.request.RequestModule;
 import google.registry.util.FormattingLogger;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
@@ -33,11 +31,9 @@ import javax.servlet.http.HttpServletResponse;
 public final class BackendServlet extends HttpServlet {
 
   private static final BackendComponent component = DaggerBackendComponent.create();
+  private static final BackendRequestHandler requestHandler = component.requestHandler();
   private static final MetricReporter metricReporter = component.metricReporter();
   private static final FormattingLogger logger = FormattingLogger.getLoggerForCallerClass();
-
-  private static final RequestHandler<BackendRequestComponent> requestHandler =
-      RequestHandler.create(BackendRequestComponent.class);
 
   @Override
   public void init() {
@@ -63,6 +59,6 @@ public final class BackendServlet extends HttpServlet {
 
   @Override
   public void service(HttpServletRequest req, HttpServletResponse rsp) throws IOException {
-    requestHandler.handleRequest(req, rsp, component.startRequest(new RequestModule(req, rsp)));
+    requestHandler.handleRequest(req, rsp);
   }
 }

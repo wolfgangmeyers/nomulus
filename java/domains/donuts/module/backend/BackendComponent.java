@@ -17,6 +17,7 @@ package domains.donuts.module.backend;
 import domains.donuts.keyring.DonutsKeyringModule;
 
 import dagger.Component;
+import domains.donuts.module.backend.BackendRequestComponent.BackendRequestComponentModule;
 import google.registry.bigquery.BigqueryModule;
 import google.registry.config.ConfigModule;
 import google.registry.dns.writer.dnsupdate.DnsUpdateConfigModule;
@@ -39,7 +40,7 @@ import google.registry.request.Modules.ModulesServiceModule;
 import google.registry.request.Modules.URLFetchServiceModule;
 import google.registry.request.Modules.UrlFetchTransportModule;
 import google.registry.request.Modules.UseAppIdentityCredentialForGoogleApisModule;
-import google.registry.request.RequestModule;
+import google.registry.request.Modules.UserServiceModule;
 import google.registry.util.SystemClock.SystemClockModule;
 import google.registry.util.SystemSleeper.SystemSleeperModule;
 
@@ -50,6 +51,7 @@ import javax.inject.Singleton;
 @Component(
     modules = {
         AppIdentityCredentialModule.class,
+        BackendRequestComponentModule.class,
         BigqueryModule.class,
         ConfigModule.class,
         DatastoreServiceModule.class,
@@ -73,8 +75,9 @@ import javax.inject.Singleton;
         URLFetchServiceModule.class,
         UrlFetchTransportModule.class,
         UseAppIdentityCredentialForGoogleApisModule.class,
+        UserServiceModule.class,
     })
 interface BackendComponent {
-  BackendRequestComponent startRequest(RequestModule requestModule);
+  BackendRequestHandler requestHandler();
   MetricReporter metricReporter();
 }

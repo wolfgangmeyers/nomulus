@@ -26,7 +26,7 @@ import static google.registry.testing.DatastoreHelper.getOnlyPollMessage;
 import static google.registry.testing.DatastoreHelper.getPollMessages;
 import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.testing.DomainResourceSubject.assertAboutDomains;
-import static google.registry.testing.GenericEppResourceSubject.assertAboutEppResources;
+import static google.registry.testing.HostResourceSubject.assertAboutHosts;
 import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import static java.util.Arrays.asList;
 import static org.joda.money.CurrencyUnit.USD;
@@ -43,7 +43,6 @@ import google.registry.flows.ResourceFlowUtils.ResourceDoesNotExistException;
 import google.registry.flows.ResourceFlowUtils.ResourceNotOwnedException;
 import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
 import google.registry.flows.exceptions.NotPendingTransferException;
-import google.registry.model.EppResource;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Cancellation;
 import google.registry.model.billing.BillingEvent.Cancellation.Builder;
@@ -52,6 +51,8 @@ import google.registry.model.contact.ContactAuthInfo;
 import google.registry.model.domain.DomainAuthInfo;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
+import google.registry.model.domain.TestExtraLogicManager;
+import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.eppcommon.AuthInfo.PasswordAuth;
 import google.registry.model.eppcommon.StatusValue;
@@ -94,16 +95,25 @@ public class DomainTransferApproveFlowTest
                     .build())
             .build());
     setClientIdForFlow("TheRegistrar");
+    createTld("extra");
+    RegistryExtraFlowLogicProxy.setOverride("extra", TestExtraLogicManager.class);
     setupDomainWithPendingTransfer();
     clock.advanceOneMilli();
   }
 
-  private void assertTransferApproved(EppResource resource) {
-    assertAboutEppResources().that(resource)
+  private void assertTransferApproved(DomainResource domain) {
+    assertAboutDomains().that(domain)
         .hasTransferStatus(TransferStatus.CLIENT_APPROVED).and()
         .hasCurrentSponsorClientId("NewRegistrar").and()
         .hasLastTransferTime(clock.nowUtc()).and()
         .hasPendingTransferExpirationTime(clock.nowUtc()).and()
+        .doesNotHaveStatusValue(StatusValue.PENDING_TRANSFER);
+  }
+
+  private void assertTransferApproved(HostResource host) {
+    assertAboutHosts().that(host)
+        .hasCurrentSponsorClientId("NewRegistrar").and()
+        .hasLastTransferTime(clock.nowUtc()).and()
         .doesNotHaveStatusValue(StatusValue.PENDING_TRANSFER);
   }
 
@@ -484,5 +494,12 @@ public class DomainTransferApproveFlowTest
 
   // NB: No need to test pending delete status since pending transfers will get cancelled upon
   // entering pending delete phase. So it's already handled in that test case.
-}
 
+  @Test
+  public void testSuccess_extra() throws Exception {
+    setupDomainWithPendingTransfer("extra");
+    clock.advanceOneMilli();
+    thrown.expect(TestExtraLogicManagerSuccessException.class, "transfer approved");
+    doFailingTest("domain_transfer_approve_extra.xml");
+  }
+}

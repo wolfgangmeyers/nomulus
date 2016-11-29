@@ -46,15 +46,36 @@ public class TypeUtils {
     }
   }
 
-  @SuppressWarnings("unchecked")
-  public static <T> T instantiate(Class<?> clazz) {
+  public static <T> T instantiate(Class<? extends T> clazz) {
     checkArgument(Modifier.isPublic(clazz.getModifiers()),
         "AppEngine's custom security manager won't let us reflectively access non-public types");
     try {
-      return (T) clazz.newInstance();
-    } catch (InstantiationException | IllegalAccessException e) {
+      return clazz.getConstructor().newInstance();
+    } catch (ReflectiveOperationException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  /**
+   * Returns the class referred to by a fully qualified class name string.
+   *
+   * <p>Throws an error if the loaded class is not assignable from the expected super type class.
+   */
+  public static <T> Class<T> getClassFromString(String className, Class<T> expectedSuperType) {
+    Class<?> clazz;
+    try {
+      clazz = Class.forName(className);
+    } catch (ClassNotFoundException e) {
+      throw new IllegalArgumentException(String.format("Failed to load class %s", className), e);
+    }
+    checkArgument(
+        expectedSuperType.isAssignableFrom(clazz),
+        "%s does not implement/extend %s",
+        clazz.getSimpleName(),
+        expectedSuperType.getSimpleName());
+    @SuppressWarnings("unchecked")
+    Class<T> castedClass = (Class<T>) clazz;
+    return castedClass;
   }
 
   /**

@@ -33,6 +33,7 @@ import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.host.HostResource;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 
 /**
@@ -102,7 +103,10 @@ public abstract class ForeignKeyIndex<E extends EppResource> extends BackupGroup
    */
   public static <E extends EppResource> ForeignKeyIndex<E> create(
       E resource, DateTime deletionTime) {
-    ForeignKeyIndex<E> instance = instantiate(RESOURCE_CLASS_TO_FKI_CLASS.get(resource.getClass()));
+    @SuppressWarnings("unchecked")
+    Class<? extends ForeignKeyIndex<E>> fkiClass =
+        (Class<? extends ForeignKeyIndex<E>>) RESOURCE_CLASS_TO_FKI_CLASS.get(resource.getClass());
+    ForeignKeyIndex<E> instance = instantiate(fkiClass);
     instance.topReference = Key.create(resource);
     instance.foreignKey = resource.getForeignKey();
     instance.deletionTime = deletionTime;
@@ -128,6 +132,7 @@ public abstract class ForeignKeyIndex<E extends EppResource> extends BackupGroup
    * @param now the current logical time to use when checking for soft deletion of the foreign key
    *        index
    */
+  @Nullable
   public static <E extends EppResource> Key<E> loadAndGetKey(
       Class<E> clazz, String foreignKey, DateTime now) {
     ForeignKeyIndex<E> index = load(clazz, foreignKey, now);
@@ -140,6 +145,7 @@ public abstract class ForeignKeyIndex<E extends EppResource> extends BackupGroup
    *
    * <p>This will return null if the {@link ForeignKeyIndex} doesn't exist or has been soft deleted.
    */
+  @Nullable
   public static <E extends EppResource> ForeignKeyIndex<E> load(
       Class<E> clazz, String foreignKey, DateTime now) {
     return load(clazz, ImmutableList.of(foreignKey), now).get(foreignKey);
