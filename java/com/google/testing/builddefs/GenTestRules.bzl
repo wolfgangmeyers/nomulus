@@ -43,11 +43,11 @@ def GenTestRules(name,
       continue
     test_size = default_test_size
     if test in small_tests:
-      test_size = "small"
-    if test in medium_tests:
       test_size = "medium"
-    if test in large_tests:
+    if test in medium_tests:
       test_size = "large"
+    if test in large_tests:
+      test_size = "enormous"
     if test in enormous_tests:
       test_size = "enormous"
     flaky = 0
