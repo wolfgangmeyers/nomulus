@@ -86,6 +86,7 @@ zip_file(
     },
     deps = [
         ":common_war",
+        "//java/google/registry/ui:war_debug",
     ],
 )
 
