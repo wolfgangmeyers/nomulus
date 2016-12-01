@@ -16,7 +16,7 @@ if [ -n "$2" ]; then
   fi
 fi
 
-if ! bazel build --javacopt "-source 1.7" --javacopt "-target 1.7" //java/google/registry:registry${ENV_SUFFIX}.ear; then
+if ! bazel build --javacopt "-source 1.7" --javacopt "-target 1.7" //java/domains/donuts:registry${ENV_SUFFIX}.ear; then
   echo "Build failed"
   exit 1
 fi
@@ -25,5 +25,5 @@ echo "Extracting .ear file to" $PWD/$EAR_DIR
 rm -rf $EAR_DIR
 mkdir $EAR_DIR
 cd $EAR_DIR
-jar -xf ../bazel-genfiles/java/google/registry/registry${ENV_SUFFIX}.ear
+jar -xf ../bazel-genfiles/java/domains/donuts/registry${ENV_SUFFIX}.ear
 cd $OLDPWD
