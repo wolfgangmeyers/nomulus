@@ -23,8 +23,14 @@ node("b2-bazel") {
     }
 
     stage 'Bazel Test'
-    // TODO: Migrate/create donut's tests to execute here
-    sh 'bazel test //javatests/google/registry/... --local_resources=10000,6,1 --test_output=errors --test_summary=detailed --cache_test_results=no --test_verbose_timeout_warnings'
+    // TODO: Migrate/create donuts tests to execute here
+    sh """bazel test //javatests/google/registry/... \
+        --local_resources=4000,2,1 \
+        --test_output=errors \
+        --test_summary=detailed \
+        --cache_test_results=no \
+        --test_verbose_timeout_warnings=true \
+        --test_sharding_strategy=disabled"""
 
     // Publish the results of the tests
     stage 'Report'
