@@ -36,17 +36,21 @@ import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DomainBase;
 import google.registry.model.domain.LrpTokenEntity;
 import google.registry.model.host.HostResource;
+import google.registry.model.icann.IcannDnsReportingFields;
+import google.registry.model.icann.IcannRegistrarReportingFields;
+import google.registry.model.icann.IcannTldReportingFields;
 import google.registry.model.index.DomainApplicationIndex;
 import google.registry.model.index.EppResourceIndex;
 import google.registry.model.index.ForeignKeyIndex.ForeignKeyContactIndex;
 import google.registry.model.index.ForeignKeyIndex.ForeignKeyDomainIndex;
 import google.registry.model.index.ForeignKeyIndex.ForeignKeyHostIndex;
+import google.registry.model.pricing.PricingCategory;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registrar.RegistrarContact;
 import google.registry.model.registry.Registry;
+import google.registry.model.registry.label.CategorizedPremiumList;
 import google.registry.model.registry.label.PremiumList;
 import google.registry.model.registry.label.PremiumList.PremiumListEntry;
-import google.registry.model.pricing.PricingCategory;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.user.User;
 
@@ -58,6 +62,8 @@ public final class ExportConstants {
   @SuppressWarnings("unchecked") // varargs
   static final ImmutableSet<Class<? extends ImmutableObject>> REPORTING_ENTITY_CLASSES =
       ImmutableSet.of(
+          CategorizedPremiumList.class,
+          CategorizedPremiumList.CategorizedListEntry.class,
           Cancellation.class,
           ContactResource.class,
           DomainApplicationIndex.class,
@@ -68,6 +74,9 @@ public final class ExportConstants {
           ForeignKeyHostIndex.class,
           HistoryEntry.class,
           HostResource.class,
+          IcannDnsReportingFields.class,
+          IcannRegistrarReportingFields.class,
+          IcannTldReportingFields.class,
           LrpTokenEntity.class,
           Modification.class,
           OneTime.class,
