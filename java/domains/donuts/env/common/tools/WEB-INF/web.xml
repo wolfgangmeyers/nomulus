@@ -9,7 +9,7 @@
   <servlet>
     <display-name>ToolsServlet</display-name>
     <servlet-name>tools-servlet</servlet-name>
-    <servlet-class>google.registry.module.tools.ToolsServlet</servlet-class>
+    <servlet-class>domains.donuts.module.tools.ToolsServlet</servlet-class>
     <load-on-startup>1</load-on-startup>
   </servlet>
 

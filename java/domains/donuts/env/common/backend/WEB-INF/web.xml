@@ -9,7 +9,7 @@
   <servlet>
     <display-name>BackendServlet</display-name>
     <servlet-name>backend-servlet</servlet-name>
-    <servlet-class>google.registry.module.backend.BackendServlet</servlet-class>
+    <servlet-class>domains.donuts.module.backend.BackendServlet</servlet-class>
     <load-on-startup>1</load-on-startup>
   </servlet>
 

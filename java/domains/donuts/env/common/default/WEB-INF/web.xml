@@ -9,7 +9,7 @@
   <servlet>
     <display-name>FrontendServlet</display-name>
     <servlet-name>frontend-servlet</servlet-name>
-    <servlet-class>google.registry.module.frontend.FrontendServlet</servlet-class>
+    <servlet-class>domains.donuts.module.frontend.FrontendServlet</servlet-class>
     <load-on-startup>1</load-on-startup>
   </servlet>
 
