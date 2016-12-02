@@ -1,4 +1,4 @@
-node("b2-bazel") {
+node("master") {
     def java7 = "PATH+JAVA=${tool 'java7'}/bin"
 
     stage 'Checkout'
@@ -25,7 +25,10 @@ node("b2-bazel") {
     stage 'Bazel Test'
     // TODO: Migrate/create donuts tests to execute here
     sh """bazel test //javatests/google/registry/... \
-        --local_resources=4000,2,1 \
+        --progress_report_interval=1 \
+        --jobs=2 \
+        --ram_utilization_factor=10 \
+        --test_keep_going=false \
         --test_output=errors \
         --test_summary=detailed \
         --cache_test_results=no \
@@ -35,6 +38,14 @@ node("b2-bazel") {
     // Publish the results of the tests
     stage 'Report'
     junit 'build/test-results/**/*.xml'
+
+    if ("$env.BRANCH_NAME" == 'master') {
+        stage 'Deploy'
+        // TODO: Should this be configurable?
+        sh './build-deploy-artifact.sh war-deploy alpha'
+        sh '/var/lib/jenkins/appengine-java-sdk-1.9.34/bin/appcfg.sh --enable_jar_splitting update war-deploy'
+    }
+
 
 // TODO: Enable when Jenkins supports disabling build on CI commit
 //    def currentBranch = sh(script: "git show -s --pretty=%d HEAD", returnStdout: true)
