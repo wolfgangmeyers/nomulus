@@ -1,4 +1,4 @@
-node("b2-bazel") {
+node {
     def java7 = "PATH+JAVA=${tool 'java7'}/bin"
 
     stage 'Checkout'
@@ -7,10 +7,11 @@ node("b2-bazel") {
     stage 'Build'
     parallel 'gradle build': {
         withEnv(["${java7}"]) {
-            sh 'java -version'
+            sh './gradlew --version'
             sh './gradlew clean build -x test'
         }
     }, 'bazel build': {
+        sh 'bazel info'
         sh 'bazel build //java/domains/donuts/...'
     }
 
@@ -30,7 +31,6 @@ node("b2-bazel") {
         --ram_utilization_factor=10 \
         --test_keep_going=false \
         --test_output=errors \
-        --test_summary=detailed \
         --cache_test_results=no \
         --test_verbose_timeout_warnings=true \
         --test_sharding_strategy=disabled"""
@@ -43,7 +43,7 @@ node("b2-bazel") {
         stage 'Deploy'
         // TODO: Should this be configurable?
         sh './build-deploy-artifact.sh war-deploy alpha'
-        sh '/var/lib/jenkins/appengine-java-sdk-1.9.34/bin/appcfg.sh --enable_jar_splitting update war-deploy'
+        sh 'appcfg.sh --enable_jar_splitting update war-deploy'
     }
 
 
