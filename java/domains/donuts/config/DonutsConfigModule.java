@@ -623,7 +623,7 @@ public final class DonutsConfigModule {
       case PRODUCTION:
         return URI.create("sftp://GoogleTLD@sftpipm2.ironmountain.com/Outbox");
       default:
-        return URI.create("sftp://google@ppftpipm.ironmountain.com/Outbox");
+        return URI.create("sftp://104.196.228.43");
     }
   }
 
