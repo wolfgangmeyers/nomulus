@@ -43,7 +43,6 @@ import static google.registry.model.registry.label.ReservedList.matchesAnchorTen
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
 import static google.registry.util.DateTimeUtils.leapSafeAddYears;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -59,8 +58,10 @@ import google.registry.flows.FlowModule.Superuser;
 import google.registry.flows.FlowModule.TargetId;
 import google.registry.flows.TransactionalFlow;
 import google.registry.flows.custom.DomainCreateFlowCustomLogic;
+import google.registry.flows.custom.DomainCreateFlowCustomLogic.BeforeResponseParameters;
+import google.registry.flows.custom.DomainCreateFlowCustomLogic.BeforeResponseReturnData;
 import google.registry.flows.custom.EntityChanges;
-import google.registry.flows.domain.TldSpecificLogicProxy.EppCommandOperations;
+import google.registry.flows.domain.DomainPricingLogic.EppCommandOperations;
 import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Flag;
@@ -105,7 +106,6 @@ import org.joda.time.DateTime;
  * @error {@link google.registry.flows.EppException.UnimplementedExtensionException}
  * @error {@link google.registry.flows.ExtensionManager.UndeclaredServiceExtensionException}
  * @error {@link google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException}
- * @error {@link DomainCreateFlow.SignedMarksNotAcceptedInCurrentPhaseException}
  * @error {@link DomainFlowUtils.AcceptedTooLongAgoException}
  * @error {@link DomainFlowUtils.BadDomainNameCharacterException}
  * @error {@link DomainFlowUtils.BadDomainNamePartsCountException}
@@ -153,7 +153,7 @@ import org.joda.time.DateTime;
 
 public class DomainCreateFlow implements TransactionalFlow {
 
-  private static final Set<TldState> QLP_SMD_ALLOWED_STATES =
+  private static final Set<TldState> SUNRISE_STATES =
       Sets.immutableEnumSet(TldState.SUNRISE, TldState.SUNRUSH);
 
   @Inject ExtensionManager extensionManager;
@@ -166,6 +166,8 @@ public class DomainCreateFlow implements TransactionalFlow {
   @Inject HistoryEntry.Builder historyBuilder;
   @Inject EppResponse.Builder responseBuilder;
   @Inject DomainCreateFlowCustomLogic customLogic;
+  @Inject DomainPricingLogic pricingLogic;
+  @Inject DnsQueue dnsQueue;
   @Inject DomainCreateFlow() {}
 
   @Override
@@ -200,9 +202,7 @@ public class DomainCreateFlow implements TransactionalFlow {
       verifyNoCodeMarks(launchCreate);
       validateLaunchCreateNotice(launchCreate.getNotice(), domainLabel, isSuperuser, now);
     }
-    if (hasSignedMarks) {
-      verifySignedMarksAllowed(tldState, isAnchorTenant);
-    }
+    boolean isSunriseCreate = hasSignedMarks && SUNRISE_STATES.contains(tldState);
     customLogic.afterValidation(
         DomainCreateFlowCustomLogic.AfterValidationParameters.newBuilder()
             .setDomainName(domainName)
@@ -211,8 +211,8 @@ public class DomainCreateFlow implements TransactionalFlow {
 
     FeeCreateCommandExtension feeCreate =
         eppInput.getSingleExtension(FeeCreateCommandExtension.class);
-    EppCommandOperations commandOperations = TldSpecificLogicProxy.getCreatePrice(
-        registry, targetId, clientId, now, years, eppInput);
+    EppCommandOperations commandOperations =
+        pricingLogic.getCreatePrice(registry, targetId, now, years);
     validateFeeChallenge(
         targetId, registry.getTldStr(), now, feeCreate, commandOperations.getTotalCost());
     // Superusers can create reserved domains, force creations on domains that require a claims
@@ -224,7 +224,7 @@ public class DomainCreateFlow implements TransactionalFlow {
         verifyLaunchPhaseMatchesRegistryPhase(registry, launchCreate, now);
       }
       if (!isAnchorTenant) {
-        verifyNotReserved(domainName, hasSignedMarks);
+        verifyNotReserved(domainName, isSunriseCreate);
       }
       if (hasClaimsNotice) {
         verifyClaimsPeriodNotEnded(registry, now);
@@ -291,19 +291,7 @@ public class DomainCreateFlow implements TransactionalFlow {
       entitiesToSave.add(
           prepareMarkedLrpTokenEntity(authInfo.getPw().getValue(), domainName, historyEntry));
     }
-    enqueueTasks(hasSignedMarks, hasClaimsNotice, newDomain);
-
-    // TODO: Remove this section and only use the customLogic.
-    Optional<RegistryExtraFlowLogic> extraFlowLogic =
-        RegistryExtraFlowLogicProxy.newInstanceForTld(registry.getTldStr());
-    if (extraFlowLogic.isPresent()) {
-      extraFlowLogic.get().performAdditionalDomainCreateLogic(
-          newDomain,
-          clientId,
-          years,
-          eppInput,
-          historyEntry);
-    }
+    enqueueTasks(isSunriseCreate, hasClaimsNotice, newDomain);
 
     EntityChanges entityChanges =
         customLogic.beforeSave(
@@ -316,9 +304,15 @@ public class DomainCreateFlow implements TransactionalFlow {
                 .build());
     persistEntityChanges(entityChanges);
 
+    BeforeResponseReturnData responseData =
+        customLogic.beforeResponse(
+            BeforeResponseParameters.newBuilder()
+                .setResData(DomainCreateData.create(targetId, now, registrationExpirationTime))
+                .setResponseExtensions(createResponseExtensions(feeCreate, commandOperations))
+                .build());
     return responseBuilder
-        .setResData(DomainCreateData.create(targetId, now, registrationExpirationTime))
-        .setExtensions(createResponseExtensions(feeCreate, commandOperations))
+        .setResData(responseData.resData())
+        .setExtensions(responseData.responseExtensions())
         .build();
   }
 
@@ -326,14 +320,6 @@ public class DomainCreateFlow implements TransactionalFlow {
     MetadataExtension metadataExtension = eppInput.getSingleExtension(MetadataExtension.class);
     return matchesAnchorTenantReservation(domainName, authInfo.getPw().getValue())
         || (metadataExtension != null && metadataExtension.getIsAnchorTenant());
-  }
-
-  /** Only QLP domains can have a signed mark on a domain create, and only in sunrise or sunrush. */
-  private void verifySignedMarksAllowed(TldState tldState, boolean isAnchorTenant)
-      throws SignedMarksNotAcceptedInCurrentPhaseException {
-    if (!isAnchorTenant || !QLP_SMD_ALLOWED_STATES.contains(tldState)) {
-      throw new SignedMarksNotAcceptedInCurrentPhaseException();
-    }
   }
 
   /** Prohibit creating a domain if there is an open application for the same name. */
@@ -429,11 +415,11 @@ public class DomainCreateFlow implements TransactionalFlow {
   }
 
   private void enqueueTasks(
-      boolean hasSignedMarks, boolean hasClaimsNotice, DomainResource newDomain) {
+      boolean isSunriseCreate, boolean hasClaimsNotice, DomainResource newDomain) {
     if (newDomain.shouldPublishToDns()) {
-      DnsQueue.create().addDomainRefreshTask(newDomain.getFullyQualifiedDomainName());
+      dnsQueue.addDomainRefreshTask(newDomain.getFullyQualifiedDomainName());
     }
-    if (hasClaimsNotice || hasSignedMarks) {
+    if (hasClaimsNotice || isSunriseCreate) {
       LordnTask.enqueueDomainResourceTask(newDomain);
     }
   }
@@ -449,13 +435,6 @@ public class DomainCreateFlow implements TransactionalFlow {
   static class DomainHasOpenApplicationsException extends StatusProhibitsOperationException {
     public DomainHasOpenApplicationsException() {
       super("There is an open application for this domain");
-    }
-  }
-
-  /** Signed marks are not accepted in the current registry phase. */
-  static class SignedMarksNotAcceptedInCurrentPhaseException extends CommandUseErrorException {
-    public SignedMarksNotAcceptedInCurrentPhaseException() {
-      super("Signed marks are not accepted in the current registry phase");
     }
   }
 

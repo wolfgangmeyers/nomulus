@@ -58,7 +58,6 @@ import google.registry.flows.ExtensionManager.UndeclaredServiceExtensionExceptio
 import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.domain.DomainCreateFlow.DomainHasOpenApplicationsException;
 import google.registry.flows.domain.DomainCreateFlow.NoGeneralRegistrationsInCurrentPhaseException;
-import google.registry.flows.domain.DomainCreateFlow.SignedMarksNotAcceptedInCurrentPhaseException;
 import google.registry.flows.domain.DomainFlowUtils.AcceptedTooLongAgoException;
 import google.registry.flows.domain.DomainFlowUtils.BadDomainNameCharacterException;
 import google.registry.flows.domain.DomainFlowUtils.BadDomainNamePartsCountException;
@@ -109,13 +108,13 @@ import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.LrpTokenEntity;
-import google.registry.model.domain.TestExtraLogicManager;
-import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.launch.ApplicationStatus;
 import google.registry.model.domain.launch.LaunchNotice;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.domain.secdns.DelegationSignerData;
 import google.registry.model.eppcommon.StatusValue;
+import google.registry.model.eppoutput.CreateData.DomainCreateData;
+import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
@@ -123,6 +122,7 @@ import google.registry.model.reporting.HistoryEntry;
 import google.registry.testing.DatastoreHelper;
 import google.registry.testing.TaskQueueHelper.TaskMatcher;
 import java.util.Map;
+import javax.annotation.Nullable;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
@@ -151,7 +151,6 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
             "anchor,RESERVED_FOR_ANCHOR_TENANT,2fooBAR"))
         .build());
     persistClaimsList(ImmutableMap.of("example-one", CLAIMS_KEY));
-    RegistryExtraFlowLogicProxy.setOverride("flags", TestExtraLogicManager.class);
   }
 
   /**
@@ -253,9 +252,14 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   }
 
   private void assertNoLordn() throws Exception {
+    assertNoLordn(null, null);
+  }
+
+  private void assertNoLordn(
+      @Nullable String smdId, @Nullable LaunchNotice launchNotice) throws Exception {
     assertAboutDomains().that(reloadResourceByForeignKey())
-        .hasSmdId(null).and()
-        .hasLaunchNotice(null);
+        .hasSmdId(smdId).and()
+        .hasLaunchNotice(launchNotice);
     assertNoTasksEnqueued(QUEUE_CLAIMS, QUEUE_SUNRISE);
   }
 
@@ -410,6 +414,18 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
         .build());
     persistContactsAndHosts();
     doSuccessfulTest();
+  }
+
+  @Test
+  public void testSuccess_generalAvailability_ignoresEncodedSignedMark() throws Exception {
+    createTld("tld", TldState.GENERAL_AVAILABILITY);
+    clock.setTo(DateTime.parse("2014-09-09T09:09:09Z"));
+    setEppInput("domain_create_registration_encoded_signed_mark.xml");
+    eppRequestSource = EppRequestSource.TOOL;  // Only tools can pass in metadata.
+    persistContactsAndHosts();
+    runFlow();
+    assertSuccessfulCreate("tld", true);
+    assertNoLordn("0000001761376042759136-65535", null);
   }
 
   @Test
@@ -1211,10 +1227,11 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   }
 
   @Test
-  public void testFailure_signedMark() throws Exception {
+  public void testFailure_signedMarkWithoutAnchorTenant() throws Exception {
+    createTld("tld", TldState.SUNRISE);
     setEppInput("domain_create_signed_mark.xml");
     persistContactsAndHosts();
-    thrown.expect(SignedMarksNotAcceptedInCurrentPhaseException.class);
+    thrown.expect(NoGeneralRegistrationsInCurrentPhaseException.class);
     runFlow();
   }
 
@@ -1451,7 +1468,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   }
 
   @Test
-  public void testSuccess_qlpSunriseRegistrationWithEncodedSignedMark() throws Exception {
+  public void testSuccess_qlpSunriseRegistration_withEncodedSignedMark() throws Exception {
     createTld("tld", TldState.SUNRISE);
     clock.setTo(DateTime.parse("2014-09-09T09:09:09Z"));
     setEppInput("domain_create_registration_qlp_sunrise_encoded_signed_mark.xml");
@@ -1463,7 +1480,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   }
 
   @Test
-  public void testSuccess_qlpSunriseRegistrationWithClaimsNotice() throws Exception {
+  public void testSuccess_qlpSunriseRegistration_withClaimsNotice() throws Exception {
     createTld("tld", TldState.SUNRISE);
     clock.setTo(DateTime.parse("2009-08-16T09:00:00.0Z"));
     setEppInput("domain_create_registration_qlp_sunrise_claims_notice.xml");
@@ -1516,7 +1533,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   }
 
   @Test
-  public void testSuccess_qlpSunrushRegistrationWithEncodedSignedMark() throws Exception {
+  public void testSuccess_qlpSunrushRegistration_withEncodedSignedMark() throws Exception {
     createTld("tld", TldState.SUNRUSH);
     clock.setTo(DateTime.parse("2014-09-09T09:09:09Z"));
     setEppInput("domain_create_registration_qlp_sunrush_encoded_signed_mark.xml");
@@ -1528,7 +1545,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   }
 
   @Test
-  public void testSuccess_qlpSunrushRegistrationWithClaimsNotice() throws Exception {
+  public void testSuccess_qlpSunrushRegistration_withClaimsNotice() throws Exception {
     createTld("tld", TldState.SUNRUSH);
     clock.setTo(DateTime.parse("2009-08-16T09:00:00.0Z"));
     setEppInput("domain_create_registration_qlp_sunrush_claims_notice.xml");
@@ -1568,18 +1585,19 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   }
 
   @Test
-  public void testFailure_qlpLandrushRegistrationWithEncodedSignedMark() throws Exception {
+  public void testSuccess_qlpLandrushRegistration_ignoresEncodedSignedMark() throws Exception {
     createTld("tld", TldState.LANDRUSH);
     clock.setTo(DateTime.parse("2014-09-09T09:09:09Z"));
     setEppInput("domain_create_registration_qlp_landrush_encoded_signed_mark.xml");
     eppRequestSource = EppRequestSource.TOOL;  // Only tools can pass in metadata.
     persistContactsAndHosts();
-    thrown.expect(SignedMarksNotAcceptedInCurrentPhaseException.class);
     runFlow();
+    assertSuccessfulCreate("tld", true);
+    assertNoLordn("0000001761376042759136-65535", null);
   }
 
   @Test
-  public void testSuccess_qlpLandrushRegistrationWithClaimsNotice() throws Exception {
+  public void testSuccess_qlpLandrushRegistration_withClaimsNotice() throws Exception {
     createTld("tld", TldState.LANDRUSH);
     clock.setTo(DateTime.parse("2009-08-16T09:00:00.0Z"));
     setEppInput("domain_create_registration_qlp_landrush_claims_notice.xml");
@@ -1710,7 +1728,9 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   public void testSuccess_flags() throws Exception {
     persistContactsAndHosts();
     setEppInput("domain_create_flags.xml", ImmutableMap.of("FEE", "42"));
-    thrown.expect(TestExtraLogicManagerSuccessException.class, "flag1,flag2");
-    runFlow();
+    EppOutput eppOutput = runFlow();
+    String domainNameWithFlagsPrefix =
+        ((DomainCreateData) eppOutput.getResponse().getResponseData().get(0)).name();
+    assertThat(domainNameWithFlagsPrefix).isEqualTo("flag1-flag2-create-42.flags");
   }
 }

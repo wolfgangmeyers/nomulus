@@ -31,6 +31,11 @@ import google.registry.model.eppinput.EppInput;
  */
 public class CustomLogicFactory {
 
+  public DomainApplicationCreateFlowCustomLogic forDomainApplicationCreateFlow(
+      EppInput eppInput, SessionMetadata sessionMetadata) {
+    return new DomainApplicationCreateFlowCustomLogic(eppInput, sessionMetadata);
+  }
+
   public DomainCreateFlowCustomLogic forDomainCreateFlow(
       EppInput eppInput, SessionMetadata sessionMetadata) {
     return new DomainCreateFlowCustomLogic(eppInput, sessionMetadata);
@@ -54,5 +59,15 @@ public class CustomLogicFactory {
   public DomainRenewFlowCustomLogic forDomainRenewFlow(
       EppInput eppInput, SessionMetadata sessionMetadata) {
     return new DomainRenewFlowCustomLogic(eppInput, sessionMetadata);
+  }
+
+  public DomainDeleteFlowCustomLogic forDomainDeleteFlow(
+      EppInput eppInput, SessionMetadata sessionMetadata) {
+    return new DomainDeleteFlowCustomLogic(eppInput, sessionMetadata);
+  }
+
+  public DomainPricingCustomLogic forDomainPricing(
+      EppInput eppInput, SessionMetadata sessionMetadata) {
+    return new DomainPricingCustomLogic(eppInput, sessionMetadata);
   }
 }

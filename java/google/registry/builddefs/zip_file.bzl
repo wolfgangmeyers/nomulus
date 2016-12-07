@@ -1,3 +1,17 @@
+# Copyright 2016 The Nomulus Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 """Zip file creator that allows arbitrary path renaming.
 
 This rule takes two main inputs: a bunch of filesets and a dictionary of
@@ -97,7 +111,7 @@ A zip file can be assembled across many rules. For example:
 
 load('//java/google/registry/builddefs:defs.bzl',
      'ZIPPER',
-     'collect_data_runfiles',
+     'collect_runfiles',
      'long_path')
 
 def _zip_file(ctx):
@@ -109,7 +123,7 @@ def _zip_file(ctx):
   srcs = set()
   srcs += ctx.files.srcs
   srcs += ctx.files.data
-  srcs += collect_data_runfiles(ctx.attr.data)
+  srcs += collect_runfiles(ctx.attr.data)
   mapped = _map_sources(ctx, srcs, ctx.attr.mappings)
   cmd = [
       '#!/bin/sh',
@@ -184,7 +198,7 @@ def _map_sources(ctx, srcs, mappings):
       used[i] = True
       break
     if not zip_path:
-      fail("no mapping matched: source '%s', run_path '%s'" % (source, run_path))
+      fail('no mapping matched: ' + run_path)
     mapped += [(file_.path, zip_path)]
   for i in mappings_indexes:
     if not used[i]:

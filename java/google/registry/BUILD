@@ -16,9 +16,6 @@ package_group(
     ],
 )
 
-
-
-
 zip_file(
     name = "common_war",
     srcs = [
@@ -111,7 +108,6 @@ zip_file(
         "//java/google/registry/ui:war",
     ],
 )
-
 
 ################################################################################
 # DOMAIN REGISTRY :: SANDBOX ENVIRONMENT
@@ -295,4 +291,3 @@ zip_file(
     mappings = {"domain_registry/java/google/registry/env/local/tools": ""},
     deps = [":registry_tools_war"],
 )
-

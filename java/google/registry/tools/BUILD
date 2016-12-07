@@ -4,7 +4,6 @@ package(
 
 licenses(["notice"])  # Apache 2.0
 
-
 # Restrict visibility to :tools because :remoteapi-internal (and transitively
 # :appengine-api-link) should never be linked into an App Engine deploy jar,
 # since the App Engine API is provided by the runtime environment.
@@ -42,10 +41,12 @@ java_library(
         "//java/com/google/common/hash",
         "//java/com/google/common/io",
         "//java/com/google/common/net",
+        "//java/com/google/common/primitives",
         "//java/com/google/common/util/concurrent",
         "//java/domains/donuts",
         "//java/google/registry/bigquery",
         "//java/google/registry/config",
+        "//java/google/registry/dns",
         "//java/google/registry/dns/writer",
         "//java/google/registry/dns/writer/clouddns",
         "//java/google/registry/dns/writer/dnsupdate",
@@ -56,8 +57,8 @@ java_library(
         "//java/google/registry/model",
         "//java/google/registry/pricing",
         "//java/google/registry/rde",
-        "//java/google/registry/security",
         "//java/google/registry/request:modules",
+        "//java/google/registry/security",
         "//java/google/registry/tldconfig/idn",
         "//java/google/registry/tmch",
         "//java/google/registry/tools/params",
@@ -68,6 +69,7 @@ java_library(
         "//java/google/registry/xjc",
         "//java/google/registry/xml",
         "//third_party/java/appengine:appengine-api",
+        "//third_party/java/appengine:appengine-remote-api",
         "//third_party/java/appengine:appengine-remote-api-link",
         "//third_party/java/bouncycastle",
         "//third_party/java/bouncycastle_bcpg",
@@ -81,9 +83,6 @@ java_library(
         "//third_party/java/jsr330_inject",
         "//third_party/java/objectify:objectify-v4_1",
         "//third_party/java/re2j",
-
-        "//third_party/java/appengine:appengine-remote-api",
-
         "@io_bazel_rules_closure//closure/templates",
     ],
 )
@@ -98,4 +97,3 @@ java_binary(
         "//third_party/java/appengine:appengine-remote-api-link",
     ],
 )
-

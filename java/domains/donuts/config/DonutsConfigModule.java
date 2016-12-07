@@ -21,21 +21,20 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import dagger.Module;
 import dagger.Provides;
-import google.registry.config.ConfigModule;
+import java.net.URI;
+import java.net.URL;
+import javax.annotation.Nullable;
+import javax.inject.Singleton;
+
+import google.registry.config.ConfigModule.Config;
 import google.registry.config.ProductionRegistryConfigExample;
+import google.registry.config.RdapNoticeDescriptor;
 import google.registry.config.RegistryConfig;
 import google.registry.config.RegistryConfigLoader;
 import google.registry.config.RegistryEnvironment;
 import org.joda.money.CurrencyUnit;
 import org.joda.time.DateTimeConstants;
 import org.joda.time.Duration;
-
-import java.lang.annotation.Documented;
-import java.net.URI;
-import java.net.URL;
-
-import javax.annotation.Nullable;
-import javax.inject.Qualifier;
 
 /**
  * Configuration example for the Nomulus codebase.
@@ -64,14 +63,6 @@ import javax.inject.Qualifier;
 @Module
 public final class DonutsConfigModule {
 
-
-  /** Dagger qualifier for configuration settings. */
-  @Qualifier
-  @Documented
-  public static @interface Config {
-    String value() default "";
-  }
-
   private static final RegistryEnvironment REGISTRY_ENVIRONMENT = RegistryEnvironment.get();
 
   @Provides
@@ -90,13 +81,13 @@ public final class DonutsConfigModule {
    * @return String name of the DPML TLD name
    */
   @Provides
-  @ConfigModule.Config("dpmlTld")
+  @Config("dpmlTld")
   public static String provideDpmlTld() {
     return "dpml.zone";
   }
 
   @Provides
-  @ConfigModule.Config("projectId")
+  @Config("projectId")
   public static String provideProjectId(RegistryConfig config) {
     return config.getProjectId();
   }
@@ -107,7 +98,7 @@ public final class DonutsConfigModule {
    * @see google.registry.ui.server.registrar.ConsoleUiAction
    */
   @Provides
-  @ConfigModule.Config("logoFilename")
+  @Config("logoFilename")
   public static String provideLogoFilename(RegistryEnvironment environment) {
     switch (environment) {
       case UNITTEST:
@@ -125,7 +116,7 @@ public final class DonutsConfigModule {
    * @see google.registry.ui.server.registrar.ConsoleUiAction
    */
   @Provides
-  @ConfigModule.Config("productName")
+  @Config("productName")
   public static String provideProductName(RegistryEnvironment environment) {
     // Change this to the name of your product.
     return "Nomulus";
@@ -138,7 +129,7 @@ public final class DonutsConfigModule {
    * @see google.registry.ui.server.registrar.ConsoleUiAction
    */
   @Provides
-  @ConfigModule.Config("integrationEmail")
+  @Config("integrationEmail")
   public static String provideIntegrationEmail(RegistryEnvironment environment) {
     // Change this to your integration email address.
     return "integration@example.com";
@@ -151,7 +142,7 @@ public final class DonutsConfigModule {
    * @see google.registry.ui.server.registrar.ConsoleUiAction
    */
   @Provides
-  @ConfigModule.Config("supportEmail")
+  @Config("supportEmail")
   public static String provideSupportEmail(RegistryEnvironment environment) {
     // Change this to your support email address.
     return "support@example.com";
@@ -164,7 +155,7 @@ public final class DonutsConfigModule {
    * @see google.registry.ui.server.registrar.ConsoleUiAction
    */
   @Provides
-  @ConfigModule.Config("announcementsEmail")
+  @Config("announcementsEmail")
   public static String provideAnnouncementsEmail(RegistryEnvironment environment) {
     // Change this to your announcements e-mail.
     return "announcements@example.com";
@@ -176,7 +167,7 @@ public final class DonutsConfigModule {
    * @see google.registry.ui.server.registrar.ConsoleUiAction
    */
   @Provides
-  @ConfigModule.Config("supportPhoneNumber")
+  @Config("supportPhoneNumber")
   public static String provideSupportPhoneNumber(RegistryEnvironment environment) {
     // Change this to your phone number.
     return "+1 (888) 555 0123";
@@ -188,7 +179,7 @@ public final class DonutsConfigModule {
    * @see google.registry.ui.server.registrar.ConsoleUiAction
    */
   @Provides
-  @ConfigModule.Config("technicalDocsUrl")
+  @Config("technicalDocsUrl")
   public static String provideTechnicalDocsUrl(RegistryEnvironment environment) {
     // Change this to your support docs link.
     return "http://example.com/your_support_docs/";
@@ -200,8 +191,8 @@ public final class DonutsConfigModule {
    * @see google.registry.backup.ExportCommitLogDiffAction
    */
   @Provides
-  @ConfigModule.Config("zoneFilesBucket")
-  public static String provideZoneFilesBucket(@ConfigModule.Config("projectId") String projectId) {
+  @Config("zoneFilesBucket")
+  public static String provideZoneFilesBucket(@Config("projectId") String projectId) {
     return projectId + "-zonefiles";
   }
 
@@ -211,14 +202,14 @@ public final class DonutsConfigModule {
    * @see google.registry.backup.ExportCommitLogDiffAction
    */
   @Provides
-  @ConfigModule.Config("commitLogGcsBucket")
-  public static String provideCommitLogGcsBucket(@ConfigModule.Config("projectId") String projectId) {
+  @Config("commitLogGcsBucket")
+  public static String provideCommitLogGcsBucket(@Config("projectId") String projectId) {
     return projectId + "-commits";
   }
 
   /** @see RegistryConfig#getCommitLogDatastoreRetention() */
   @Provides
-  @ConfigModule.Config("commitLogDatastoreRetention")
+  @Config("commitLogDatastoreRetention")
   public static Duration provideCommitLogDatastoreRetention(RegistryConfig config) {
     return config.getCommitLogDatastoreRetention();
   }
@@ -229,8 +220,8 @@ public final class DonutsConfigModule {
    * @see google.registry.export.ExportDomainListsAction
    */
   @Provides
-  @ConfigModule.Config("domainListsGcsBucket")
-  public static String provideDomainListsGcsBucket(@ConfigModule.Config("projectId") String projectId) {
+  @Config("domainListsGcsBucket")
+  public static String provideDomainListsGcsBucket(@Config("projectId") String projectId) {
     return projectId + "-domain-lists";
   }
 
@@ -250,7 +241,7 @@ public final class DonutsConfigModule {
    * @see google.registry.backup.DeleteOldCommitLogsAction
    */
   @Provides
-  @ConfigModule.Config("commitLogMaxDeletes")
+  @Config("commitLogMaxDeletes")
   public static int provideCommitLogMaxDeletes() {
     return 500;
   }
@@ -262,7 +253,7 @@ public final class DonutsConfigModule {
    * @see google.registry.backup.ExportCommitLogDiffAction
    */
   @Provides
-  @ConfigModule.Config("commitLogDiffExportBatchSize")
+  @Config("commitLogDiffExportBatchSize")
   public static int provideCommitLogDiffExportBatchSize() {
     return 100;
   }
@@ -273,14 +264,14 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.PendingDepositChecker
    */
   @Provides
-  @ConfigModule.Config("brdaBucket")
-  public static String provideBrdaBucket(@ConfigModule.Config("projectId") String projectId) {
+  @Config("brdaBucket")
+  public static String provideBrdaBucket(@Config("projectId") String projectId) {
     return projectId + "-icann-brda";
   }
 
   /** @see google.registry.rde.BrdaCopyAction */
   @Provides
-  @ConfigModule.Config("brdaDayOfWeek")
+  @Config("brdaDayOfWeek")
   public static int provideBrdaDayOfWeek() {
     return DateTimeConstants.TUESDAY;
   }
@@ -291,7 +282,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.PendingDepositChecker
    */
   @Provides
-  @ConfigModule.Config("brdaInterval")
+  @Config("brdaInterval")
   public static Duration provideBrdaInterval() {
     return Duration.standardDays(7);
   }
@@ -300,7 +291,7 @@ public final class DonutsConfigModule {
    * Returns {@code true} if the target zone should be created in DNS if it does not exist.
    */
   @Provides
-  @ConfigModule.Config("dnsCreateZone")
+  @Config("dnsCreateZone")
   public static boolean provideDnsCreateZone(RegistryEnvironment environment) {
     switch (environment) {
       case PRODUCTION:
@@ -317,7 +308,7 @@ public final class DonutsConfigModule {
    * @see google.registry.dns.ReadDnsQueueAction
    */
   @Provides
-  @ConfigModule.Config("dnsTldUpdateBatchSize")
+  @Config("dnsTldUpdateBatchSize")
   public static int provideDnsTldUpdateBatchSize() {
     return 100;
   }
@@ -329,7 +320,7 @@ public final class DonutsConfigModule {
    * @see google.registry.dns.PublishDnsUpdatesAction
    */
   @Provides
-  @ConfigModule.Config("dnsWriteLockTimeout")
+  @Config("dnsWriteLockTimeout")
   public static Duration provideDnsWriteLockTimeout() {
     // Optimally, we would set this to a little less than the length of the DNS refresh cycle, since
     // otherwise, a new PublishDnsUpdatesAction could get kicked off before the current one has
@@ -346,7 +337,7 @@ public final class DonutsConfigModule {
    * @see google.registry.dns.writer.clouddns.CloudDnsWriter
    */
   @Provides
-  @ConfigModule.Config("dnsDefaultTtl")
+  @Config("dnsDefaultTtl")
   public static Duration provideDnsDefaultTtl() {
     return Duration.standardSeconds(180);
   }
@@ -359,7 +350,7 @@ public final class DonutsConfigModule {
    * @see google.registry.model.index.EppResourceIndex
    */
   @Provides
-  @ConfigModule.Config("eppResourceIndexBucketCount")
+  @Config("eppResourceIndexBucketCount")
   public static int provideEppResourceIndexBucketCount(RegistryConfig config) {
     return config.getEppResourceIndexBucketCount();
   }
@@ -370,7 +361,7 @@ public final class DonutsConfigModule {
    * @see google.registry.gcs.GcsUtils
    */
   @Provides
-  @ConfigModule.Config("gcsBufferSize")
+  @Config("gcsBufferSize")
   public static int provideGcsBufferSize() {
     return 1024 * 1024;
   }
@@ -381,7 +372,7 @@ public final class DonutsConfigModule {
    * @see google.registry.groups.DirectoryGroupsConnection
    */
   @Provides
-  @ConfigModule.Config("googleAppsAdminEmailAddress")
+  @Config("googleAppsAdminEmailAddress")
   public static String provideGoogleAppsAdminEmailAddress(RegistryEnvironment environment) {
     // Change this to your admin account.
     return "admin@example.com";
@@ -394,9 +385,9 @@ public final class DonutsConfigModule {
    * @see google.registry.ui.server.registrar.RegistrarSettingsAction
    */
   @Provides
-  @ConfigModule.Config("registrarChangesNotificationEmailAddresses")
+  @Config("registrarChangesNotificationEmailAddresses")
   public static ImmutableList<String> provideRegistrarChangesNotificationEmailAddresses(
-                                                                                           RegistryEnvironment environment) {
+      RegistryEnvironment environment) {
     switch (environment) {
       case PRODUCTION:
         // Change this to an appropriate notification e-mail address.
@@ -415,7 +406,7 @@ public final class DonutsConfigModule {
    * @see google.registry.tools.server.CreateGroupsAction
    */
   @Provides
-  @ConfigModule.Config("publicDomainName")
+  @Config("publicDomainName")
   public static String providePublicDomainName(RegistryEnvironment environment) {
     // Change this to your domain name.
     return "registry.example.com";
@@ -427,7 +418,7 @@ public final class DonutsConfigModule {
    * @see RegistryConfig#getTmchCaTestingMode()
    */
   @Provides
-  @ConfigModule.Config("tmchCaTestingMode")
+  @Config("tmchCaTestingMode")
   public static boolean provideTmchCaTestingMode(RegistryConfig config) {
     return config.getTmchCaTestingMode();
   }
@@ -442,7 +433,7 @@ public final class DonutsConfigModule {
    * @see "http://tools.ietf.org/html/draft-lozano-tmch-func-spec-08#section-5.2.3.2"
    */
   @Provides
-  @ConfigModule.Config("tmchCrlUrl")
+  @Config("tmchCrlUrl")
   public static URL provideTmchCrlUrl(RegistryEnvironment environment) {
     switch (environment) {
       case PRODUCTION:
@@ -461,7 +452,7 @@ public final class DonutsConfigModule {
    * @see google.registry.tmch.NordnUploadAction
    */
   @Provides
-  @ConfigModule.Config("tmchMarksdbUrl")
+  @Config("tmchMarksdbUrl")
   public static String provideTmchMarksdbUrl(RegistryEnvironment environment) {
     switch (environment) {
       case PRODUCTION:
@@ -478,8 +469,8 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeStagingAction
    */
   @Provides
-  @ConfigModule.Config("rdeBucket")
-  public static String provideRdeBucket(@ConfigModule.Config("projectId") String projectId) {
+  @Config("rdeBucket")
+  public static String provideRdeBucket(@Config("projectId") String projectId) {
     return projectId + "-rde";
   }
 
@@ -490,8 +481,8 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeHostImportAction
    */
   @Provides
-  @ConfigModule.Config("rdeImportBucket")
-  public static String provideRdeImportBucket(@ConfigModule.Config("projectId") String projectId) {
+  @Config("rdeImportBucket")
+  public static String provideRdeImportBucket(@Config("projectId") String projectId) {
     return projectId + "-rde-import";
   }
 
@@ -501,7 +492,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.Ghostryde
    */
   @Provides
-  @ConfigModule.Config("rdeGhostrydeBufferSize")
+  @Config("rdeGhostrydeBufferSize")
   public static Integer provideRdeGhostrydeBufferSize() {
     return 64 * 1024;
   }
@@ -514,7 +505,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeUploadAction
    */
   @Provides
-  @ConfigModule.Config("rdeInterval")
+  @Config("rdeInterval")
   public static Duration provideRdeInterval() {
     return Duration.standardDays(1);
   }
@@ -525,7 +516,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeReportAction
    */
   @Provides
-  @ConfigModule.Config("rdeReportLockTimeout")
+  @Config("rdeReportLockTimeout")
   public static Duration provideRdeReportLockTimeout() {
     return Duration.standardSeconds(60);
   }
@@ -538,7 +529,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeReportAction
    */
   @Provides
-  @ConfigModule.Config("rdeReportUrlPrefix")
+  @Config("rdeReportUrlPrefix")
   public static String provideRdeReportUrlPrefix(RegistryEnvironment environment) {
     switch (environment) {
       case PRODUCTION:
@@ -557,7 +548,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RydeTarOutputStream
    */
   @Provides
-  @ConfigModule.Config("rdeRydeBufferSize")
+  @Config("rdeRydeBufferSize")
   public static Integer provideRdeRydeBufferSize() {
     return 64 * 1024;
   }
@@ -568,7 +559,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeStagingReducer
    */
   @Provides
-  @ConfigModule.Config("rdeStagingLockTimeout")
+  @Config("rdeStagingLockTimeout")
   public static Duration provideRdeStagingLockTimeout() {
     return Duration.standardHours(5);
   }
@@ -579,7 +570,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeUploadAction
    */
   @Provides
-  @ConfigModule.Config("rdeUploadLockTimeout")
+  @Config("rdeUploadLockTimeout")
   public static Duration provideRdeUploadLockTimeout() {
     return Duration.standardMinutes(30);
   }
@@ -592,7 +583,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeStagingReducer
    */
   @Provides
-  @ConfigModule.Config("rdeUploadSftpCooldown")
+  @Config("rdeUploadSftpCooldown")
   public static Duration provideRdeUploadSftpCooldown() {
     return Duration.standardHours(2);
   }
@@ -604,7 +595,7 @@ public final class DonutsConfigModule {
    * @see google.registry.keyring.api.Keyring#getRdeSshClientPrivateKey()
    */
   @Provides
-  @ConfigModule.Config("rdeSshIdentity")
+  @Config("rdeSshIdentity")
   public static String provideSshIdentity() {
     return "mercury-donuts-test@example.test";
   }
@@ -617,7 +608,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeUploadAction
    */
   @Provides
-  @ConfigModule.Config("rdeUploadUrl")
+  @Config("rdeUploadUrl")
   public static URI provideRdeUploadUrl(RegistryEnvironment environment) {
     switch (environment) {
       case PRODUCTION:
@@ -633,7 +624,7 @@ public final class DonutsConfigModule {
    * @see google.registry.ui.server.registrar.ConsoleUiAction
    */
   @Provides
-  @ConfigModule.Config("registrarConsoleEnabled")
+  @Config("registrarConsoleEnabled")
   public static boolean provideRegistrarConsoleEnabled() {
     return true;
   }
@@ -644,7 +635,7 @@ public final class DonutsConfigModule {
    * @see google.registry.export.sheet.SyncRegistrarsSheetAction
    */
   @Provides
-  @ConfigModule.Config("sheetLockTimeout")
+  @Config("sheetLockTimeout")
   public static Duration provideSheetLockTimeout() {
     return Duration.standardHours(1);
   }
@@ -657,7 +648,7 @@ public final class DonutsConfigModule {
    * @see google.registry.export.sheet.SyncRegistrarsSheetAction
    */
   @Provides
-  @ConfigModule.Config("sheetRegistrarId")
+  @Config("sheetRegistrarId")
   public static Optional<String> provideSheetRegistrarId(RegistryEnvironment environment) {
     switch (environment) {
       case PRODUCTION:
@@ -680,7 +671,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeUploadAction
    */
   @Provides
-  @ConfigModule.Config("sshTimeout")
+  @Config("sshTimeout")
   public static Duration provideSshTimeout() {
     return Duration.standardSeconds(30);
   }
@@ -691,7 +682,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rde.RdeStagingAction
    */
   @Provides
-  @ConfigModule.Config("transactionCooldown")
+  @Config("transactionCooldown")
   public static Duration provideTransactionCooldown() {
     return Duration.standardMinutes(5);
   }
@@ -704,7 +695,7 @@ public final class DonutsConfigModule {
    * @see google.registry.util.TaskEnqueuer
    */
   @Provides
-  @ConfigModule.Config("transientFailureRetries")
+  @Config("transientFailureRetries")
   public static int provideTransientFailureRetries() {
     return 12;  // Four seconds.
   }
@@ -715,7 +706,7 @@ public final class DonutsConfigModule {
    * @see google.registry.whois.WhoisHttpServer
    */
   @Provides
-  @ConfigModule.Config("whoisHttpExpires")
+  @Config("whoisHttpExpires")
   public static Duration provideWhoisHttpExpires() {
     return Duration.standardDays(1);
   }
@@ -726,7 +717,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rdap.RdapActionBase
    */
   @Provides
-  @ConfigModule.Config("rdapResultSetMaxSize")
+  @Config("rdapResultSetMaxSize")
   public static int provideRdapResultSetMaxSize() {
     return 100;
   }
@@ -737,7 +728,7 @@ public final class DonutsConfigModule {
    * @see google.registry.rdap.RdapActionBase
    */
   @Provides
-  @ConfigModule.Config("rdapLinkBase")
+  @Config("rdapLinkBase")
   public static String provideRdapLinkBase() {
     return "https://nic.google/rdap/";
   }
@@ -751,7 +742,7 @@ public final class DonutsConfigModule {
    */
   @Nullable
   @Provides
-  @ConfigModule.Config("rdapWhoisServer")
+  @Config("rdapWhoisServer")
   public static String provideRdapWhoisServer() {
     return null;
   }
@@ -763,9 +754,9 @@ public final class DonutsConfigModule {
    * @see google.registry.ui.server.registrar.RegistrarPaymentSetupAction
    */
   @Provides
-  @ConfigModule.Config("braintreeMerchantAccountIds")
+  @Config("braintreeMerchantAccountIds")
   public static ImmutableMap<CurrencyUnit, String> provideBraintreeMerchantAccountId(
-                                                                                        RegistryEnvironment environment) {
+      RegistryEnvironment environment) {
     switch (environment) {
       case PRODUCTION:
         return ImmutableMap.of(
@@ -786,7 +777,7 @@ public final class DonutsConfigModule {
    * @see google.registry.braintree.BraintreeModule
    */
   @Provides
-  @ConfigModule.Config("braintreeMerchantId")
+  @Config("braintreeMerchantId")
   public static String provideBraintreeMerchantId(RegistryEnvironment environment) {
     switch (environment) {
       case PRODUCTION:
@@ -806,7 +797,7 @@ public final class DonutsConfigModule {
    * @see google.registry.keyring.api.Keyring#getBraintreePrivateKey()
    */
   @Provides
-  @ConfigModule.Config("braintreePublicKey")
+  @Config("braintreePublicKey")
   public static String provideBraintreePublicKey(RegistryEnvironment environment) {
     switch (environment) {
       case PRODUCTION:
@@ -823,7 +814,7 @@ public final class DonutsConfigModule {
    * @see google.registry.whois.WhoisResponse
    */
   @Provides
-  @ConfigModule.Config("whoisDisclaimer")
+  @Config("whoisDisclaimer")
   public static String provideWhoisDisclaimer() {
     return "Terms of Use: Users accessing the Donuts WHOIS service must agree to use the data "
                + "only for lawful purposes, and under under no circumstances use the data to: Allow, "
@@ -849,7 +840,7 @@ public final class DonutsConfigModule {
    * @see google.registry.monitoring.metrics.StackdriverWriter
    */
   @Provides
-  @ConfigModule.Config("stackdriverMaxQps")
+  @Config("stackdriverMaxQps")
   public static int provideStackdriverMaxQps() {
     return 30;
   }
@@ -861,7 +852,7 @@ public final class DonutsConfigModule {
    * @see google.registry.monitoring.metrics.StackdriverWriter
    */
   @Provides
-  @ConfigModule.Config("stackdriverMaxPointsPerRequest")
+  @Config("stackdriverMaxPointsPerRequest")
   public static int provideStackdriverMaxPointsPerRequest() {
     return 200;
   }
@@ -873,7 +864,7 @@ public final class DonutsConfigModule {
    * @see google.registry.monitoring.metrics.MetricReporter
    */
   @Provides
-  @ConfigModule.Config("metricsWriteInterval")
+  @Config("metricsWriteInterval")
   public static Duration provideMetricsWriteInterval() {
     return Duration.standardSeconds(60);
   }
@@ -884,7 +875,7 @@ public final class DonutsConfigModule {
    * @see google.registry.flows.contact.ContactTransferRequestFlow
    */
   @Provides
-  @ConfigModule.Config("contactAutomaticTransferLength")
+  @Config("contactAutomaticTransferLength")
   public static Duration provideContactAutomaticTransferLength(RegistryConfig config) {
     return config.getContactAutomaticTransferLength();
   }
@@ -893,7 +884,7 @@ public final class DonutsConfigModule {
    * Returns the maximum number of entities that can be checked at one time in an EPP check flow.
    */
   @Provides
-  @ConfigModule.Config("maxChecks")
+  @Config("maxChecks")
   public static int provideMaxChecks() {
     return 50;
   }
@@ -919,7 +910,7 @@ public final class DonutsConfigModule {
    * @see google.registry.flows.async.AsyncFlowEnqueuer
    */
   @Provides
-  @ConfigModule.Config("asyncDeleteFlowMapreduceDelay")
+  @Config("asyncDeleteFlowMapreduceDelay")
   public static Duration provideAsyncDeleteFlowMapreduceDelay() {
     return Duration.standardSeconds(90);
   }
@@ -930,15 +921,100 @@ public final class DonutsConfigModule {
    * @see <a href="https://tools.ietf.org/html/rfc5730">RFC 7530</a>
    */
   @Provides
-  @ConfigModule.Config("greetingServerId")
+  @Config("greetingServerId")
   public static String provideGreetingServerId() {
     return "Donuts, Inc";
   }
 
   @Provides
-  @ConfigModule.Config("customLogicFactoryClass")
+  @Config("customLogicFactoryClass")
   public static String provideCustomLogicFactoryClass() {
     // TODO(b/32875427): This will be moved into configuration in a text file in a future refactor.
     return "google.registry.flows.custom.CustomLogicFactory";
+  }
+
+  /**
+   * Returns the help path for the RDAP terms of service.
+   *
+   * <p>Make sure that this path is equal to the key of the entry in the RDAP help map containing
+   * the terms of service. The ICANN operational profile requires that the TOS be included in all
+   * responses, and this string is used to find the TOS in the help map.
+   */
+  @Provides
+  @Config("rdapTosPath")
+  public static String provideRdapTosPath() {
+    return "/tos";
+  }
+
+  /**
+   * Returns the help text to be used by RDAP.
+   *
+   * <p>Make sure that the map entry for the terms of service use the same key as specified in
+   * rdapTosPath above.
+   */
+  @Singleton
+  @Provides
+  @Config("rdapHelpMap")
+  public static ImmutableMap<String, RdapNoticeDescriptor> provideRdapHelpMap() {
+    return new ImmutableMap.Builder<String, RdapNoticeDescriptor>()
+        .put("/", RdapNoticeDescriptor.builder()
+            .setTitle("RDAP Help")
+            .setDescription(ImmutableList.of(
+                "RDAP Help Topics (use /help/topic for information)",
+                "syntax",
+                "tos (Terms of Service)"))
+            .setLinkValueSuffix("help/")
+            .build())
+        .put("/index", RdapNoticeDescriptor.builder()
+            .setTitle("RDAP Help")
+            .setDescription(ImmutableList.of(
+                "RDAP Help Topics (use /help/topic for information)",
+                "syntax",
+                "tos (Terms of Service)"))
+            .setLinkValueSuffix("help/index")
+            .build())
+        .put("/syntax", RdapNoticeDescriptor.builder()
+            .setTitle("RDAP Command Syntax")
+            .setDescription(ImmutableList.of(
+                "domain/XXXX",
+                "nameserver/XXXX",
+                "entity/XXXX",
+                "domains?name=XXXX",
+                "domains?nsLdhName=XXXX",
+                "domains?nsIp=XXXX",
+                "nameservers?name=XXXX",
+                "nameservers?ip=XXXX",
+                "entities?fn=XXXX",
+                "entities?handle=XXXX",
+                "help/XXXX"))
+            .setLinkValueSuffix("help/syntax")
+            .build())
+        .put("/tos", RdapNoticeDescriptor.builder()
+            .setTitle("RDAP Terms of Service")
+            .setDescription(ImmutableList.of(
+                "By querying our Domain Database, you are agreeing to comply with these terms so"
+                    + " please read them carefully.",
+                "Any information provided is 'as is' without any guarantee of accuracy.",
+                "Please do not misuse the Domain Database. It is intended solely for"
+                    + " query-based access.",
+                "Don't use the Domain Database to allow, enable, or otherwise support the"
+                    + " transmission of mass unsolicited, commercial advertising or"
+                    + " solicitations.",
+                "Don't access our Domain Database through the use of high volume, automated"
+                    + " electronic processes that send queries or data to the systems of any"
+                    + " ICANN-accredited registrar.",
+                "You may only use the information contained in the Domain Database for lawful"
+                    + " purposes.",
+                "Do not compile, repackage, disseminate, or otherwise use the information"
+                    + " contained in the Domain Database in its entirety, or in any substantial"
+                    + " portion, without our prior written permission.",
+                "We may retain certain details about queries to our Domain Database for the"
+                    + " purposes of detecting and preventing misuse.",
+                "We reserve the right to restrict or deny your access to the database if we"
+                    + " suspect that you have failed to comply with these terms.",
+                "We reserve the right to modify this agreement at any time."))
+            .setLinkValueSuffix("help/tos")
+            .build())
+        .build();
   }
 }
