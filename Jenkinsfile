@@ -1,31 +1,25 @@
 node {
-    def java7 = "PATH+JAVA=${tool 'java7'}/bin"
-
     stage 'Checkout'
     checkout scm
 
     stage 'Build'
     parallel 'gradle build': {
-        withEnv(["${java7}"]) {
-            sh './gradlew --version'
-            sh './gradlew clean build -x test'
-        }
+        sh './gradlew --version'
+        sh './gradlew clean build -x test'
     }, 'bazel build': {
         sh 'bazel info'
-        sh 'bazel build //java/domains/donuts/...'
+        sh 'bazel build --javacopt "-source 1.7" --javacopt "-target 1.7" //java/domains/donuts/...'
     }
 
     // Note: Running Gradle and Bazel tests in parallel causes Bazel test timeouts
     stage 'Gradle Test'
-    withEnv(["${java7}"]) {
-        wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm']) {
-            sh './gradlew clean test'
-        }
+    wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm']) {
+        sh './gradlew clean test'
     }
 
     stage 'Bazel Test'
     // TODO: Migrate/create donuts tests to execute here
-    sh """bazel test //javatests/google/registry/... \
+    sh """bazel test --javacopt "-source 1.7" --javacopt "-target 1.7" //javatests/google/registry/... \
         --progress_report_interval=1 \
         --jobs=2 \
         --ram_utilization_factor=10 \
