@@ -15,6 +15,7 @@
 package google.registry.flows.domain;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static google.registry.flows.FlowUtils.persistEntityChanges;
 import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.handlePendingTransferOnDelete;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
@@ -45,6 +46,12 @@ import google.registry.flows.FlowModule.TargetId;
 import google.registry.flows.ResourceFlowUtils;
 import google.registry.flows.SessionMetadata;
 import google.registry.flows.TransactionalFlow;
+import google.registry.flows.custom.DomainDeleteFlowCustomLogic;
+import google.registry.flows.custom.DomainDeleteFlowCustomLogic.AfterValidationParameters;
+import google.registry.flows.custom.DomainDeleteFlowCustomLogic.BeforeResponseParameters;
+import google.registry.flows.custom.DomainDeleteFlowCustomLogic.BeforeResponseReturnData;
+import google.registry.flows.custom.DomainDeleteFlowCustomLogic.BeforeSaveParameters;
+import google.registry.flows.custom.EntityChanges;
 import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.domain.DomainResource;
@@ -91,7 +98,6 @@ import org.joda.time.DateTime;
 public final class DomainDeleteFlow implements TransactionalFlow {
 
   private static final ImmutableSet<StatusValue> DISALLOWED_STATUSES = ImmutableSet.of(
-      StatusValue.LINKED,
       StatusValue.CLIENT_DELETE_PROHIBITED,
       StatusValue.PENDING_DELETE,
       StatusValue.SERVER_DELETE_PROHIBITED);
@@ -107,11 +113,13 @@ public final class DomainDeleteFlow implements TransactionalFlow {
   @Inject DnsQueue dnsQueue;
   @Inject Trid trid;
   @Inject EppResponse.Builder responseBuilder;
+  @Inject DomainDeleteFlowCustomLogic customLogic;
   @Inject DomainDeleteFlow() {}
 
   @Override
   public final EppResponse run() throws EppException {
     extensionManager.register(MetadataExtension.class, SecDnsCreateExtension.class);
+    customLogic.beforeValidation();
     extensionManager.validate();
     validateClientIsLoggedIn(clientId);
     DateTime now = ofy().getTransactionTime();
@@ -119,10 +127,14 @@ public final class DomainDeleteFlow implements TransactionalFlow {
     DomainResource existingDomain = loadAndVerifyExistence(DomainResource.class, targetId, now);
     Registry registry = Registry.get(existingDomain.getTld());
     verifyDeleteAllowed(existingDomain, registry, now);
+    customLogic.afterValidation(
+        AfterValidationParameters.newBuilder().setExistingDomain(existingDomain).build());
+    ImmutableSet.Builder<ImmutableObject> entitiesToSave = new ImmutableSet.Builder<>();
     HistoryEntry historyEntry = buildHistoryEntry(existingDomain, now);
-    Builder builder =
-        ResourceFlowUtils.<DomainResource, DomainResource.Builder>resolvePendingTransfer(
-            existingDomain, TransferStatus.SERVER_CANCELLED, now);
+    Builder builder = existingDomain.getStatusValues().contains(StatusValue.PENDING_TRANSFER)
+        ? ResourceFlowUtils.<DomainResource, DomainResource.Builder>resolvePendingTransfer(
+            existingDomain, TransferStatus.SERVER_CANCELLED, now)
+        : existingDomain.asBuilder();
     builder.setDeletionTime(now).setStatusValues(null);
     // If the domain is in the Add Grace Period, we delete it immediately, which is already
     // reflected in the builder we just prepared. Otherwise we give it a PENDING_DELETE status.
@@ -133,7 +145,7 @@ public final class DomainDeleteFlow implements TransactionalFlow {
           .plus(registry.getPendingDeleteLength());
       PollMessage.OneTime deletePollMessage =
           createDeletePollMessage(existingDomain, historyEntry, deletionTime);
-      ofy().save().entity(deletePollMessage);
+      entitiesToSave.add(deletePollMessage);
       builder.setStatusValues(ImmutableSet.of(StatusValue.PENDING_DELETE))
           .setDeletionTime(deletionTime)
           // Clear out all old grace periods and add REDEMPTION, which does not include a key to a
@@ -158,15 +170,31 @@ public final class DomainDeleteFlow implements TransactionalFlow {
     for (GracePeriod gracePeriod : existingDomain.getGracePeriods()) {
       // No cancellation is written if the grace period was not for a billable event.
       if (gracePeriod.hasBillingEvent()) {
-        ofy().save().entity(
+        entitiesToSave.add(
             BillingEvent.Cancellation.forGracePeriod(gracePeriod, historyEntry, targetId));
       }
     }
-    ofy().save().<ImmutableObject>entities(newDomain, historyEntry);
+    entitiesToSave.add(newDomain, historyEntry);
+    EntityChanges entityChanges = customLogic.beforeSave(
+        BeforeSaveParameters.newBuilder()
+            .setExistingDomain(existingDomain)
+            .setNewDomain(newDomain)
+            .setHistoryEntry(historyEntry)
+            .setEntityChanges(EntityChanges.newBuilder().setSaves(entitiesToSave.build()).build())
+            .build());
+    persistEntityChanges(entityChanges);
+    BeforeResponseReturnData responseData =
+        customLogic.beforeResponse(
+            BeforeResponseParameters.newBuilder()
+                .setResultCode(
+                    newDomain.getDeletionTime().isAfter(now)
+                        ? SUCCESS_WITH_ACTION_PENDING
+                        : SUCCESS)
+                .setResponseExtensions(getResponseExtensions(existingDomain, now))
+                .build());
     return responseBuilder
-        .setResultFromCode(
-            newDomain.getDeletionTime().isAfter(now) ? SUCCESS_WITH_ACTION_PENDING : SUCCESS)
-        .setExtensions(getResponseExtensions(existingDomain, now))
+        .setResultFromCode(responseData.resultCode())
+        .setExtensions(responseData.responseExtensions())
         .build();
   }
 
