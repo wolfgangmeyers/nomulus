@@ -19,7 +19,7 @@ node {
 
     stage 'Bazel Test'
     // TODO: Migrate/create donuts tests to execute here
-    sh """bazel test --javacopt "-source 1.7" --javacopt "-target 1.7" //javatests/google/registry/... \
+    sh """bazel test //javatests/google/registry/... \
         --progress_report_interval=1 \
         --jobs=2 \
         --ram_utilization_factor=10 \
