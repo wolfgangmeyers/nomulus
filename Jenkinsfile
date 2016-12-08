@@ -7,8 +7,8 @@ node {
         sh './gradlew --version'
         sh './gradlew clean build -x test'
     }, 'bazel build': {
-        sh 'bazel info'
-        sh 'bazel build --javacopt "-source 1.7" --javacopt "-target 1.7" //java/domains/donuts/...'
+        sh 'bazel --batch info'
+        sh 'bazel --batch build --javacopt "-source 1.7" --javacopt "-target 1.7" //java/domains/donuts/...'
     }
 
     // Note: Running Gradle and Bazel tests in parallel causes Bazel test timeouts
@@ -19,7 +19,7 @@ node {
 
     stage 'Bazel Test'
     // TODO: Migrate/create donuts tests to execute here
-    sh """bazel test //javatests/google/registry/... \
+    sh """bazel --batch test //javatests/google/registry/... \
         --progress_report_interval=1 \
         --jobs=2 \
         --ram_utilization_factor=10 \
