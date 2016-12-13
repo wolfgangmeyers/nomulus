@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <cronentries>
 
+  <!--
+  TODO: Purposely commenting out to reduce the numerous errors that are being reported StackDriver Error Reporting. Issue is being tracked https://donuts.atlassian.net/browse/MERC-830
   <cron>
     <url><![CDATA[/_dr/cron/fanout?queue=marksdb&endpoint=/_dr/task/tmchDnl&runInEmpty]]></url>
     <description>
@@ -10,7 +12,10 @@
     <schedule>every 12 hours synchronized</schedule>
     <target>backend</target>
   </cron>
+  -->
 
+  <!--
+  TODO: Purposely commenting out to reduce the numerous errors that are being reported StackDriver Error Reporting. Issue is being tracked https://donuts.atlassian.net/browse/MERC-830
   <cron>
     <url><![CDATA[/_dr/cron/fanout?queue=marksdb&endpoint=/_dr/task/tmchSmdrl&runInEmpty]]></url>
     <description>
@@ -20,7 +25,10 @@
     <schedule>every 12 hours synchronized</schedule>
     <target>backend</target>
   </cron>
+  -->
 
+  <!--
+  TODO: Purposely commenting out to reduce the numerous errors that are being reported StackDriver Error Reporting. Issue is being tracked https://donuts.atlassian.net/browse/MERC-830
   <cron>
     <url><![CDATA[/_dr/cron/fanout?queue=marksdb&endpoint=/_dr/task/tmchCrl&runInEmpty]]></url>
     <description>
@@ -30,7 +38,10 @@
     <schedule>every 12 hours synchronized</schedule>
     <target>backend</target>
   </cron>
+  -->
 
+  <!--
+  TODO: Purposely commenting out to reduce the numerous errors that are being reported StackDriver Error Reporting. Issue is being tracked https://donuts.atlassian.net/browse/MERC-828
   <cron>
     <url><![CDATA[/_dr/cron/fanout?queue=retryable-cron-tasks&endpoint=/_dr/task/syncGroupMembers&runInEmpty]]></url>
     <description>
@@ -39,6 +50,7 @@
     <schedule>every 1 hours synchronized</schedule>
     <target>backend</target>
   </cron>
+  -->
 
   <cron>
     <url><![CDATA[/_dr/task/deleteContactsAndHosts]]></url>
