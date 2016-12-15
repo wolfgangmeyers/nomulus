@@ -21,6 +21,13 @@
         <property name="currentSponsorClientId" direction="asc"/>
         <property name="deletionTime" direction="asc"/>
     </datastore-index>
+    <!-- For finding domain resource by deletionTime, tld and fullyQualifiedDomainName -->
+    <datastore-index kind="DomainBase" ancestor="false" source="manual">
+        <property name="^i" direction="asc"/>
+        <property name="deletionTime" direction="asc"/>
+        <property name="tld" direction="asc"/>
+        <property name="fullyQualifiedDomainName" direction="asc"/>
+    </datastore-index>
     <!-- For finding host resources by registrar. -->
     <datastore-index kind="HostResource" ancestor="false" source="manual">
         <property name="currentSponsorClientId" direction="asc"/>

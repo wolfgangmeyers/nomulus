@@ -3,13 +3,13 @@ node {
     checkout scm
 
     stage 'Build'
-    parallel 'gradle build': {
+
         sh './gradlew --version'
         sh './gradlew clean build -x test'
-    }, 'bazel build': {
+
         sh 'bazel --batch info'
         sh 'bazel --batch build --javacopt "-source 1.7" --javacopt "-target 1.7" //java/domains/donuts/...'
-    }
+
 
     // Note: Running Gradle and Bazel tests in parallel causes Bazel test timeouts
     stage 'Gradle Test'
@@ -33,7 +33,7 @@ node {
     stage 'Report'
     junit 'build/test-results/**/*.xml'
 
-    if ("$env.BRANCH_NAME" == 'master') {
+    if (env.BRANCH_NAME == 'master') {
         stage 'Deploy'
         // TODO: Should this be configurable?
         sh './build-deploy-artifact.sh war-deploy alpha'

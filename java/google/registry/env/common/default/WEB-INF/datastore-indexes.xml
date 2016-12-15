@@ -83,4 +83,11 @@
         <property name="deletionTime" direction="asc"/>
         <property name="searchName" direction="asc"/>
     </datastore-index>
+    <!-- For finding domain resource by deletionTime, tld and fullyQualifiedDomainName -->
+    <datastore-index kind="DomainBase" ancestor="false" source="manual">
+        <property name="^i" direction="asc"/>
+        <property name="deletionTime" direction="asc"/>
+        <property name="tld" direction="asc"/>
+        <property name="fullyQualifiedDomainName" direction="asc"/>
+    </datastore-index>
 </datastore-indexes>
