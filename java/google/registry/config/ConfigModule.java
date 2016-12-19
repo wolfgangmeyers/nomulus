@@ -77,17 +77,6 @@ public final class ConfigModule {
     return environment.config();
   }
 
-  /**
-   * Returns the DPML TLD name
-   *
-   * @return String name of the DPML TLD name
-   */
-  @Provides
-  @Config("dpmlTld")
-  public static String provideDpmlTld() {
-    return "dpml.zone";
-  }
-
   @Provides
   @Config("projectId")
   public static String provideProjectId(RegistryConfig config) {

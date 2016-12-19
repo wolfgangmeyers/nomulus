@@ -281,18 +281,22 @@ public abstract class FlowTestCase<F extends Flow> extends ShardableTestCase {
         .build()
         .startRequest()
         .flowComponentBuilder()
-            .flowModule(new FlowModule.Builder()
-                .setSessionMetadata(sessionMetadata)
-                .setCredentials(credentials)
-                .setEppRequestSource(eppRequestSource)
-                .setIsDryRun(commitMode.equals(CommitMode.DRY_RUN))
-                .setIsSuperuser(userPrivileges.equals(UserPrivileges.SUPERUSER))
-                .setInputXmlBytes(eppLoader.getEppXml().getBytes(UTF_8))
-                .setEppInput(eppLoader.getEpp())
-                .build())
+            .flowModule(createFlowModule(commitMode, userPrivileges))
             .build()
             .flowRunner()
             .run();
+  }
+
+  protected FlowModule createFlowModule(CommitMode commitMode, UserPrivileges userPrivileges) throws EppException {
+    return new FlowModule.Builder()
+        .setSessionMetadata(sessionMetadata)
+        .setCredentials(credentials)
+        .setEppRequestSource(eppRequestSource)
+        .setIsDryRun(commitMode.equals(CommitMode.DRY_RUN))
+        .setIsSuperuser(userPrivileges.equals(UserPrivileges.SUPERUSER))
+        .setInputXmlBytes(eppLoader.getEppXml().getBytes(UTF_8))
+        .setEppInput(eppLoader.getEpp())
+        .build();
   }
 
   /** Run a flow and marshal the result to EPP, or throw if it doesn't validate. */

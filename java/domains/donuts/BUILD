@@ -6,7 +6,7 @@ java_library(
     name = "donuts",
     srcs = glob([
         "config/*.java",
-        "flows/*.java",
+        "flows/**/*.java",
         "keyring/*.java",
     ]),
     resources = glob([

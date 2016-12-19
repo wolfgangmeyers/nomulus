@@ -142,12 +142,14 @@ public class DomainFlowUtils {
 
   /** Map from launch phases to the equivalent tld states. */
   private static final ImmutableMap<LaunchPhase, TldState> LAUNCH_PHASE_TO_TLD_STATE =
-      ImmutableMap.of(
-          LaunchPhase.SUNRISE, TldState.SUNRISE,
-          LaunchPhase.SUNRUSH, TldState.SUNRUSH,
-          LaunchPhase.LANDRUSH, TldState.LANDRUSH,
-          LaunchPhase.CLAIMS, TldState.GENERAL_AVAILABILITY,
-          LaunchPhase.OPEN, TldState.GENERAL_AVAILABILITY);
+      new ImmutableMap.Builder<LaunchPhase, TldState>()
+          .put(LaunchPhase.SUNRISE, TldState.SUNRISE)
+          .put(LaunchPhase.SUNRUSH, TldState.SUNRUSH)
+          .put(LaunchPhase.LANDRUSH, TldState.LANDRUSH)
+          .put(LaunchPhase.CLAIMS, TldState.GENERAL_AVAILABILITY)
+          .put(LaunchPhase.OPEN, TldState.GENERAL_AVAILABILITY)
+          .put(LaunchPhase.DPML, TldState.GENERAL_AVAILABILITY)
+          .build();
 
   /** Reservation types that are allowed in sunrise by policy. */
   public static final ImmutableSet<ReservationType> TYPES_ALLOWED_FOR_CREATE_ONLY_IN_SUNRISE =

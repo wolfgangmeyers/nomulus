@@ -64,6 +64,8 @@ public class LaunchPhase extends ImmutableObject {
   /** A custom server launch phase that is defined using the "name" attribute. */
   public static final LaunchPhase CUSTOM = create("custom", null);
 
+  public static final LaunchPhase DPML = create("custom", "dpml");
+
   private static final Map<String, LaunchPhase> LAUNCH_PHASES = initEnumMapping();
 
   /**

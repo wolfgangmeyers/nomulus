@@ -31,11 +31,6 @@ import static com.google.common.truth.Truth.assertThat;
 public class ConfigModuleTest {
 
   @Test
-  public void testProvideDpmlTld() throws Exception {
-    assertThat(ConfigModule.provideDpmlTld()).isEqualTo("dpml.zone");
-  }
-
-  @Test
   public void testProvideSshIdentity() throws Exception {
     assertThat(ConfigModule.provideSshIdentity()).isEqualTo("mercury-donuts-test@example.test");
   }
