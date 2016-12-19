@@ -37,7 +37,10 @@ node {
         stage 'Deploy'
         // TODO: Should this be configurable?
         sh './build-deploy-artifact.sh war-deploy alpha'
-        sh 'appcfg.sh --enable_jar_splitting update war-deploy'
+        withCredentials([file(credentialsId: 'e56f0d0d-9ac6-48a1-91d7-e9f803901d04', variable: 'ALPHA_CREDENTIALS')]) {
+            sh "appcfg.sh --enable_jar_splitting update war-deploy " +
+                    "--service_account_json_key_file=$ALPHA_CREDENTIALS"
+        }
     }
 
 
