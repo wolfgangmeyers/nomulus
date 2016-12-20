@@ -393,13 +393,7 @@ public final class Ghostryde {
 
   /** Does stuff. */
   private SecureRandom getRandom() {
-    SecureRandom random;
-    try {
-      random = SecureRandom.getInstance(RANDOM_SOURCE);
-    } catch (NoSuchAlgorithmException e) {
-      throw new ProviderException(e);
-    }
-    return random;
+    return new SecureRandom();
   }
 
   /**

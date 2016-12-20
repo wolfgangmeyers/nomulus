@@ -39,11 +39,7 @@ abstract class RegistryToolModule {
 
   @Provides
   static Random provideRandom() {
-    try {
-      return SecureRandom.getInstance("NativePRNG");
-    } catch (NoSuchAlgorithmException e) {
-      throw new ProviderException(e);
-    }
+    return new SecureRandom();
   }
 
   @Provides

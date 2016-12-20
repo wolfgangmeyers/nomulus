@@ -91,11 +91,7 @@ public final class UrlFetchUtils {
   }
 
   private static SecureRandom initSecureRandom() {
-    try {
-      return SecureRandom.getInstance("NativePRNG");
-    } catch (NoSuchAlgorithmException e) {
-      throw new ProviderException(e);
-    }
+    return new SecureRandom();
   }
 
   /** Sets the HTTP Basic Authentication header on an {@link HTTPRequest}. */

@@ -104,12 +104,10 @@ public class RydePgpEncryptionOutputStream extends ImprovedOutputStream {
       PGPEncryptedDataGenerator encryptor = new PGPEncryptedDataGenerator(
           new JcePGPDataEncryptorBuilder(CIPHER)
               .setWithIntegrityPacket(USE_INTEGRITY_PACKET)
-              .setSecureRandom(SecureRandom.getInstance(RANDOM_SOURCE))
+              .setSecureRandom(new SecureRandom())
               .setProvider(PROVIDER_NAME));
       encryptor.addMethod(new JcePublicKeyKeyEncryptionMethodGenerator(receiverKey));
       return encryptor.open(os, new byte[bufferSize]);
-    } catch (NoSuchAlgorithmException e) {
-      throw new ProviderException(e);
     } catch (IOException | PGPException e) {
       throw new RuntimeException(e);
     }
