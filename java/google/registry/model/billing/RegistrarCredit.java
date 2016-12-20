@@ -31,12 +31,14 @@ import com.googlecode.objectify.annotation.Id;
 import com.googlecode.objectify.annotation.Parent;
 import google.registry.model.Buildable;
 import google.registry.model.ImmutableObject;
+import google.registry.model.annotations.ReportedOn;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
 import org.joda.money.CurrencyUnit;
 import org.joda.time.DateTime;
 
 /** A per-registrar billing credit, applied toward future charges for registrar activity. */
+@ReportedOn
 @Entity
 public final class RegistrarCredit extends ImmutableObject implements Buildable {
 
@@ -55,7 +57,7 @@ public final class RegistrarCredit extends ImmutableObject implements Buildable 
     PROMOTION("Promotional Credit");
 
     /** A descriptive name for a credit of this type. */
-    private String descriptiveName;
+    private final String descriptiveName;
 
     CreditType(String descriptiveName) {
       this.descriptiveName = descriptiveName;

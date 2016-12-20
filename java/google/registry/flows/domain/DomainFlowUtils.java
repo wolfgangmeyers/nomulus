@@ -22,7 +22,7 @@ import static com.google.common.collect.Iterables.concat;
 import static com.google.common.collect.Sets.difference;
 import static com.google.common.collect.Sets.union;
 import static google.registry.flows.EppXmlTransformer.unmarshal;
-import static google.registry.flows.domain.TldSpecificLogicProxy.getMatchingLrpToken;
+import static google.registry.flows.domain.DomainPricingLogic.getMatchingLrpToken;
 import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.registry.Registries.findTldForName;
@@ -56,7 +56,7 @@ import google.registry.flows.EppException.ParameterValueSyntaxErrorException;
 import google.registry.flows.EppException.RequiredParameterMissingException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
 import google.registry.flows.EppException.UnimplementedOptionException;
-import google.registry.flows.domain.DomainPricingLogic.EppCommandOperations;
+import google.registry.flows.domain.DomainPricingLogic.FeesAndCredits;
 import google.registry.flows.exceptions.ResourceAlreadyExistsException;
 import google.registry.flows.exceptions.ResourceHasClientUpdateProhibitedException;
 import google.registry.model.EppResource;
@@ -94,7 +94,6 @@ import google.registry.model.domain.secdns.SecDnsUpdateExtension;
 import google.registry.model.domain.secdns.SecDnsUpdateExtension.Add;
 import google.registry.model.domain.secdns.SecDnsUpdateExtension.Remove;
 import google.registry.model.eppcommon.StatusValue;
-import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppoutput.EppResponse.ResponseExtension;
 import google.registry.model.host.HostResource;
 import google.registry.model.mark.Mark;
@@ -588,10 +587,8 @@ public class DomainFlowUtils {
       FeeQueryCommandExtensionItem feeRequest,
       FeeQueryResponseExtensionItem.Builder<?, ?> builder,
       InternetDomainName domain,
-      String clientId,
       @Nullable CurrencyUnit topLevelCurrency,
       DateTime currentDate,
-      EppInput eppInput,
       DomainPricingLogic pricingLogic)
       throws EppException {
     DateTime now = currentDate;
@@ -619,7 +616,7 @@ public class DomainFlowUtils {
         .setCommand(feeRequest.getCommandName(), feeRequest.getPhase(), feeRequest.getSubphase())
         .setCurrencyIfSupported(registry.getCurrency())
         .setPeriod(feeRequest.getPeriod())
-        .setClass(TldSpecificLogicProxy.getFeeClass(domainNameString, now).orNull());
+        .setClass(pricingLogic.getFeeClass(domainNameString, now).orNull());
 
     ImmutableList<Fee> fees = ImmutableList.of();
     switch (feeRequest.getCommandName()) {
@@ -635,26 +632,22 @@ public class DomainFlowUtils {
         break;
       case RENEW:
         builder.setAvailIfSupported(true);
-        fees = TldSpecificLogicProxy.getRenewPrice(
-            registry, domainNameString, clientId, now, years, eppInput).getFees();
+        fees = pricingLogic.getRenewPrice(registry, domainNameString, now, years).getFees();
         break;
       case RESTORE:
         if (years != 1) {
           throw new RestoresAreAlwaysForOneYearException();
         }
         builder.setAvailIfSupported(true);
-        fees = TldSpecificLogicProxy.getRestorePrice(
-            registry, domainNameString, clientId, now, eppInput).getFees();
+        fees = pricingLogic.getRestorePrice(registry, domainNameString, now).getFees();
         break;
       case TRANSFER:
         builder.setAvailIfSupported(true);
-        fees = TldSpecificLogicProxy.getTransferPrice(
-            registry, domainNameString, clientId, now, years, eppInput).getFees();
+        fees = pricingLogic.getTransferPrice(registry, domainNameString, now, years).getFees();
         break;
       case UPDATE:
         builder.setAvailIfSupported(true);
-        fees = TldSpecificLogicProxy.getUpdatePrice(
-            registry, domainNameString, clientId, now, eppInput).getFees();
+        fees = pricingLogic.getUpdatePrice(registry, domainNameString, now).getFees();
         break;
       default:
         throw new UnknownFeeCommandException(feeRequest.getUnparsedCommandName());
@@ -996,12 +989,12 @@ public class DomainFlowUtils {
 
   /** Create a response extension listign the fees on a domain or application create. */
   static FeeTransformResponseExtension createFeeCreateResponse(
-      FeeTransformCommandExtension feeCreate,
-      EppCommandOperations commandOperations) {
-    return feeCreate.createResponseBuilder()
-        .setCurrency(commandOperations.getCurrency())
-        .setFees(commandOperations.getFees())
-        .setCredits(commandOperations.getCredits())
+      FeeTransformCommandExtension feeCreate, FeesAndCredits feesAndCredits) {
+    return feeCreate
+        .createResponseBuilder()
+        .setCurrency(feesAndCredits.getCurrency())
+        .setFees(feesAndCredits.getFees())
+        .setCredits(feesAndCredits.getCredits())
         .build();
   }
 

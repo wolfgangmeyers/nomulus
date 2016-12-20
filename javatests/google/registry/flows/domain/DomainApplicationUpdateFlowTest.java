@@ -61,8 +61,6 @@ import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.DesignatedContact.Type;
 import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainApplication.Builder;
-import google.registry.model.domain.TestExtraLogicManager;
-import google.registry.model.domain.TestExtraLogicManager.TestExtraLogicManagerSuccessException;
 import google.registry.model.domain.launch.ApplicationStatus;
 import google.registry.model.domain.secdns.DelegationSignerData;
 import google.registry.model.eppcommon.StatusValue;
@@ -94,7 +92,6 @@ public class DomainApplicationUpdateFlowTest
   public void setUp() {
     createTld("tld", TldState.SUNRUSH);
     createTld("flags", TldState.SUNRISE);
-    RegistryExtraFlowLogicProxy.setOverride("flags", TestExtraLogicManager.class);
   }
 
   private void persistReferencedEntities() {
@@ -676,24 +673,15 @@ public class DomainApplicationUpdateFlowTest
   }
 
   @Test
-  public void testFailure_flags_feeMismatch() throws Exception {
+  public void testFailure_customPricingLogic_feeMismatch() throws Exception {
     persistReferencedEntities();
     persistResource(
-        newDomainApplication("update-42.flags").asBuilder().setRepoId("1-ROID").build());
-    setEppInput("domain_update_sunrise_flags.xml", ImmutableMap.of("FEE", "12"));
+        newDomainApplication("non-free-update.tld").asBuilder().setRepoId("1-ROID").build());
+    setEppInput(
+        "domain_update_sunrise_fee.xml",
+        ImmutableMap.of("DOMAIN", "non-free-update.tld", "AMOUNT", "12"));
     clock.advanceOneMilli();
     thrown.expect(FeesMismatchException.class);
-    runFlow();
-  }
-
-  @Test
-  public void testSuccess_flags() throws Exception {
-    persistReferencedEntities();
-    persistResource(
-        newDomainApplication("update-42.flags").asBuilder().setRepoId("1-ROID").build());
-    setEppInput("domain_update_sunrise_flags.xml", ImmutableMap.of("FEE", "42"));
-    clock.advanceOneMilli();
-    thrown.expect(TestExtraLogicManagerSuccessException.class, "add:flag1;remove:flag2");
     runFlow();
   }
 }

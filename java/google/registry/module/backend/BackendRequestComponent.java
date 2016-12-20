@@ -21,8 +21,12 @@ import google.registry.backup.CommitLogCheckpointAction;
 import google.registry.backup.DeleteOldCommitLogsAction;
 import google.registry.backup.ExportCommitLogDiffAction;
 import google.registry.backup.RestoreCommitLogsAction;
+import google.registry.batch.BatchModule;
+import google.registry.batch.DeleteContactsAndHostsAction;
 import google.registry.batch.DeleteProberDataAction;
 import google.registry.batch.ExpandRecurringBillingEventsAction;
+import google.registry.batch.RefreshDnsOnHostRenameAction;
+import google.registry.batch.VerifyEntityIntegrityAction;
 import google.registry.cron.CommitLogFanoutAction;
 import google.registry.cron.CronModule;
 import google.registry.cron.TldFanoutAction;
@@ -43,20 +47,18 @@ import google.registry.export.UpdateSnapshotViewAction;
 import google.registry.export.sheet.SheetModule;
 import google.registry.export.sheet.SyncRegistrarsSheetAction;
 import google.registry.flows.async.AsyncFlowsModule;
-import google.registry.flows.async.DeleteContactsAndHostsAction;
-import google.registry.flows.async.RefreshDnsOnHostRenameAction;
 import google.registry.mapreduce.MapreduceModule;
 import google.registry.monitoring.whitebox.MetricsExportAction;
-import google.registry.monitoring.whitebox.VerifyEntityIntegrityAction;
 import google.registry.monitoring.whitebox.WhiteboxModule;
 import google.registry.rde.BrdaCopyAction;
-import google.registry.rde.RdeContactImportAction;
-import google.registry.rde.RdeHostImportAction;
 import google.registry.rde.RdeModule;
 import google.registry.rde.RdeReportAction;
 import google.registry.rde.RdeReporter;
 import google.registry.rde.RdeStagingAction;
 import google.registry.rde.RdeUploadAction;
+import google.registry.rde.imports.RdeContactImportAction;
+import google.registry.rde.imports.RdeHostImportAction;
+import google.registry.rde.imports.RdeImportsModule;
 import google.registry.request.RequestComponentBuilder;
 import google.registry.request.RequestModule;
 import google.registry.request.RequestScope;
@@ -74,6 +76,7 @@ import google.registry.tmch.TmchSmdrlAction;
         AsyncFlowsModule.class,
         BackendModule.class,
         BackupModule.class,
+        BatchModule.class,
         CloudDnsWriterModule.class,
         CronModule.class,
         DnsModule.class,
@@ -82,6 +85,7 @@ import google.registry.tmch.TmchSmdrlAction;
         ExportRequestModule.class,
         MapreduceModule.class,
         RdeModule.class,
+        RdeImportsModule.class,
         RequestModule.class,
         SheetModule.class,
         TmchModule.class,

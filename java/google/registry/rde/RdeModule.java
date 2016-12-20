@@ -28,7 +28,7 @@ import org.joda.time.DateTime;
 /**
  * Dagger module for RDE package.
  *
- * @see "google.registry.module.backend.BackendComponent"
+ * @see "google.registry.module.backend.BackendRequestComponent"
  */
 @Module
 public final class RdeModule {
@@ -52,11 +52,5 @@ public final class RdeModule {
   @Named("rde-report")
   static Queue provideQueueRdeReport() {
     return getQueue("rde-report");
-  }
-
-  @Provides
-  @Parameter(PATH)
-  static String providePath(HttpServletRequest req) {
-    return RequestParameters.extractRequiredParameter(req, PATH);
   }
 }
