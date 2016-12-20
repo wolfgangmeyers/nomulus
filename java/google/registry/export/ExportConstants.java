@@ -18,78 +18,16 @@ import static com.google.common.base.Predicates.not;
 import static google.registry.model.EntityClasses.CLASS_TO_KIND_FUNCTION;
 import static google.registry.util.TypeUtils.hasAnnotation;
 
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Ordering;
 import google.registry.model.EntityClasses;
-import google.registry.model.ImmutableObject;
 import google.registry.model.annotations.NotBackedUp;
+import google.registry.model.annotations.ReportedOn;
 import google.registry.model.annotations.VirtualEntity;
-import google.registry.model.billing.BillingEvent.Cancellation;
-import google.registry.model.billing.BillingEvent.Modification;
-import google.registry.model.billing.BillingEvent.OneTime;
-import google.registry.model.billing.BillingEvent.Recurring;
-import google.registry.model.billing.RegistrarCredit;
-import google.registry.model.billing.RegistrarCreditBalance;
-import google.registry.model.contact.ContactResource;
-import google.registry.model.domain.DomainBase;
-import google.registry.model.domain.LrpTokenEntity;
-import google.registry.model.host.HostResource;
-import google.registry.model.icann.IcannDnsReportingFields;
-import google.registry.model.icann.IcannRegistrarReportingFields;
-import google.registry.model.icann.IcannTldReportingFields;
-import google.registry.model.index.DomainApplicationIndex;
-import google.registry.model.index.EppResourceIndex;
-import google.registry.model.index.ForeignKeyIndex.ForeignKeyContactIndex;
-import google.registry.model.index.ForeignKeyIndex.ForeignKeyDomainIndex;
-import google.registry.model.index.ForeignKeyIndex.ForeignKeyHostIndex;
-import google.registry.model.pricing.PricingCategory;
-import google.registry.model.registrar.Registrar;
-import google.registry.model.registrar.RegistrarContact;
-import google.registry.model.registry.Registry;
-import google.registry.model.registry.label.CategorizedPremiumList;
-import google.registry.model.registry.label.PremiumList;
-import google.registry.model.registry.label.PremiumList.PremiumListEntry;
-import google.registry.model.reporting.HistoryEntry;
-import google.registry.model.user.User;
 
 /** Constants related to export code. */
 public final class ExportConstants {
-
-  /** Set of entity classes to export into BigQuery for reporting purposes. */
-  @VisibleForTesting
-  @SuppressWarnings("unchecked") // varargs
-  static final ImmutableSet<Class<? extends ImmutableObject>> REPORTING_ENTITY_CLASSES =
-      ImmutableSet.of(
-          CategorizedPremiumList.class,
-          CategorizedPremiumList.CategorizedListEntry.class,
-          Cancellation.class,
-          ContactResource.class,
-          DomainApplicationIndex.class,
-          DomainBase.class,
-          EppResourceIndex.class,
-          ForeignKeyContactIndex.class,
-          ForeignKeyDomainIndex.class,
-          ForeignKeyHostIndex.class,
-          HistoryEntry.class,
-          HostResource.class,
-          IcannDnsReportingFields.class,
-          IcannRegistrarReportingFields.class,
-          IcannTldReportingFields.class,
-          LrpTokenEntity.class,
-          Modification.class,
-          OneTime.class,
-          PremiumList.class,
-          PremiumListEntry.class,
-          PricingCategory.class,
-          Recurring.class,
-          Registrar.class,
-          RegistrarContact.class,
-          RegistrarCredit.class,
-          RegistrarCreditBalance.class,
-          Registry.class,
-          User.class);
 
   /** Returns the names of kinds to include in datastore backups. */
   public static ImmutableSet<String> getBackupKinds() {
@@ -104,7 +42,9 @@ public final class ExportConstants {
 
   /** Returns the names of kinds to import into reporting tools (e.g. BigQuery). */
   public static ImmutableSet<String> getReportingKinds() {
-    return FluentIterable.from(REPORTING_ENTITY_CLASSES)
+    return FluentIterable.from(EntityClasses.ALL_CLASSES)
+        .filter(hasAnnotation(ReportedOn.class))
+        .filter(not(hasAnnotation(VirtualEntity.class)))
         .transform(CLASS_TO_KIND_FUNCTION)
         .toSortedSet(Ordering.natural());
   }

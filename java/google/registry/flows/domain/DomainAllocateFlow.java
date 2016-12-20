@@ -37,7 +37,6 @@ import static google.registry.util.CollectionUtils.isNullOrEmpty;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
 import static google.registry.util.DateTimeUtils.leapSafeAddYears;
 
-import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InternetDomainName;
@@ -52,7 +51,7 @@ import google.registry.flows.FlowModule.ClientId;
 import google.registry.flows.FlowModule.Superuser;
 import google.registry.flows.FlowModule.TargetId;
 import google.registry.flows.TransactionalFlow;
-import google.registry.flows.domain.DomainPricingLogic.EppCommandOperations;
+import google.registry.flows.domain.DomainPricingLogic.FeesAndCredits;
 import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Flag;
@@ -177,7 +176,6 @@ public class DomainAllocateFlow implements TransactionalFlow {
         .setNameservers(command.getNameservers())
         .setContacts(command.getContacts())
         .build();
-    handleExtraFlowLogic(registry.getTldStr(), years, historyEntry, newDomain, now);
     entitiesToSave.add(
         newDomain,
         buildApplicationHistory(application, now),
@@ -363,22 +361,6 @@ public class DomainAllocateFlow implements TransactionalFlow {
         && !matchesAnchorTenantReservation(domainName, authInfoToken);
   }
 
-  private void handleExtraFlowLogic(
-      String tld, int years, HistoryEntry historyEntry, DomainResource newDomain, DateTime now)
-          throws EppException {
-    Optional<RegistryExtraFlowLogic> extraFlowLogic =
-        RegistryExtraFlowLogicProxy.newInstanceForTld(tld);
-    if (extraFlowLogic.isPresent()) {
-      extraFlowLogic.get().performAdditionalDomainAllocateLogic(
-          newDomain,
-          clientId,
-          now,
-          years,
-          eppInput,
-          historyEntry);
-    }
-  }
-
   private void enqueueTasks(AllocateCreateExtension allocateCreate, DomainResource newDomain) {
     if (newDomain.shouldPublishToDns()) {
       DnsQueue.create().addDomainRefreshTask(newDomain.getFullyQualifiedDomainName());
@@ -390,13 +372,12 @@ public class DomainAllocateFlow implements TransactionalFlow {
 
   private ImmutableList<FeeTransformResponseExtension> createResponseExtensions(
       DateTime now, Registry registry, int years) throws EppException {
-    EppCommandOperations commandOperations =
-        pricingLogic.getCreatePrice(registry, targetId, now, years);
+    FeesAndCredits feesAndCredits = pricingLogic.getCreatePrice(registry, targetId, now, years);
     FeeCreateCommandExtension feeCreate =
         eppInput.getSingleExtension(FeeCreateCommandExtension.class);
     return (feeCreate == null)
         ? ImmutableList.<FeeTransformResponseExtension>of()
-        : ImmutableList.of(createFeeCreateResponse(feeCreate, commandOperations));
+        : ImmutableList.of(createFeeCreateResponse(feeCreate, feesAndCredits));
   }
 
   /** Domain application with specific ROID does not exist. */

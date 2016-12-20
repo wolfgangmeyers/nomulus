@@ -44,7 +44,6 @@ import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.registry.label.ReservedList.matchesAnchorTenantReservation;
 
 import com.google.common.base.Function;
-import com.google.common.base.Optional;
 import com.google.common.collect.FluentIterable;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -64,7 +63,7 @@ import google.registry.flows.custom.DomainApplicationCreateFlowCustomLogic.After
 import google.registry.flows.custom.DomainApplicationCreateFlowCustomLogic.BeforeResponseParameters;
 import google.registry.flows.custom.DomainApplicationCreateFlowCustomLogic.BeforeResponseReturnData;
 import google.registry.flows.custom.EntityChanges;
-import google.registry.flows.domain.DomainPricingLogic.EppCommandOperations;
+import google.registry.flows.domain.DomainPricingLogic.FeesAndCredits;
 import google.registry.model.ImmutableObject;
 import google.registry.model.domain.DomainApplication;
 import google.registry.model.domain.DomainCommand.Create;
@@ -201,7 +200,7 @@ public final class DomainApplicationCreateFlow implements TransactionalFlow {
     String tld = domainName.parent().toString();
     checkAllowedAccessToTld(clientId, tld);
     Registry registry = Registry.get(tld);
-    EppCommandOperations commandOperations =
+    FeesAndCredits feesAndCredits =
         pricingLogic.getCreatePrice(registry, targetId, now, command.getPeriod().getValue());
     // Superusers can create reserved domains, force creations on domains that require a claims
     // notice without specifying a claims key, and override blocks on registering premium domains.
@@ -224,7 +223,7 @@ public final class DomainApplicationCreateFlow implements TransactionalFlow {
     }
     FeeCreateCommandExtension feeCreate =
         eppInput.getSingleExtension(FeeCreateCommandExtension.class);
-    validateFeeChallenge(targetId, tld, now, feeCreate, commandOperations.getTotalCost());
+    validateFeeChallenge(targetId, tld, now, feeCreate, feesAndCredits.getTotalCost());
     SecDnsCreateExtension secDnsCreate =
         validateSecDnsExtension(eppInput.getSingleExtension(SecDnsCreateExtension.class));
     customLogic.afterValidation(
@@ -260,8 +259,6 @@ public final class DomainApplicationCreateFlow implements TransactionalFlow {
         .build();
     HistoryEntry historyEntry = buildHistory(newApplication.getRepoId(), command.getPeriod(), now);
     ImmutableSet.Builder<ImmutableObject> entitiesToSave = new ImmutableSet.Builder<>();
-    handleExtraFlowLogic(
-        registry.getTldStr(), command.getPeriod().getValue(), historyEntry, newApplication);
     entitiesToSave.add(
         newApplication,
         historyEntry,
@@ -292,7 +289,7 @@ public final class DomainApplicationCreateFlow implements TransactionalFlow {
                         newApplication.getForeignKey(),
                         launchCreate.getPhase(),
                         feeCreate,
-                        commandOperations))
+                        feesAndCredits))
                 .build());
     return responseBuilder
         .setResData(responseData.resData())
@@ -366,11 +363,11 @@ public final class DomainApplicationCreateFlow implements TransactionalFlow {
         .build();
   }
 
-  private ImmutableList<ResponseExtension> createResponseExtensions(
+  private static ImmutableList<ResponseExtension> createResponseExtensions(
       String applicationId,
       LaunchPhase launchPhase,
       FeeTransformCommandExtension feeCreate,
-      EppCommandOperations commandOperations) {
+      FeesAndCredits feesAndCredits) {
     ImmutableList.Builder<ResponseExtension> responseExtensionsBuilder =
         new ImmutableList.Builder<>();
     responseExtensionsBuilder.add(new LaunchCreateResponseExtension.Builder()
@@ -378,24 +375,9 @@ public final class DomainApplicationCreateFlow implements TransactionalFlow {
         .setApplicationId(applicationId)
         .build());
     if (feeCreate != null) {
-      responseExtensionsBuilder.add(createFeeCreateResponse(feeCreate, commandOperations));
+      responseExtensionsBuilder.add(createFeeCreateResponse(feeCreate, feesAndCredits));
     }
     return responseExtensionsBuilder.build();
-  }
-
-  private void handleExtraFlowLogic(
-      String tld, int years, HistoryEntry historyEntry, DomainApplication newApplication)
-          throws EppException {
-    Optional<RegistryExtraFlowLogic> extraFlowLogic =
-        RegistryExtraFlowLogicProxy.newInstanceForTld(tld);
-    if (extraFlowLogic.isPresent()) {
-      extraFlowLogic.get().performAdditionalApplicationCreateLogic(
-          newApplication,
-          clientId,
-          years,
-          eppInput,
-          historyEntry);
-    }
   }
 
   /** Landrush applications are disallowed during sunrise. */

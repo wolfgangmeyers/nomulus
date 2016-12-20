@@ -24,11 +24,13 @@ import com.googlecode.objectify.condition.IfNull;
 import google.registry.model.Buildable;
 import google.registry.model.EppResource;
 import google.registry.model.ImmutableObject;
+import google.registry.model.annotations.ReportedOn;
 import google.registry.model.domain.Period;
 import google.registry.model.eppcommon.Trid;
 import org.joda.time.DateTime;
 
 /** A record of an EPP command that mutated a resource. */
+@ReportedOn
 @Entity
 public class HistoryEntry extends ImmutableObject implements Buildable {
 
@@ -62,6 +64,8 @@ public class HistoryEntry extends ImmutableObject implements Buildable {
     HOST_DELETE_FAILURE,
     HOST_PENDING_DELETE,
     HOST_UPDATE,
+    /** Resource was created by an escrow file import. */
+    RDE_IMPORT,
     /**
      * A synthetic history entry created by a tool or back-end migration script outside of the scope
      * of usual EPP flows. These are sometimes needed to serve as parents for billing events or poll

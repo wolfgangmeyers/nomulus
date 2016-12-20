@@ -149,11 +149,6 @@ public final class DonutsRegistryConfig implements RegistryConfig {
   }
 
   @Override
-  public String getDocumentationProjectTitle() {
-    return "Donuts Registry";
-  }
-
-  @Override
   public int getEppResourceIndexBucketCount() {
     return 997;  // decrease this and the world ends
   }

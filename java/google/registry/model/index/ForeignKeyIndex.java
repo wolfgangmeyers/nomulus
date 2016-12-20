@@ -29,6 +29,7 @@ import com.googlecode.objectify.annotation.Id;
 import com.googlecode.objectify.annotation.Index;
 import google.registry.model.BackupGroupRoot;
 import google.registry.model.EppResource;
+import google.registry.model.annotations.ReportedOn;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.host.HostResource;
@@ -45,16 +46,19 @@ public abstract class ForeignKeyIndex<E extends EppResource> extends BackupGroup
 
   /** The {@link ForeignKeyIndex} type for {@link ContactResource} entities. */
   @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
+  @ReportedOn
   @Entity
   public static class ForeignKeyContactIndex extends ForeignKeyIndex<ContactResource> {}
 
   /** The {@link ForeignKeyIndex} type for {@link DomainResource} entities. */
   @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
+  @ReportedOn
   @Entity
   public static class ForeignKeyDomainIndex extends ForeignKeyIndex<DomainResource> {}
 
   /** The {@link ForeignKeyIndex} type for {@link HostResource} entities. */
   @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
+  @ReportedOn
   @Entity
   public static class ForeignKeyHostIndex extends ForeignKeyIndex<HostResource> {}
 
@@ -122,7 +126,7 @@ public abstract class ForeignKeyIndex<E extends EppResource> extends BackupGroup
   /**
    * Loads a {@link Key} to an {@link EppResource} from the datastore by foreign key.
    *
-   * <p>Returns absent if no foreign key index with this foreign key was ever created, or if the
+   * <p>Returns null if no foreign key index with this foreign key was ever created, or if the
    * most recently created foreign key index was deleted before time "now". This method does not
    * actually check that the referenced resource actually exists. However, for normal epp resources,
    * it is safe to assume that the referenced resource exists if the foreign key index does.
