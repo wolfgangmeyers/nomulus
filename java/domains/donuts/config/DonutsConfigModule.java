@@ -477,8 +477,8 @@ public final class DonutsConfigModule {
   /**
    * Returns the Google Cloud Storage bucket for importing escrow files.
    *
-   * @see google.registry.rde.RdeContactImportAction
-   * @see google.registry.rde.RdeHostImportAction
+   * @see google.registry.rde.imports.RdeContactImportAction
+   * @see google.registry.rde.imports.RdeHostImportAction
    */
   @Provides
   @Config("rdeImportBucket")
@@ -730,7 +730,8 @@ public final class DonutsConfigModule {
   @Provides
   @Config("rdapLinkBase")
   public static String provideRdapLinkBase() {
-    return "https://nic.google/rdap/";
+    // TODO: We need to replace this URL with correct one once we know what it will be.  Identified in https://donuts.atlassian.net/browse/MERC-729
+    return "https://<CHANGE-ME>/rdap/";
   }
 
   /**
@@ -760,6 +761,7 @@ public final class DonutsConfigModule {
     switch (environment) {
       case PRODUCTION:
         return ImmutableMap.of(
+            // TODO: Need to swap out "Charleston Registry" - https://donuts.atlassian.net/browse/MERC-729
             CurrencyUnit.USD, "charlestonregistryUSD",
             CurrencyUnit.JPY, "charlestonregistryJPY");
       default:
