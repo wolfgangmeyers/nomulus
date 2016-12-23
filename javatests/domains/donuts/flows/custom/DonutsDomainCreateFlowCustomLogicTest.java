@@ -10,6 +10,7 @@ import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.launch.LaunchCreateExtension;
 import google.registry.model.domain.launch.LaunchPhase;
 import google.registry.model.eppinput.EppInput;
+import google.registry.model.external.BlockedLabel;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.smd.AbstractSignedMark;
 import google.registry.testing.AppEngineRule;
@@ -25,6 +26,7 @@ import org.mockito.runners.MockitoJUnitRunner;
 import static domains.donuts.config.DonutsConfigModule.provideDpmlTld;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistActiveDomain;
+import static google.registry.testing.DatastoreHelper.persistResource;
 import static org.mockito.Mockito.doReturn;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -102,8 +104,12 @@ public class DonutsDomainCreateFlowCustomLogicTest {
 
   @Test
   public void testBeforeSave_LabelBlockedByDpml() throws Exception {
-    createTld(provideDpmlTld());
-    persistActiveDomain("sld." + provideDpmlTld());
+    // Note: This test will need to be updated once the DPML lookup has been switched to use internal
+    persistResource(new BlockedLabel.Builder()
+        .setLabel("sld")
+        .setDateCreated(DateTime.now())
+        .setDateModified(DateTime.now())
+        .build());
     // Block the creation of a label if it exists in the DPML tld
     thrown.expect(DpmlBlockedException.class);
     tested.beforeSave(beforeParameters);

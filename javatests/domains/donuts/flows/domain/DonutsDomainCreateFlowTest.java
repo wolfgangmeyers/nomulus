@@ -4,7 +4,10 @@ import com.google.appengine.labs.repackaged.com.google.common.collect.ImmutableM
 import domains.donuts.flows.custom.DonutsDomainCreateFlowCustomLogic.DpmlBlockedException;
 import domains.donuts.flows.custom.DonutsDomainCreateFlowCustomLogic.SignedMarksRequiredException;
 import google.registry.model.eppoutput.Result;
+import google.registry.model.external.BlockedLabel;
+import org.joda.time.DateTime;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 
 import static com.google.common.truth.Truth.assertThat;
@@ -12,6 +15,7 @@ import static domains.donuts.config.DonutsConfigModule.provideDpmlTld;
 import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistActiveDomain;
+import static google.registry.testing.DatastoreHelper.persistResource;
 
 public class DonutsDomainCreateFlowTest extends DonutsDomainCreateFlowTestCase {
 
@@ -26,9 +30,24 @@ public class DonutsDomainCreateFlowTest extends DonutsDomainCreateFlowTestCase {
   }
 
   @Test
-  public void testCreateBlockedByDpml() throws Exception {
+  @Ignore("This test validates internal dpml blocks which will need to be configured and added once " +
+      "ALL tlds are ran from Nomulus. Until then the external block will be used.")
+  public void testCreate_internal_BlockedByDpml() throws Exception {
     setEppInput("domain_create.xml");
     persistActiveDomain("example." + dpml_tld);
+    thrown.expect(DpmlBlockedException.class, "The requested domain name is blocked by DPML");
+    runDonutsFlow();
+  }
+
+  @Test
+  public void testCreate_external_BlockedByDpml() throws Exception {
+    setEppInput("domain_create.xml");
+    persistResource(
+        new BlockedLabel.Builder()
+            .setLabel("example")
+            .setDateCreated(DateTime.now())
+            .setDateModified(DateTime.now())
+            .build());
     thrown.expect(DpmlBlockedException.class, "The requested domain name is blocked by DPML");
     runDonutsFlow();
   }

@@ -16,6 +16,8 @@ package domains.donuts.module.backend;
 
 import dagger.Module;
 import dagger.Subcomponent;
+import domains.donuts.external.BlockedLabelQueueAction;
+import domains.donuts.external.BlockedLabelWorkerAction;
 import google.registry.backup.BackupModule;
 import google.registry.backup.CommitLogCheckpointAction;
 import google.registry.backup.DeleteOldCommitLogsAction;
@@ -124,6 +126,8 @@ interface BackendRequestComponent {
   TmchSmdrlAction tmchSmdrlAction();
   UpdateSnapshotViewAction updateSnapshotViewAction();
   VerifyEntityIntegrityAction verifyEntityIntegrityAction();
+  BlockedLabelQueueAction blockedLabelQueueAction();
+  BlockedLabelWorkerAction blockedLabelWorkerAction();
 
   @Subcomponent.Builder
   abstract class Builder implements RequestComponentBuilder<BackendRequestComponent, Builder> {

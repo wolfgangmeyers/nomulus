@@ -7,6 +7,7 @@ import google.registry.flows.custom.DomainCheckFlowCustomLogic.BeforeResponseRet
 import google.registry.model.eppinput.EppInput;
 import google.registry.model.eppoutput.CheckData;
 import google.registry.model.eppoutput.EppResponse;
+import google.registry.model.external.BlockedLabel;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.label.ReservedList;
 import google.registry.testing.AppEngineRule;
@@ -93,14 +94,18 @@ public class DonutsDomainCheckFlowCustomLogicTest {
   }
 
   @Test
-  public void testBeforeResponse_DpmlBlocked() throws Exception {
+  public void testBeforeResponse_external_DpmlBlocked() throws Exception {
+    // Note: This test will need to be updated once the DPML lookup has been switched to use internal
     doReturn(ImmutableList.of(domainCheck)).when(parameters).domainChecks();
     doReturn(true).when(checkName).getAvail();
     final ReservedList reservedList = persistReservedList("tld", "sld,UNRESERVED");
     final Registry tld = Registry.get("tld").asBuilder().setReservedLists(reservedList).build();
     persistResource(tld);
-    createTld(provideDpmlTld());
-    persistActiveDomain("sld." + provideDpmlTld());
+    persistResource(new BlockedLabel.Builder()
+        .setLabel("sld")
+        .setDateCreated(DateTime.now())
+        .setDateModified(DateTime.now())
+        .build());
     final BeforeResponseReturnData result = tested.beforeResponse(parameters);
     assertThat(result.domainChecks()).hasSize(1);
     assertThat(result.domainChecks().get(0).getReason()).isEqualTo("DPML block");

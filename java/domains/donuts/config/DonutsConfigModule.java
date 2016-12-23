@@ -26,6 +26,8 @@ import java.net.URL;
 import javax.annotation.Nullable;
 import javax.inject.Singleton;
 
+import domains.donuts.external.ExternalDpmlLookup;
+import domains.donuts.flows.DpmlLookup;
 import google.registry.config.ConfigModule.Config;
 import google.registry.config.ProductionRegistryConfigExample;
 import google.registry.config.RdapNoticeDescriptor;
@@ -84,6 +86,12 @@ public final class DonutsConfigModule {
   @Config("dpmlTld")
   public static String provideDpmlTld() {
     return "dpml.zone";
+  }
+
+  @Provides
+  @Config("dpmlLookup")
+  public static DpmlLookup provideDpmlLookup() {
+    return new ExternalDpmlLookup();
   }
 
   @Provides

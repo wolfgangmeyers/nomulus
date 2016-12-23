@@ -29,8 +29,5 @@ public abstract class DonutsResourceFlowTestCase<
             .build()
             .flowRunner()
             .run();
-//            .getResponse()
-//            .getResponseData()
-//            .get(0);
   }
 }

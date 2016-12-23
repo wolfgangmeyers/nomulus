@@ -14,6 +14,9 @@
 
 package domains.donuts.module.backend;
 
+import static domains.donuts.external.BlockedLabelConstants.ACTION_PARAM;
+import static domains.donuts.external.BlockedLabelConstants.ADDED_TO_QUEUE;
+import static domains.donuts.external.BlockedLabelConstants.LABEL_PARAM;
 import static google.registry.model.registry.Registries.assertTldExists;
 import static google.registry.request.RequestParameters.extractOptionalDatetimeParameter;
 import static google.registry.request.RequestParameters.extractRequiredParameter;
@@ -21,6 +24,8 @@ import static google.registry.request.RequestParameters.extractRequiredParameter
 import com.google.common.base.Optional;
 import dagger.Module;
 import dagger.Provides;
+import domains.donuts.external.BlockedLabelConstants;
+import domains.donuts.external.BlockedLabelConstants.Action;
 import google.registry.batch.ExpandRecurringBillingEventsAction;
 import google.registry.request.Parameter;
 import google.registry.request.RequestParameters;
@@ -45,5 +50,23 @@ public class BackendModule {
   static Optional<DateTime> provideCursorTime(HttpServletRequest req) {
     return extractOptionalDatetimeParameter(
         req, ExpandRecurringBillingEventsAction.PARAM_CURSOR_TIME);
+  }
+
+  @Provides
+  @Parameter(LABEL_PARAM)
+  static String[] provideLabels(HttpServletRequest req) {
+    return req.getParameterValues(LABEL_PARAM);
+  }
+
+  @Provides
+  @Parameter(ACTION_PARAM)
+  static String provideAction(HttpServletRequest req) {
+    return req.getParameter(ACTION_PARAM);
+  }
+
+  @Provides
+  @Parameter(ADDED_TO_QUEUE)
+  static DateTime providedAddedToQueue(HttpServletRequest req) {
+    return DateTime.parse(req.getParameter(ADDED_TO_QUEUE));
   }
 }

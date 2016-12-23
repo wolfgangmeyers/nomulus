@@ -32,6 +32,16 @@
   </queue>
 
   <queue>
+    <name>queue-blocked-label</name>
+    <rate>100/s</rate>
+    <bucket-size>100</bucket-size>
+    <retry-parameters>
+      <min-backoff-seconds>1</min-backoff-seconds>
+      <max-backoff-seconds>60</max-backoff-seconds>
+    </retry-parameters>
+  </queue>
+
+  <queue>
     <name>export-commits</name>
     <rate>10/s</rate>
     <bucket-size>100</bucket-size>

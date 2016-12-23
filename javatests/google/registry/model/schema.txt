@@ -377,6 +377,12 @@ class google.registry.model.export.LogsExportCursor {
   java.util.List<java.lang.String> filesPendingImport;
   java.util.Set<google.registry.model.common.PersistedRangeLong> exportedRanges;
 }
+class google.registry.model.external.BlockedLabel {
+  @Id java.lang.String label;
+  boolean deleted;
+  org.joda.time.DateTime dateCreated;
+  org.joda.time.DateTime dateModified;
+}
 class google.registry.model.host.HostResource {
   @Id java.lang.String repoId;
   com.google.common.collect.ImmutableSortedMap<org.joda.time.DateTime, com.googlecode.objectify.Key<google.registry.model.ofy.CommitLogManifest>> revisions;

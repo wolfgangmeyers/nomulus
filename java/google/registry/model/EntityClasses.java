@@ -17,6 +17,7 @@ package google.registry.model;
 import com.google.common.base.Function;
 import com.google.common.collect.ImmutableSet;
 import com.googlecode.objectify.Key;
+import google.registry.model.external.BlockedLabel;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.RegistrarBillingEntry;
 import google.registry.model.billing.RegistrarCredit;
@@ -77,6 +78,7 @@ public final class EntityClasses {
           BillingEvent.Modification.class,
           BillingEvent.OneTime.class,
           BillingEvent.Recurring.class,
+          BlockedLabel.class,
           CategorizedPremiumList.class,
           CategorizedPremiumList.CategorizedListEntry.class,
           ClaimsListShard.class,

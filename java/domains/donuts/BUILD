@@ -6,6 +6,7 @@ java_library(
     name = "donuts",
     srcs = glob([
         "config/*.java",
+        "external/*.java",
         "flows/**/*.java",
         "keyring/*.java",
     ]),
@@ -23,6 +24,7 @@ java_library(
         "//java/google/registry/model",
         "//java/google/registry/pricing",
         "//java/google/registry/request",
+        "//java/google/registry/util",
         "//third_party/java/appengine:appengine-api",
         "//third_party/java/bouncycastle",
         "//third_party/java/bouncycastle_bcpg",
@@ -30,6 +32,7 @@ java_library(
         "//third_party/java/joda_money",
         "//third_party/java/joda_time",
         "//third_party/java/jsr305_annotations",
+        "//third_party/java/objectify:objectify-v4_1",
         "//third_party/java/servlet/servlet_api",
     ],
 )

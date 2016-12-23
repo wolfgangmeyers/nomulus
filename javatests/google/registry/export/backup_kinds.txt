@@ -1,3 +1,4 @@
+BlockedLabel
 Cancellation
 CategorizedListEntry
 CategorizedPremiumList
