@@ -48,12 +48,24 @@ import google.registry.flows.domain.DomainApplicationCreateFlow.LandrushApplicat
 import google.registry.flows.domain.DomainApplicationCreateFlow.NoticeCannotBeUsedWithSignedMarkException;
 import google.registry.flows.domain.DomainApplicationCreateFlow.SunriseApplicationDisallowedDuringLandrushException;
 import google.registry.flows.domain.DomainApplicationCreateFlow.UncontestedSunriseApplicationBlockedInLandrushException;
+import google.registry.flows.domain.DomainFlowTmchUtils.Base64RequiredForEncodedSignedMarksException;
+import google.registry.flows.domain.DomainFlowTmchUtils.NoMarksFoundMatchingDomainException;
+import google.registry.flows.domain.DomainFlowTmchUtils.SignedMarkCertificateExpiredException;
+import google.registry.flows.domain.DomainFlowTmchUtils.SignedMarkCertificateInvalidException;
+import google.registry.flows.domain.DomainFlowTmchUtils.SignedMarkCertificateNotYetValidException;
+import google.registry.flows.domain.DomainFlowTmchUtils.SignedMarkCertificateRevokedException;
+import google.registry.flows.domain.DomainFlowTmchUtils.SignedMarkCertificateSignatureException;
+import google.registry.flows.domain.DomainFlowTmchUtils.SignedMarkEncodingErrorException;
+import google.registry.flows.domain.DomainFlowTmchUtils.SignedMarkParsingErrorException;
+import google.registry.flows.domain.DomainFlowTmchUtils.SignedMarkRevokedErrorException;
+import google.registry.flows.domain.DomainFlowTmchUtils.SignedMarkSignatureException;
+import google.registry.flows.domain.DomainFlowTmchUtils.SignedMarksMustBeEncodedException;
+import google.registry.flows.domain.DomainFlowTmchUtils.TooManySignedMarksException;
 import google.registry.flows.domain.DomainFlowUtils.AcceptedTooLongAgoException;
 import google.registry.flows.domain.DomainFlowUtils.BadCommandForRegistryPhaseException;
 import google.registry.flows.domain.DomainFlowUtils.BadDomainNameCharacterException;
 import google.registry.flows.domain.DomainFlowUtils.BadDomainNamePartsCountException;
 import google.registry.flows.domain.DomainFlowUtils.BadPeriodUnitException;
-import google.registry.flows.domain.DomainFlowUtils.Base64RequiredForEncodedSignedMarksException;
 import google.registry.flows.domain.DomainFlowUtils.ClaimsPeriodEndedException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyUnitMismatchException;
 import google.registry.flows.domain.DomainFlowUtils.CurrencyValueScaleException;
@@ -79,24 +91,12 @@ import google.registry.flows.domain.DomainFlowUtils.MissingClaimsNoticeException
 import google.registry.flows.domain.DomainFlowUtils.MissingContactTypeException;
 import google.registry.flows.domain.DomainFlowUtils.NameserversNotAllowedException;
 import google.registry.flows.domain.DomainFlowUtils.NameserversNotSpecifiedException;
-import google.registry.flows.domain.DomainFlowUtils.NoMarksFoundMatchingDomainException;
 import google.registry.flows.domain.DomainFlowUtils.NotAuthorizedForTldException;
 import google.registry.flows.domain.DomainFlowUtils.PremiumNameBlockedException;
 import google.registry.flows.domain.DomainFlowUtils.RegistrantNotAllowedException;
-import google.registry.flows.domain.DomainFlowUtils.SignedMarkCertificateExpiredException;
-import google.registry.flows.domain.DomainFlowUtils.SignedMarkCertificateInvalidException;
-import google.registry.flows.domain.DomainFlowUtils.SignedMarkCertificateNotYetValidException;
-import google.registry.flows.domain.DomainFlowUtils.SignedMarkCertificateRevokedException;
-import google.registry.flows.domain.DomainFlowUtils.SignedMarkCertificateSignatureException;
-import google.registry.flows.domain.DomainFlowUtils.SignedMarkEncodingErrorException;
-import google.registry.flows.domain.DomainFlowUtils.SignedMarkParsingErrorException;
-import google.registry.flows.domain.DomainFlowUtils.SignedMarkRevokedErrorException;
-import google.registry.flows.domain.DomainFlowUtils.SignedMarkSignatureException;
-import google.registry.flows.domain.DomainFlowUtils.SignedMarksMustBeEncodedException;
 import google.registry.flows.domain.DomainFlowUtils.TldDoesNotExistException;
 import google.registry.flows.domain.DomainFlowUtils.TooManyDsRecordsException;
 import google.registry.flows.domain.DomainFlowUtils.TooManyNameserversException;
-import google.registry.flows.domain.DomainFlowUtils.TooManySignedMarksException;
 import google.registry.flows.domain.DomainFlowUtils.TrailingDashException;
 import google.registry.flows.domain.DomainFlowUtils.UnexpectedClaimsNoticeException;
 import google.registry.flows.domain.DomainFlowUtils.UnsupportedFeeAttributeException;
@@ -110,8 +110,6 @@ import google.registry.model.domain.launch.LaunchNotice;
 import google.registry.model.domain.launch.LaunchPhase;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.domain.secdns.DelegationSignerData;
-import google.registry.model.eppoutput.CreateData.DomainCreateData;
-import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
@@ -119,7 +117,6 @@ import google.registry.model.registry.label.ReservedList;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.smd.SignedMarkRevocationList;
 import google.registry.testing.DatastoreHelper;
-import google.registry.testing.RegistryConfigRule;
 import google.registry.tmch.TmchCertificateAuthority;
 import java.util.Collections;
 import java.util.Comparator;
@@ -130,7 +127,6 @@ import org.joda.time.DateTime;
 import org.joda.time.Interval;
 import org.junit.Before;
 import org.junit.Ignore;
-import org.junit.Rule;
 import org.junit.Test;
 
 /** Unit tests for {@link DomainApplicationCreateFlow}. */
@@ -138,9 +134,6 @@ public class DomainApplicationCreateFlowTest
     extends ResourceFlowTestCase<DomainApplicationCreateFlow, DomainApplication> {
 
   private static final String CLAIMS_KEY = "2013041500/2/6/9/rJ1NrDO92vDsAzf7EQzgjX4R0000000001";
-
-  @Rule
-  public final RegistryConfigRule configRule = new RegistryConfigRule();
 
   /** This is the id of the SMD stored in "domain_create_sunrise_encoded_signed_mark.xml". */
   public static final String SMD_ID = "0000001761376042759136-65535";
@@ -157,9 +150,6 @@ public class DomainApplicationCreateFlowTest
     setEppInput("domain_create_sunrise_encoded_signed_mark.xml");
     createTld("tld", TldState.SUNRISE);
     persistResource(Registry.get("tld").asBuilder().setReservedLists(createReservedList()).build());
-    createTld("flags", TldState.LANDRUSH);
-    persistResource(
-        Registry.get("flags").asBuilder().setReservedLists(createReservedList()).build());
     inject.setStaticField(TmchCertificateAuthority.class, "clock", clock);
     clock.setTo(DateTime.parse("2014-09-09T09:09:09Z"));
   }
@@ -287,7 +277,6 @@ public class DomainApplicationCreateFlowTest
     setEppInput("domain_create_sunrush_encoded_signed_mark.xml");
     persistContactsAndHosts();
     clock.advanceOneMilli();
-    clock.setTo(DateTime.parse("2012-07-26T00:01:00Z"));
     clock.setTo(DateTime.parse("2012-07-22T00:01:00Z"));
     thrown.expect(SignedMarkCertificateNotYetValidException.class);
     runFlow();
@@ -296,7 +285,7 @@ public class DomainApplicationCreateFlowTest
   @Test
   @Ignore("I'm not sure how to get this to throw without creating a custom CA / certs")
   public void testFailure_signedMarkCertificateCorrupt() throws Exception {
-    configRule.useTmchProdCert();
+    useTmchProdCert();
     createTld("tld", TldState.SUNRUSH);
     setEppInput("domain_create_sunrush_encoded_signed_mark_certificate_corrupt.xml");
     persistContactsAndHosts();
@@ -307,7 +296,7 @@ public class DomainApplicationCreateFlowTest
 
   @Test
   public void testFailure_signedMarkCertificateSignature() throws Exception {
-    configRule.useTmchProdCert();
+    useTmchProdCert();
     createTld("tld", TldState.SUNRUSH);
     setEppInput("domain_create_sunrush_encoded_signed_mark.xml");
     persistContactsAndHosts();
@@ -1690,23 +1679,5 @@ public class DomainApplicationCreateFlowTest
   public void testFailure_invalidIdnCodePoints() throws Exception {
     // ❤☀☆☂☻♞☯.tld
     doFailingDomainNameTest("xn--k3hel9n7bxlu1e.tld", InvalidIdnDomainLabelException.class);
-  }
-
-  @Test
-  public void testFailure_flags_feeMismatch() throws Exception {
-    persistContactsAndHosts();
-    setEppInput("domain_create_landrush_flags.xml", ImmutableMap.of("FEE", "12"));
-    thrown.expect(FeesMismatchException.class);
-    runFlow();
-  }
-
-  @Test
-  public void testSuccess_flags() throws Exception {
-    persistContactsAndHosts();
-    setEppInput("domain_create_landrush_flags.xml", ImmutableMap.of("FEE", "42"));
-    EppOutput eppOutput = runFlow();
-    String domainNameWithFlagsPrefix =
-        ((DomainCreateData) eppOutput.getResponse().getResponseData().get(0)).name();
-    assertThat(domainNameWithFlagsPrefix).isEqualTo("flag1-flag2-create-42.flags");
   }
 }

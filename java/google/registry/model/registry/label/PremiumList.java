@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.partition;
+import static google.registry.config.RegistryConfig.getDomainLabelListCacheDuration;
 import static google.registry.model.common.EntityGroupRoot.getCrossTldKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
@@ -43,7 +44,6 @@ import com.googlecode.objectify.annotation.Cache;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Parent;
 import com.googlecode.objectify.cmd.Query;
-import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.ImmutableObject;
 import google.registry.model.annotations.ReportedOn;
@@ -67,11 +67,9 @@ import javax.annotation.Nullable;
 public class PremiumList extends BasePremiumList<Money, PremiumList.PremiumListEntry> {
 
   /** Stores the revision key for the set of currently used premium list entry entities. */
-  private static LoadingCache<String, PremiumList> cache = CacheBuilder
-      .newBuilder()
-      .expireAfterWrite(
-          RegistryEnvironment.get().config().getDomainLabelListCacheDuration().getMillis(),
-          MILLISECONDS)
+  private static LoadingCache<String, PremiumList> cache =
+      CacheBuilder.newBuilder()
+      .expireAfterWrite(getDomainLabelListCacheDuration().getMillis(), MILLISECONDS)
       .build(new CacheLoader<String, PremiumList>() {
         @Override
         public PremiumList load(final String listName) {
@@ -101,6 +99,38 @@ public class PremiumList extends BasePremiumList<Money, PremiumList.PremiumListE
       throw new IllegalStateException("Could not load premium list named " + listName);
     }
     return premiumList.get().getPremiumPrice(label);
+  }
+
+  @OnLoad
+  private void loadPremiumListMap() {
+    try {
+      ImmutableMap.Builder<String, PremiumListEntry> entriesMap = new ImmutableMap.Builder<>();
+      if (revisionKey != null) {
+        for (PremiumListEntry entry : loadEntriesForCurrentRevision()) {
+          entriesMap.put(entry.getLabel(), entry);
+        }
+      }
+      premiumListMap = entriesMap.build();
+    } catch (Exception e) {
+      throw new RuntimeException("Could not retrieve entries for premium list " + name, e);
+    }
+  }
+
+  /**
+   * Gets the premium price for the specified label in the current PremiumList, or returns
+   * Optional.absent if there is no premium price.
+   */
+  public Optional<Money> getPremiumPrice(String label) {
+    return Optional.fromNullable(
+        premiumListMap.containsKey(label) ? premiumListMap.get(label).getValue() : null);
+  }
+
+  public Map<String, PremiumListEntry> getPremiumListEntries() {
+    return nullToEmptyImmutableCopy(premiumListMap);
+  }
+
+  public Key<PremiumListRevision> getRevisionKey() {
+    return revisionKey;
   }
 
   /** Returns the PremiumList with the specified name. */

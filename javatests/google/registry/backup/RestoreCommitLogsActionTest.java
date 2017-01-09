@@ -40,7 +40,6 @@ import com.google.common.collect.Lists;
 import com.google.common.primitives.Longs;
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.ObjectifyService;
-import google.registry.config.TestRegistryConfig;
 import google.registry.model.ImmutableObject;
 import google.registry.model.ofy.CommitLogBucket;
 import google.registry.model.ofy.CommitLogCheckpoint;
@@ -50,7 +49,6 @@ import google.registry.model.ofy.CommitLogMutation;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.FakeClock;
 import google.registry.testing.FakeSleeper;
-import google.registry.testing.RegistryConfigRule;
 import google.registry.testing.TestObject;
 import google.registry.util.Retrier;
 import java.io.ByteArrayOutputStream;
@@ -81,9 +79,6 @@ public class RestoreCommitLogsActionTest {
       .withDatastore()
       .build();
 
-  @Rule
-  public final RegistryConfigRule configRule = new RegistryConfigRule();
-
   @Before
   public void init() {
     ObjectifyService.register(TestObject.class);
@@ -96,11 +91,6 @@ public class RestoreCommitLogsActionTest {
     action.diffLister.gcsService = gcsService;
     action.diffLister.gcsBucket = GCS_BUCKET;
     action.diffLister.executor = newDirectExecutorService();
-    configRule.override(new TestRegistryConfig() {
-      @Override
-      public int getCommitLogBucketCount() {
-        return 3;
-      }});
   }
 
   @Test

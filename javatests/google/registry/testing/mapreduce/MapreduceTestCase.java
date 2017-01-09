@@ -15,6 +15,7 @@
 package google.registry.testing.mapreduce;
 
 import static com.google.common.truth.Truth.assertThat;
+import static google.registry.config.RegistryConfig.getEppResourceIndexBucketCount;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -33,7 +34,6 @@ import com.google.appengine.tools.pipeline.impl.servlets.TaskHandler;
 import com.google.apphosting.api.ApiProxy;
 import com.google.common.base.CharMatcher;
 import com.google.common.base.Optional;
-import google.registry.config.RegistryEnvironment;
 import google.registry.mapreduce.MapreduceRunner;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.FakeClock;
@@ -88,8 +88,8 @@ public abstract class MapreduceTestCase<T> extends ShardableTestCase {
   }
 
   protected MapreduceRunner makeDefaultRunner() {
-    int numBuckets = RegistryEnvironment.get().config().getEppResourceIndexBucketCount();
-    return new MapreduceRunner(Optional.<Integer>of(numBuckets), Optional.<Integer>of(1));
+    return new MapreduceRunner(
+        Optional.<Integer>of(getEppResourceIndexBucketCount()), Optional.<Integer>of(1));
   }
 
   protected List<QueueStateInfo.TaskStateInfo> getTasks(String queueName) {
@@ -158,6 +158,12 @@ public abstract class MapreduceTestCase<T> extends ShardableTestCase {
     }
   }
 
+  /**
+   * Executes tasks in the mapreduce queue until all are finished.
+   *
+   * <p>If you are mocking a clock in your tests, use the
+   * {@link #executeTasksUntilEmpty(String, FakeClock)} version instead.
+   */
   protected void executeTasksUntilEmpty(String queueName) throws Exception {
     executeTasksUntilEmpty(queueName, null);
   }
@@ -168,8 +174,8 @@ public abstract class MapreduceTestCase<T> extends ShardableTestCase {
    * <p>Incrementing the clock between tasks is important if tasks have transactions inside the
    * mapper or reducer, which don't have access to the fake clock.
    */
-  protected void
-      executeTasksUntilEmpty(String queueName, @Nullable FakeClock clock) throws Exception {
+  protected void executeTasksUntilEmpty(String queueName, @Nullable FakeClock clock)
+      throws Exception {
     while (true) {
       ofy().clearSessionCache();
       // We have to re-acquire task list every time, because local implementation returns a copy.

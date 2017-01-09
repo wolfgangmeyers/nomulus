@@ -18,7 +18,6 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.collect.Sets.difference;
 import static google.registry.mapreduce.MapreduceRunner.PARAM_DRY_RUN;
 import static google.registry.mapreduce.inputs.EppResourceInputs.createChildEntityInput;
-import static google.registry.model.EppResourceUtils.loadByForeignKey;
 import static google.registry.model.common.Cursor.CursorType.RECURRING_BILLING;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.pricing.PricingEngineProxy.getDomainRenewCost;
@@ -139,7 +138,9 @@ public class ExpandRecurringBillingEventsAction implements Runnable {
       }
       getContext().incrementCounter("Recurring billing events encountered");
       // Ignore any recurring billing events that have yet to apply.
-      if (recurring.getEventTime().isAfter(executeTime)) {
+      if (recurring.getEventTime().isAfter(executeTime)
+          // This second case occurs when a domain is transferred or deleted before first renewal.
+          || recurring.getRecurrenceEndTime().isBefore(recurring.getEventTime())) {
         getContext().incrementCounter("Recurring billing events ignored");
         return;
       }
@@ -165,8 +166,7 @@ public class ExpandRecurringBillingEventsAction implements Runnable {
 
             Iterable<OneTime> oneTimesForDomain = ofy().load()
                 .type(OneTime.class)
-                .ancestor(loadByForeignKey(
-                    DomainResource.class, recurring.getTargetId(), executeTime));
+                .ancestor(recurring.getParentKey().getParent());
 
             // Determine the billing times that already have OneTime events persisted.
             ImmutableSet<DateTime> existingBillingTimes =

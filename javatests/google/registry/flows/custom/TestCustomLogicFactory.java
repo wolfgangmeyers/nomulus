@@ -21,20 +21,14 @@ import google.registry.model.eppinput.EppInput;
 public class TestCustomLogicFactory extends CustomLogicFactory {
 
   @Override
-  public DomainPricingCustomLogic forDomainPricing(
-      EppInput eppInput, SessionMetadata sessionMetadata) {
-    return new TestDomainPricingCustomLogic(eppInput, sessionMetadata);
-  }
-
-  @Override
   public DomainCreateFlowCustomLogic forDomainCreateFlow(
       EppInput eppInput, SessionMetadata sessionMetadata) {
     return new TestDomainCreateFlowCustomLogic(eppInput, sessionMetadata);
   }
 
   @Override
-  public DomainApplicationCreateFlowCustomLogic forDomainApplicationCreateFlow(
+  public DomainPricingCustomLogic forDomainPricing(
       EppInput eppInput, SessionMetadata sessionMetadata) {
-    return new TestDomainApplicationCreateFlowCustomLogic(eppInput, sessionMetadata);
+    return new TestDomainPricingCustomLogic(eppInput, sessionMetadata);
   }
 }
