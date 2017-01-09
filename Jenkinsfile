@@ -1,6 +1,6 @@
 parallel (
     "Gradle": {
-        node {
+        node('main') {
             stage('Gradle - Checkout') {
                 checkout scm
                 sh './gradlew --version'
@@ -28,7 +28,7 @@ parallel (
         }
     },
     "Bazel": {
-        node {
+        node('bazel') {
             stage('Bazel - Checkout') {
                 checkout scm
                 sh 'bazel --batch info'

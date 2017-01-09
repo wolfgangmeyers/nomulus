@@ -967,11 +967,11 @@ public final class RegistryConfig {
     }
 
     private static final String RESERVED_TERMS_EXPORT_DISCLAIMER = ""
-        + "# This list contains reserve terms for the TLD. Other terms may be reserved\n"
-        + "# but not included in this list, including terms EXAMPLE REGISTRY chooses not\n"
-        + "# to publish, and terms that ICANN commonly mandates to be reserved. This\n"
-        + "# list is subject to change and the most up-to-date source is always to\n"
-        + "# check availability directly with the Registry server.\n";
+                                                                       + "# This list contains reserve terms for the TLD. Other terms may be reserved\n"
+                                                                       + "# but not included in this list, including terms EXAMPLE REGISTRY chooses not\n"
+                                                                       + "# to publish, and terms that ICANN commonly mandates to be reserved. This\n"
+                                                                       + "# list is subject to change and the most up-to-date source is always to\n"
+                                                                       + "# check availability directly with the Registry server.\n";
 
     /**
      * Returns the header text at the top of the reserved terms exported list.

@@ -16,13 +16,14 @@
  *
  */
 
-package google.registry.config;
+package domains.donuts.config;
 
+import static com.google.common.truth.Truth.assertThat;
+
+import google.registry.config.RegistryEnvironment;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
-
-import static com.google.common.truth.Truth.assertThat;
 
 /**
  * Unit tests for {@link RegistryEnvironment}.
@@ -32,12 +33,14 @@ public class ConfigModuleTest {
 
   @Test
   public void testProvideSshIdentity() throws Exception {
-    assertThat(ConfigModule.provideSshIdentity()).isEqualTo("mercury-donuts-test@example.test");
+    assertThat(DonutsConfigModule.provideSshIdentity()).isEqualTo("mercury-donuts-test@example"
+                                                                     + ".test");
   }
 
   @Test
   public void testProvideWhoisDisclaimer2() throws Exception {
-    assertThat(ConfigModule.provideWhoisDisclaimer()).isEqualTo("Terms of Use: Users accessing the"
+    assertThat(DonutsConfigModule.provideWhoisDisclaimer()).isEqualTo("Terms of Use: Users "
+                                                                        + "accessing the"
         + " Donuts WHOIS service must agree to use the data "
         + "only for lawful purposes, and under under no circumstances use the data to: Allow, "
         + "enable, or otherwise support the transmission by e-mail, telephone, or facsimile "
