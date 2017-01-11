@@ -1,11 +1,11 @@
 package domains.donuts.flows.domain;
 
+import static google.registry.model.eppoutput.CheckData.DomainCheck.create;
+
 import domains.donuts.flows.DonutsResourceFlowTestCase;
 import google.registry.flows.domain.DomainCheckFlow;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.eppoutput.CheckData;
-
-import static google.registry.model.eppoutput.CheckData.DomainCheck.create;
 
 public abstract class DonutsDomainCheckFlowTestCase
     extends DonutsResourceFlowTestCase<DomainCheckFlow, DomainResource> {

@@ -1,5 +1,7 @@
 package domains.donuts.external;
 
+import static google.registry.util.ResourceUtils.readResourceUtf8;
+
 import google.registry.request.HttpException;
 import google.registry.testing.AppEngineRule;
 import org.junit.Before;
@@ -8,8 +10,6 @@ import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
-
-import static google.registry.util.ResourceUtils.readResourceUtf8;
 
 @RunWith(MockitoJUnitRunner.class)
 public class BlockedLabelQueueActionTest {

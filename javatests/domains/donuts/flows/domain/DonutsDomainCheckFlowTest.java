@@ -1,6 +1,14 @@
 package domains.donuts.flows.domain;
 
-import com.google.appengine.labs.repackaged.com.google.common.collect.ImmutableList;
+import static com.google.common.truth.Truth.assertThat;
+import static domains.donuts.config.DonutsConfigModule.provideDpmlCreateOverridePrice;
+import static google.registry.model.ofy.ObjectifyService.ofy;
+import static google.registry.testing.DatastoreHelper.createTld;
+import static google.registry.testing.DatastoreHelper.persistActiveDomain;
+import static google.registry.testing.DatastoreHelper.persistResource;
+
+import com.google.common.collect.ImmutableList;
+import com.googlecode.objectify.Work;
 import google.registry.model.eppoutput.CheckData;
 import google.registry.model.external.BlockedLabel;
 import org.joda.time.DateTime;
@@ -9,11 +17,6 @@ import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
-
-import static com.google.common.truth.Truth.assertThat;
-import static google.registry.testing.DatastoreHelper.createTld;
-import static google.registry.testing.DatastoreHelper.persistActiveDomain;
-import static google.registry.testing.DatastoreHelper.persistResource;
 
 @RunWith(MockitoJUnitRunner.class)
 public class DonutsDomainCheckFlowTest extends DonutsDomainCheckFlowTestCase {
@@ -27,8 +30,8 @@ public class DonutsDomainCheckFlowTest extends DonutsDomainCheckFlowTestCase {
   }
 
   @Test
-  @Ignore("This test validates internal dpml blocks which will need to be configured and added once " +
-      "ALL tlds are ran from Nomulus. Until then the external block will be used.")
+  @Ignore("This test checks the internal DPML blocks. " +
+    "This logic will need to be added once all TLD's are ran from nomulus")
   public void testSuccess_internal_dpmlBlock() throws Exception {
     persistActiveDomain("example1.dpml.zone");
     persistActiveDomain("example3.dpml.zone");
@@ -37,7 +40,8 @@ public class DonutsDomainCheckFlowTest extends DonutsDomainCheckFlowTestCase {
 
     // Verify the 2 labels registered in the dpml tld are unavailable and have
     // a reason string of 'DPML block'
-    assertThat(result.getChecks()).containsExactlyElementsIn(
+    assertThat(result.getChecks())
+      .containsExactlyElementsIn(
         ImmutableList.of(
           unavailableCheck("example1.tld", "DPML block"),
           availableCheck("example2.tld"),
@@ -47,19 +51,55 @@ public class DonutsDomainCheckFlowTest extends DonutsDomainCheckFlowTestCase {
   @Test
   public void testSuccess_external_dpmlBlock() throws Exception {
     persistResource(
-        new BlockedLabel.Builder()
-            .setLabel("example1")
-            .setDateCreated(DateTime.now())
-            .setDateModified(DateTime.now())
-            .build());
+      new BlockedLabel.Builder()
+        .setLabel("example1")
+        .setDateCreated(DateTime.now())
+        .setDateModified(DateTime.now())
+        .build());
 
-    final CheckData result = runDonutsCheckFlow();
+    final CheckData result = ofy().transact(new Work<CheckData>() {
+      @Override
+      public CheckData run() {
+        try {
+          return runDonutsCheckFlow();
+        } catch (Exception e) {
+          throw new RuntimeException(e.getMessage(), e);
+        }
+      }
+    });
 
     // Verify the label is unavailable if it exists in the BlockedLabel entity
-    assertThat(result.getChecks()).containsExactlyElementsIn(
+    assertThat(result.getChecks())
+      .containsExactlyElementsIn(
         ImmutableList.of(
-            unavailableCheck("example1.tld", "DPML block"),
-            availableCheck("example2.tld"),
-            availableCheck("example3.tld")));
+          unavailableCheck("example1.tld", "DPML block"),
+          availableCheck("example2.tld"),
+          availableCheck("example3.tld")));
+  }
+
+  @Test
+  public void testSuccess_external_dpmlBlock_fee() throws Exception {
+    persistResource(
+      new BlockedLabel.Builder()
+        .setLabel("example1")
+        .setDateCreated(DateTime.now())
+        .setDateModified(DateTime.now())
+        .build());
+
+    final String result = ofy().transact(new Work<String>() {
+      @Override
+      public String run() {
+        try {
+          return serialize(runDonutsFlow());
+        } catch (Exception e) {
+          throw new RuntimeException(e.getMessage(), e);
+        }
+      }
+    });
+
+    assertThat(result).contains(
+      String.format(
+        "<fee:fee description=\"DPML Override\">%s</fee:fee>",
+        provideDpmlCreateOverridePrice().getAmount()));
   }
 }

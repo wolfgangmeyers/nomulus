@@ -39,7 +39,7 @@ parallel (
             }
 
             stage('Bazel - Test') {
-                sh """bazel --batch test //javatests/... \
+                sh """bazel --batch test --jvmopt "-Djava.security.egd=file:/dev/urandom" //javatests/... \
                     --jobs=2 \
                     --verbose_failures=true \
                     --ram_utilization_factor=10 \

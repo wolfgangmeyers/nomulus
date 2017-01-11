@@ -46,6 +46,7 @@ public abstract class BaseFee extends ImmutableObject {
   public enum FeeType {
     CREATE("create"),
     EAP("Early Access Period, fee expires: %s"),
+    DPML("DPML Override"),
     RENEW("renew"),
     RESTORE("restore"),
     /**

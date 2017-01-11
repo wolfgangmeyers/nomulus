@@ -4,6 +4,7 @@ import google.registry.flows.SessionMetadata;
 import google.registry.flows.custom.CustomLogicFactory;
 import google.registry.flows.custom.DomainCheckFlowCustomLogic;
 import google.registry.flows.custom.DomainCreateFlowCustomLogic;
+import google.registry.flows.custom.DomainPricingCustomLogic;
 import google.registry.model.eppinput.EppInput;
 
 /**
@@ -12,6 +13,7 @@ import google.registry.model.eppinput.EppInput;
  * {@inheritDoc}
  */
 public class DonutsCustomLogicFactory extends CustomLogicFactory {
+
     @Override
     public DomainCreateFlowCustomLogic forDomainCreateFlow(EppInput eppInput, SessionMetadata sessionMetadata) {
         return new DonutsDomainCreateFlowCustomLogic(eppInput, sessionMetadata);
@@ -20,5 +22,10 @@ public class DonutsCustomLogicFactory extends CustomLogicFactory {
     @Override
     public DomainCheckFlowCustomLogic forDomainCheckFlow(EppInput eppInput, SessionMetadata sessionMetadata) {
         return new DonutsDomainCheckFlowCustomLogic(eppInput, sessionMetadata);
+    }
+
+    @Override
+    public DomainPricingCustomLogic forDomainPricing(EppInput eppInput, SessionMetadata sessionMetadata) {
+        return new DonutsDomainPricingCustomLogic(eppInput, sessionMetadata);
     }
 }

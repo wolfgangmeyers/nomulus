@@ -1,5 +1,7 @@
 package domains.donuts.flows;
 
+import static org.mockito.Mockito.mock;
+
 import com.google.appengine.api.modules.ModulesService;
 import dagger.Component;
 import dagger.Module;
@@ -20,8 +22,6 @@ import google.registry.util.Clock;
 import google.registry.util.Sleeper;
 
 import javax.inject.Singleton;
-
-import static org.mockito.Mockito.mock;
 
 /** Dagger component for running EPP tests. */
 @Singleton

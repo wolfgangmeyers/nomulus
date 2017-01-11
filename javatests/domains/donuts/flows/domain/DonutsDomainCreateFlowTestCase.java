@@ -1,12 +1,12 @@
 package domains.donuts.flows.domain;
 
+import static google.registry.testing.DatastoreHelper.persistActiveContact;
+import static google.registry.testing.DatastoreHelper.persistActiveHost;
+
 import domains.donuts.flows.DonutsResourceFlowTestCase;
 import google.registry.flows.domain.DomainCreateFlow;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.eppoutput.EppOutput;
-
-import static google.registry.testing.DatastoreHelper.persistActiveContact;
-import static google.registry.testing.DatastoreHelper.persistActiveHost;
 
 public abstract class DonutsDomainCreateFlowTestCase
     extends DonutsResourceFlowTestCase<DomainCreateFlow, DomainResource> {

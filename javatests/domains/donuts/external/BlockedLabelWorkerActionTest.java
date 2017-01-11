@@ -1,5 +1,11 @@
 package domains.donuts.external;
 
+import static com.google.common.truth.Truth.assertThat;
+import static domains.donuts.external.BlockedLabelConstants.Action.CREATE;
+import static domains.donuts.external.BlockedLabelConstants.Action.DELETE;
+import static google.registry.model.ofy.ObjectifyService.ofy;
+import static google.registry.testing.DatastoreHelper.persistResource;
+
 import com.googlecode.objectify.Key;
 import google.registry.model.external.BlockedLabel;
 import google.registry.testing.AppEngineRule;
@@ -9,12 +15,6 @@ import org.junit.Rule;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
-
-import static com.google.common.truth.Truth.assertThat;
-import static domains.donuts.external.BlockedLabelConstants.Action.CREATE;
-import static domains.donuts.external.BlockedLabelConstants.Action.DELETE;
-import static google.registry.model.ofy.ObjectifyService.ofy;
-import static google.registry.testing.DatastoreHelper.persistResource;
 
 @RunWith(MockitoJUnitRunner.class)
 public class BlockedLabelWorkerActionTest {

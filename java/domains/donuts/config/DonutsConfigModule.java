@@ -35,6 +35,7 @@ import google.registry.config.RegistryConfig;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.config.RegistryEnvironment;
 import org.joda.money.CurrencyUnit;
+import org.joda.money.Money;
 import org.joda.time.DateTimeConstants;
 import org.joda.time.Duration;
 
@@ -83,6 +84,12 @@ public final class DonutsConfigModule {
   @Config("dpmlLookup")
   public static DpmlLookup provideDpmlLookup() {
     return new ExternalDpmlLookup();
+  }
+
+  @Provides
+  @Config("dpmlCreateOverridePrice")
+  public static Money provideDpmlCreateOverridePrice() {
+    return Money.of(CurrencyUnit.USD, 25.00);
   }
 
   @Provides

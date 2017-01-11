@@ -1,22 +1,20 @@
 package domains.donuts.flows.custom;
 
+import static domains.donuts.config.DonutsConfigModule.provideDpmlLookup;
+import static google.registry.model.ofy.ObjectifyService.ofy;
+
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.net.InternetDomainName;
 import domains.donuts.flows.DonutsLaunchCreateWrapper;
 import domains.donuts.flows.DpmlLookup;
-import google.registry.flows.SessionMetadata;
-import google.registry.flows.custom.DomainCreateFlowCustomLogic;
-import google.registry.flows.custom.EntityChanges;
-import google.registry.model.eppinput.EppInput;
-import org.joda.time.DateTime;
-
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ParameterValuePolicyErrorException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
-import google.registry.model.domain.DomainResource;
+import google.registry.flows.SessionMetadata;
+import google.registry.flows.custom.DomainCreateFlowCustomLogic;
 import google.registry.model.domain.launch.LaunchCreateExtension;
-
-import static domains.donuts.config.DonutsConfigModule.provideDpmlLookup;
-import static google.registry.pricing.PricingEngineProxy.isDomainPremium;
+import google.registry.model.eppinput.EppInput;
+import org.joda.time.DateTime;
 
 /** Provides Donuts custom domain create logic */
 public class DonutsDomainCreateFlowCustomLogic extends DomainCreateFlowCustomLogic {
@@ -26,10 +24,11 @@ public class DonutsDomainCreateFlowCustomLogic extends DomainCreateFlowCustomLog
 
   private final DonutsLaunchCreateWrapper launchCreateWrapper;
 
-  DonutsDomainCreateFlowCustomLogic(final EppInput eppInput, final SessionMetadata sessionMetadata) {
+  DonutsDomainCreateFlowCustomLogic(
+      final EppInput eppInput, final SessionMetadata sessionMetadata) {
     super(eppInput, sessionMetadata);
-    this.launchCreateWrapper = new DonutsLaunchCreateWrapper(
-        eppInput.getSingleExtension(LaunchCreateExtension.class));
+    this.launchCreateWrapper =
+        new DonutsLaunchCreateWrapper(eppInput.getSingleExtension(LaunchCreateExtension.class));
   }
 
   @Override
@@ -37,30 +36,26 @@ public class DonutsDomainCreateFlowCustomLogic extends DomainCreateFlowCustomLog
     if (launchCreateWrapper.isDpmlRegistration()) {
       verifySignedMarkProvided();
     }
+
+    verifyDpmlAllows(
+        parameters.domainName(), parameters.signedMarkId().isPresent(), ofy().getTransactionTime());
   }
 
-  @Override
-  public EntityChanges beforeSave(final BeforeSaveParameters parameters) throws EppException {
-    verifyDpmlAllows(parameters.newDomain(), parameters.historyEntry().getModificationTime());
-    return parameters.entityChanges();
-  }
+  @VisibleForTesting
+  void verifyDpmlAllows(
+      final InternetDomainName domainName, boolean smdIdPresent, final DateTime now)
+      throws DpmlBlockedException {
 
-  private void verifyDpmlAllows(final DomainResource domain, final DateTime now) throws DpmlBlockedException {
-    final String fqdn = domain.getFullyQualifiedDomainName();
-
-    // Do NOT block labels that exist in both dpml and premium. Premium names need to be bought
-    // individually to add coverage.
-    if (!isDomainPremium(fqdn, now)
-        // The existence of the SmdId means a valid signed mark was supplied. Allow the user to override the current
-        // dpml block by not throwing the exception.
-        && domain.getSmdId() == null
-        && dpmlLookup.isBlocked(InternetDomainName.from(fqdn).parts().get(0), now)) {
+    // This assumes the DomainCreateFlow has checked the domain name is not reserved and
+    // the SMD has already been checked against the domain name.
+    if (dpmlLookup.isBlocked(domainName, now) && !smdIdPresent) {
       throw new DpmlBlockedException();
     }
   }
 
   /** Validates signed marks were provided on the current flow */
-  private void verifySignedMarkProvided() throws SignedMarksRequiredException {
+  @VisibleForTesting
+  void verifySignedMarkProvided() throws SignedMarksRequiredException {
     // DPML requires a signed mark to create
     if (launchCreateWrapper.getSignedMarks().isEmpty()) {
       throw new SignedMarksRequiredException();
