@@ -19,6 +19,7 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.partition;
+import static google.registry.config.RegistryConfig.getDomainLabelListCacheDuration;
 import static google.registry.model.common.EntityGroupRoot.getCrossTldKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
@@ -43,11 +44,8 @@ import com.googlecode.objectify.annotation.Cache;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Parent;
 import com.googlecode.objectify.cmd.Query;
-import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
-import google.registry.model.ImmutableObject;
 import google.registry.model.annotations.ReportedOn;
-import google.registry.model.annotations.VirtualEntity;
 import google.registry.model.registry.Registry;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
@@ -67,11 +65,9 @@ import javax.annotation.Nullable;
 public class PremiumList extends BasePremiumList<Money, PremiumList.PremiumListEntry> {
 
   /** Stores the revision key for the set of currently used premium list entry entities. */
-  private static LoadingCache<String, PremiumList> cache = CacheBuilder
-      .newBuilder()
-      .expireAfterWrite(
-          RegistryEnvironment.get().config().getDomainLabelListCacheDuration().getMillis(),
-          MILLISECONDS)
+  private static LoadingCache<String, PremiumList> cache =
+      CacheBuilder.newBuilder()
+      .expireAfterWrite(getDomainLabelListCacheDuration().getMillis(), MILLISECONDS)
       .build(new CacheLoader<String, PremiumList>() {
         @Override
         public PremiumList load(final String listName) {

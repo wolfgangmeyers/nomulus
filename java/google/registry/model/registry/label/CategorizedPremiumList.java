@@ -17,6 +17,7 @@ package google.registry.model.registry.label;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.partition;
+import static google.registry.config.RegistryConfig.getDomainLabelListCacheDuration;
 import static google.registry.model.common.EntityGroupRoot.getCrossTldKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
@@ -73,7 +74,7 @@ public class CategorizedPremiumList
   private static LoadingCache<String, CategorizedPremiumList> cache = CacheBuilder
       .newBuilder()
       .expireAfterWrite(
-          RegistryEnvironment.get().config().getDomainLabelListCacheDuration().getMillis(),
+          getDomainLabelListCacheDuration().getMillis(),
           MILLISECONDS)
       .build(new CacheLoader<String, CategorizedPremiumList>() {
         @Override

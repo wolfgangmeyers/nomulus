@@ -14,10 +14,6 @@ java_library(
         "**/*.asc",
     ]),
     deps = [
-        "//java/com/google/common/base",
-        "//java/com/google/common/collect",
-        "//java/com/google/common/io",
-        "//java/com/google/common/net",
         "//java/google/registry/config",
         "//java/google/registry/flows",
         "//java/google/registry/keyring/api",
@@ -25,15 +21,16 @@ java_library(
         "//java/google/registry/pricing",
         "//java/google/registry/request",
         "//java/google/registry/util",
-        "//third_party/java/appengine:appengine-api",
-        "//third_party/java/bouncycastle",
-        "//third_party/java/bouncycastle_bcpg",
-        "//third_party/java/dagger",
-        "//third_party/java/joda_money",
-        "//third_party/java/joda_time",
-        "//third_party/java/jsr305_annotations",
         "//third_party/java/objectify:objectify-v4_1",
-        "//third_party/java/servlet/servlet_api",
+        "@org_joda_money",
+        "@joda_time",
+        "@com_google_appengine_api_1_0_sdk",
+        "@com_google_code_findbugs_jsr305",
+        "@com_google_dagger",
+        "@com_google_guava",
+        "@javax_servlet_api",
+        "@org_bouncycastle_bcpkix_jdk15on",
+        "@org_bouncycastle_bcpg_jdk15on",
     ],
 )
 
@@ -43,11 +40,11 @@ load("//java/google/registry/builddefs:registry_ear_file.bzl", "registry_ear_fil
 zip_file(
     name = "common_war",
     srcs = [
-        "@appengine_api_sdk//jar",
+        "@com_google_appengine_api_1_0_sdk",
     ],
     out = "mandatory_stuff.war",
     mappings = {
-        "appengine_api_sdk/jar": "WEB-INF/lib",
+        "com_google_appengine_api_1_0_sdk": "WEB-INF/lib",
     },
     visibility = ["//visibility:private"],
 )

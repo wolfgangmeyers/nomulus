@@ -32,9 +32,7 @@ import org.joda.time.Duration;
 
 /** Donuts production {@link RegistryConfig}. */
 @Immutable
-public final class DonutsRegistryConfig implements RegistryConfig {
-
-  private final RegistryEnvironment environment;
+public final class DonutsRegistryConfig {
 
   private static final String RESERVED_TERMS_EXPORT_DISCLAIMER = ""
       + "# This list contains reserve terms for the TLD. Other terms may be reserved\n"
@@ -43,26 +41,17 @@ public final class DonutsRegistryConfig implements RegistryConfig {
       + "# list is subject to change and the most up-to-date source is always to\n"
       + "# check availability directly with the Registry server.\n";
 
-  public DonutsRegistryConfig(RegistryEnvironment environment) {
-    this.environment = checkNotNull(environment);
-  }
 
-  @Override
-  public String getProjectId() {
+  public static String getProjectId() {
     // TODO: Create App Engine projects named mercury-donuts-alpha, mercury-donuts-sandbox, etc.
+    String prodProjectId = "mercury-donuts";
+    RegistryEnvironment environment = RegistryEnvironment.get();
     switch (environment) {
       case PRODUCTION:
-        return "mercury-donuts";
+        return prodProjectId;
       default:
-        return "mercury-donuts-" + Ascii.toLowerCase(environment.name());
+        return prodProjectId + "-" + Ascii.toLowerCase(environment.name());
     }
-  }
-
-  @Override
-  public int getCommitLogBucketCount() {
-    // TODO: May cause NPE (for one request) in ExportCommitLogDiffAction until merging Google fix to CommitLogCheckpoint.
-    //       See: https://github.com/DonutsInc/domain-registry/pull/21#issuecomment-238730780
-    return 100;  // if you decrease this number, the world ends
   }
 
   /**
@@ -72,19 +61,12 @@ public final class DonutsRegistryConfig implements RegistryConfig {
    * deposit older than that. And if we do, we could always bring up a separate App Engine instance
    * and replay the commit logs off GCS.
    */
-  @Override
-  public Duration getCommitLogDatastoreRetention() {
+  public static Duration getCommitLogDatastoreRetention() {
     return Duration.standardDays(30);
   }
 
-  @Override
-  public String getSnapshotsBucket() {
-    return getProjectId() + "-snapshots";
-  }
-
-  @Override
-  public boolean getTmchCaTestingMode() {
-    switch (environment) {
+  public static boolean getTmchCaTestingMode() {
+    switch (RegistryEnvironment.get()) {
       case PRODUCTION:
         return false;
       default:
@@ -92,14 +74,8 @@ public final class DonutsRegistryConfig implements RegistryConfig {
     }
   }
 
-  @Override
-  public Optional<String> getECatcherAddress() {
-    throw new UnsupportedOperationException();  // n/a
-  }
-
-  @Override
-  public HostAndPort getServer() {
-    switch (environment) {
+  public static HostAndPort getServer() {
+    switch (RegistryEnvironment.get()) {
       case LOCAL:
         return HostAndPort.fromParts("localhost", 8080);
       default:
@@ -108,71 +84,8 @@ public final class DonutsRegistryConfig implements RegistryConfig {
     }
   }
 
-  @Override
-  public Duration getSingletonCacheRefreshDuration() {
-    return Duration.standardMinutes(10);
-  }
-
-  @Override
-  public Duration getDomainLabelListCacheDuration() {
-    return Duration.standardHours(1);
-  }
-
-  @Override
-  public Duration getSingletonCachePersistDuration() {
-    return Duration.standardDays(365);
-  }
-
-  @Override
-  public String getReservedTermsExportDisclaimer() {
-    return RESERVED_TERMS_EXPORT_DISCLAIMER;
-  }
-
-  @Override
-  public String getGoogleAppsAdminEmailDisplayName() {
-    return "Donuts Registry";
-  }
-
-  @Override
-  public String getGoogleAppsSendFromEmailAddress() {
-    return String.format("noreply@%s.appspotmail.com", SystemProperty.applicationId.get());
-  }
-
-  @Override
-  public String getRegistrarDefaultWhoisServer() {
-    return "whois.donuts.co";
-  }
-
-  @Override
-  public URL getRegistrarDefaultReferralUrl() {
-    return makeUrl("https://www.donuts.domains");
-  }
-
-  @Override
-  public int getEppResourceIndexBucketCount() {
+  public static int getEppResourceIndexBucketCount() {
     return 997;  // decrease this and the world ends
-  }
-
-  @Override
-  public Duration getBaseOfyRetryDuration() {
-    return Duration.millis(100);
-  }
-
-  @Override
-  public String getContactAndHostRepositoryIdentifier() {
-    return "ROID";
-  }
-
-  @Override
-  public Duration getContactAutomaticTransferLength() {
-    return standardDays(5);
-  }
-
-  @Override
-  public String getCheckApiServletRegistrarClientId() {
-    // TODO: Create a Registrar in datastore called "Donuts." It's used to buy domains from
-    //       yourself, among other things.
-    return "Donuts";
   }
 
 }

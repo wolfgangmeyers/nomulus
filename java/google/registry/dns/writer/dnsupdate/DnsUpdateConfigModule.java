@@ -16,9 +16,8 @@ package google.registry.dns.writer.dnsupdate;
 
 import dagger.Module;
 import dagger.Provides;
-import google.registry.config.ConfigModule.Config;
+import google.registry.config.RegistryConfig.Config;
 import google.registry.config.RegistryEnvironment;
-
 import org.joda.time.Duration;
 
 /** Dagger module that provides DNS configuration settings. */
@@ -31,8 +30,8 @@ public class DnsUpdateConfigModule {
    */
   @Provides
   @Config("dnsUpdateHost")
-  public static String provideDnsUpdateHost() {
-    switch (RegistryEnvironment.get()) {
+  public static String provideDnsUpdateHost(RegistryEnvironment environment) {
+    switch (environment) {
       case ALPHA:
         return "ns-master.alpha.hg.team";
       case CRASH:
@@ -45,7 +44,7 @@ public class DnsUpdateConfigModule {
         throw new UnsupportedOperationException("not implemented");
     }
   }
- 
+
   /**
    * Timeout on the socket for DNS update requests.
    */

@@ -15,6 +15,7 @@
 package google.registry.model.pricing;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static google.registry.config.RegistryConfig.getDomainLabelListCacheDuration;
 import static google.registry.model.common.EntityGroupRoot.getCrossTldKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
@@ -93,7 +94,7 @@ public class PricingCategory extends ImmutableObject
   private static LoadingCache<String, PricingCategory> cache =
     CacheBuilder.newBuilder()
       .expireAfterWrite(
-        RegistryEnvironment.get().config().getDomainLabelListCacheDuration().getMillis(),
+        getDomainLabelListCacheDuration().getMillis(),
         MILLISECONDS)
       .build(new CacheLoader<String, PricingCategory>() {
         @Override

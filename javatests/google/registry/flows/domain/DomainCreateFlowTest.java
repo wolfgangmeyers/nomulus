@@ -20,8 +20,8 @@ import static google.registry.model.domain.fee.Fee.FEE_EXTENSION_URIS;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.pricing.PricingEngineProxy.isDomainPremium;
 import static google.registry.testing.DatastoreHelper.assertBillingEvents;
+import static google.registry.testing.DatastoreHelper.assertPollMessagesForResource;
 import static google.registry.testing.DatastoreHelper.createTld;
-import static google.registry.testing.DatastoreHelper.createTlds;
 import static google.registry.testing.DatastoreHelper.deleteTld;
 import static google.registry.testing.DatastoreHelper.getHistoryEntries;
 import static google.registry.testing.DatastoreHelper.newContactResource;
@@ -113,8 +113,7 @@ import google.registry.model.domain.launch.LaunchNotice;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.domain.secdns.DelegationSignerData;
 import google.registry.model.eppcommon.StatusValue;
-import google.registry.model.eppoutput.CreateData.DomainCreateData;
-import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.poll.PollMessage;
 import google.registry.model.registrar.Registrar;
 import google.registry.model.registry.Registry;
 import google.registry.model.registry.Registry.TldState;
@@ -143,7 +142,7 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
 
   @Before
   public void initCreateTest() throws Exception {
-    createTlds("tld", "flags");
+    createTld("tld");
     persistResource(Registry.get("tld").asBuilder()
         .setReservedLists(persistReservedList(
             "tld-reserved",
@@ -237,6 +236,15 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
       expectedBillingEvents.add(eapBillingEvent);
     }
     assertBillingEvents(expectedBillingEvents.build());
+    assertPollMessagesForResource(
+        domain,
+        new PollMessage.Autorenew.Builder()
+            .setTargetId(domain.getFullyQualifiedDomainName())
+            .setClientId("TheRegistrar")
+            .setEventTime(domain.getRegistrationExpirationTime())
+            .setMsg("Domain was auto-renewed.")
+            .setParent(historyEntry)
+            .build());
 
     assertGracePeriods(
         domain.getGracePeriods(),
@@ -1179,6 +1187,36 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
   }
 
   @Test
+  public void testSuccess_customLogicIsCalled_andSavesExtraEntity() throws Exception {
+    // @see TestDomainCreateFlowCustomLogic for what the label "custom-logic-test" triggers.
+    ImmutableMap<String, String> substitutions = ImmutableMap.of("DOMAIN", "custom-logic-test.tld");
+    setEppInput("domain_create_wildcard.xml", substitutions);
+    persistContactsAndHosts();
+    runFlowAssertResponse(
+        CommitMode.LIVE,
+        UserPrivileges.NORMAL,
+        readFile("domain_create_response_wildcard.xml", substitutions));
+    DomainResource domain = reloadResourceByForeignKey();
+    HistoryEntry historyEntry = getHistoryEntries(domain).get(0);
+    assertPollMessagesForResource(
+        domain,
+        new PollMessage.Autorenew.Builder()
+            .setTargetId(domain.getFullyQualifiedDomainName())
+            .setClientId("TheRegistrar")
+            .setEventTime(domain.getRegistrationExpirationTime())
+            .setMsg("Domain was auto-renewed.")
+            .setParent(historyEntry)
+            .build(),
+        new PollMessage.OneTime.Builder()
+            .setParent(historyEntry)
+            .setEventTime(domain.getCreationTime())
+            .setClientId("TheRegistrar")
+            .setMsg("Custom logic was triggered")
+            .setId(1L)
+            .build());
+  }
+
+  @Test
   public void testFailure_duplicateContact() throws Exception {
     setEppInput("domain_create_duplicate_contact.xml");
     persistContactsAndHosts();
@@ -1741,23 +1779,5 @@ public class DomainCreateFlowTest extends ResourceFlowTestCase<DomainCreateFlow,
             clock.nowUtc().minusDays(1), Money.of(USD, 0)))
         .build());
     doSuccessfulTest("tld", "domain_create_response.xml");
-  }
-
-  @Test
-  public void testFailure_flags_feeMismatch() throws Exception {
-    persistContactsAndHosts();
-    setEppInput("domain_create_flags.xml", ImmutableMap.of("FEE", "12"));
-    thrown.expect(FeesMismatchException.class);
-    runFlow();
-  }
-
-  @Test
-  public void testSuccess_flags() throws Exception {
-    persistContactsAndHosts();
-    setEppInput("domain_create_flags.xml", ImmutableMap.of("FEE", "42"));
-    EppOutput eppOutput = runFlow();
-    String domainNameWithFlagsPrefix =
-        ((DomainCreateData) eppOutput.getResponse().getResponseData().get(0)).name();
-    assertThat(domainNameWithFlagsPrefix).isEqualTo("flag1-flag2-create-42.flags");
   }
 }

@@ -21,6 +21,7 @@ import static google.registry.testing.DatastoreHelper.assertBillingEvents;
 import static google.registry.testing.DatastoreHelper.assertBillingEventsForResource;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistActiveDomain;
+import static google.registry.testing.DatastoreHelper.persistDeletedDomain;
 import static google.registry.testing.DatastoreHelper.persistPremiumList;
 import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
@@ -38,11 +39,13 @@ import google.registry.model.billing.BillingEvent.Flag;
 import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.common.Cursor;
 import google.registry.model.domain.DomainResource;
+import google.registry.model.ofy.Ofy;
 import google.registry.model.registry.Registry;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.testing.ExceptionRule;
 import google.registry.testing.FakeClock;
 import google.registry.testing.FakeResponse;
+import google.registry.testing.InjectRule;
 import google.registry.testing.mapreduce.MapreduceTestCase;
 import java.util.ArrayList;
 import java.util.List;
@@ -62,7 +65,11 @@ public class ExpandRecurringBillingEventsActionTest
   @Rule
   public final ExceptionRule thrown = new ExceptionRule();
 
-  final FakeClock clock = new FakeClock(DateTime.parse("2000-10-02T00:00:00Z"));
+  @Rule
+  public final InjectRule inject = new InjectRule();
+
+  private final DateTime beginningOfTest = DateTime.parse("2000-10-02T00:00:00Z");
+  private final FakeClock clock = new FakeClock(beginningOfTest);
 
   DomainResource domain;
   HistoryEntry historyEntry;
@@ -70,6 +77,7 @@ public class ExpandRecurringBillingEventsActionTest
 
   @Before
   public void init() {
+    inject.setStaticField(Ofy.class, "clock", clock);
     action = new ExpandRecurringBillingEventsAction();
     action.mrRunner = makeDefaultRunner();
     action.clock = clock;
@@ -100,7 +108,7 @@ public class ExpandRecurringBillingEventsActionTest
   void runMapreduce() throws Exception {
     action.response = new FakeResponse();
     action.run();
-    executeTasksUntilEmpty("mapreduce");
+    executeTasksUntilEmpty("mapreduce", clock);
     ofy().clearSessionCache();
   }
 
@@ -125,12 +133,47 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
     assertBillingEventsForResource(domain, expected, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
+  }
+
+  @Test
+  public void testSuccess_expandSingleEvent_deletedDomain() throws Exception {
+    DateTime deletionTime = DateTime.parse("2000-08-01T00:00:00Z");
+    DomainResource deletedDomain = persistDeletedDomain("deleted.tld", deletionTime);
+    historyEntry = persistResource(new HistoryEntry.Builder().setParent(deletedDomain).build());
+    recurring = persistResource(new BillingEvent.Recurring.Builder()
+        .setParent(historyEntry)
+        .setClientId(deletedDomain.getCreationClientId())
+        .setEventTime(DateTime.parse("2000-01-05T00:00:00Z"))
+        .setFlags(ImmutableSet.of(Flag.AUTO_RENEW))
+        .setId(2L)
+        .setReason(Reason.RENEW)
+        .setRecurrenceEndTime(deletionTime)
+        .setTargetId(deletedDomain.getFullyQualifiedDomainName())
+        .build());
+    action.cursorTimeParam = Optional.of(START_OF_TIME);
+    runMapreduce();
+    BillingEvent.OneTime expected = new BillingEvent.OneTime.Builder()
+        // Default renew grace period of 45 days.
+        .setBillingTime(DateTime.parse("2000-02-19T00:00:00Z"))
+        .setClientId("TheRegistrar")
+        .setCost(Money.of(USD, 11))
+        .setEventTime(DateTime.parse("2000-01-05T00:00:00Z"))
+        .setFlags(ImmutableSet.of(Flag.AUTO_RENEW, Flag.SYNTHETIC))
+        .setParent(historyEntry)
+        .setPeriodYears(1)
+        .setReason(Reason.RENEW)
+        .setSyntheticCreationTime(beginningOfTest)
+        .setCancellationMatchingBillingEvent(Key.create(recurring))
+        .setTargetId(deletedDomain.getFullyQualifiedDomainName())
+        .build();
+    assertBillingEventsForResource(deletedDomain, expected, recurring);
+    assertCursorAt(beginningOfTest);
   }
 
   @Test
@@ -148,14 +191,15 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
+    DateTime beginningOfSecondRun = clock.nowUtc();
     action.response = new FakeResponse();
     runMapreduce();
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfSecondRun);
     assertBillingEventsForResource(domain, expected, recurring);
   }
 
@@ -172,13 +216,13 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build());
     action.cursorTimeParam = Optional.of(START_OF_TIME);
     runMapreduce();
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
     assertBillingEventsForResource(domain, persisted, recurring); // no additional billing events
   }
 
@@ -195,7 +239,7 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
@@ -206,7 +250,7 @@ public class ExpandRecurringBillingEventsActionTest
         .build());
     action.cursorTimeParam = Optional.of(START_OF_TIME);
     runMapreduce();
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
     assertBillingEventsForResource(domain, persisted, expected, recurring);
   }
 
@@ -226,7 +270,7 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
@@ -236,7 +280,7 @@ public class ExpandRecurringBillingEventsActionTest
         .build());
     action.cursorTimeParam = Optional.of(START_OF_TIME);
     runMapreduce();
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
     assertBillingEventsForResource(domain, persisted, expected, recurring, recurring2);
   }
 
@@ -249,7 +293,7 @@ public class ExpandRecurringBillingEventsActionTest
     action.cursorTimeParam = Optional.of(DateTime.parse("2000-01-01T00:00:00Z"));
     runMapreduce();
     assertBillingEventsForResource(domain, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
   }
 
   @Test
@@ -277,12 +321,12 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
     assertBillingEventsForResource(domain, expected, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
   }
 
   @Test
@@ -301,35 +345,37 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
     assertBillingEventsForResource(domain, expected, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
   }
 
   @Test
   public void testSuccess_expandSingleEvent_billingTimeAtExecutionTime() throws Exception {
+    DateTime testTime = DateTime.parse("2000-02-19T00:00:00Z").minusMillis(1);
     persistResource(recurring);
     action.cursorTimeParam = Optional.of(START_OF_TIME);
     // Clock is advanced one milli in runMapreduce()
-    clock.setTo(DateTime.parse("2000-02-19T00:00:00Z").minusMillis(1));
+    clock.setTo(testTime);
     runMapreduce();
     // A candidate billing event is set to be billed exactly on 2/19/00 @ 00:00,
     // but these should not be generated as the interval is closed on cursorTime, open on
     // executeTime.
     assertBillingEventsForResource(domain, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(testTime);
   }
 
   @Test
   public void testSuccess_expandSingleEvent_multipleYearCreate() throws Exception {
+    DateTime testTime = beginningOfTest.plusYears(2);
     action.cursorTimeParam = Optional.of(recurring.getEventTime());
-    recurring = persistResource(recurring.asBuilder()
-        .setEventTime(recurring.getEventTime().plusYears(2))
-        .build());
-    clock.setTo(clock.nowUtc().plusYears(2));
+    recurring =
+        persistResource(
+            recurring.asBuilder().setEventTime(recurring.getEventTime().plusYears(2)).build());
+    clock.setTo(testTime);
     runMapreduce();
     BillingEvent.OneTime expected = new BillingEvent.OneTime.Builder()
         // Default renew grace period of 45 days.
@@ -341,12 +387,12 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(testTime)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
     assertBillingEventsForResource(domain, expected, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(testTime);
   }
 
   @Test
@@ -364,12 +410,12 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
     assertBillingEventsForResource(domain, expected, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
   }
 
   @Test
@@ -379,7 +425,19 @@ public class ExpandRecurringBillingEventsActionTest
     saveCursor(clock.nowUtc().minusSeconds(1));
     runMapreduce();
     assertBillingEventsForResource(domain, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
+  }
+
+  @Test
+  public void testSuccess_expandSingleEvent_recurrenceEndBeforeEvent() throws Exception {
+    // This can occur when a domain is transferred or deleted before a domain comes up for renewal.
+    recurring = persistResource(recurring.asBuilder()
+        .setRecurrenceEndTime(recurring.getEventTime().minusDays(5))
+        .build());
+    action.cursorTimeParam = Optional.of(START_OF_TIME);
+    runMapreduce();
+    assertBillingEventsForResource(domain, recurring);
+    assertCursorAt(beginningOfTest);
   }
 
   @Test
@@ -394,7 +452,8 @@ public class ExpandRecurringBillingEventsActionTest
 
   @Test
   public void testSuccess_expandSingleEvent_multipleYears() throws Exception {
-    clock.setTo(clock.nowUtc().plusYears(5));
+    DateTime testTime = clock.nowUtc().plusYears(5);
+    clock.setTo(testTime);
     List<BillingEvent> expectedEvents = new ArrayList<>();
     expectedEvents.add(persistResource(recurring));
     action.cursorTimeParam = Optional.of(START_OF_TIME);
@@ -413,18 +472,19 @@ public class ExpandRecurringBillingEventsActionTest
           .setParent(historyEntry)
           .setPeriodYears(1)
           .setReason(Reason.RENEW)
-          .setSyntheticCreationTime(clock.nowUtc())
+          .setSyntheticCreationTime(testTime)
           .setCancellationMatchingBillingEvent(Key.create(recurring))
           .setTargetId(domain.getFullyQualifiedDomainName())
           .build());
     }
     assertBillingEventsForResource(domain, Iterables.toArray(expectedEvents, BillingEvent.class));
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(testTime);
   }
 
   @Test
   public void testSuccess_expandSingleEvent_multipleYears_cursorInBetweenYears() throws Exception {
-    clock.setTo(clock.nowUtc().plusYears(5));
+    DateTime testTime = clock.nowUtc().plusYears(5);
+    clock.setTo(testTime);
     List<BillingEvent> expectedEvents = new ArrayList<>();
     expectedEvents.add(persistResource(recurring));
     saveCursor(DateTime.parse("2003-10-02T00:00:00Z"));
@@ -443,28 +503,30 @@ public class ExpandRecurringBillingEventsActionTest
           .setParent(historyEntry)
           .setPeriodYears(1)
           .setReason(Reason.RENEW)
-          .setSyntheticCreationTime(clock.nowUtc())
+          .setSyntheticCreationTime(testTime)
           .setCancellationMatchingBillingEvent(Key.create(recurring))
           .setTargetId(domain.getFullyQualifiedDomainName())
           .build());
     }
     assertBillingEventsForResource(domain, Iterables.toArray(expectedEvents, BillingEvent.class));
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(testTime);
   }
 
   @Test
   public void testSuccess_singleEvent_beforeRenewal() throws Exception {
-    clock.setTo(DateTime.parse("2000-01-04T00:00:00Z"));
+    DateTime testTime = DateTime.parse("2000-01-04T00:00:00Z");
+    clock.setTo(testTime);
     persistResource(recurring);
     action.cursorTimeParam = Optional.of(START_OF_TIME);
     runMapreduce();
     assertBillingEventsForResource(domain, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(testTime);
   }
 
   @Test
   public void testSuccess_singleEvent_afterRecurrenceEnd() throws Exception {
-    clock.setTo(clock.nowUtc().plusYears(2));
+    DateTime testTime = beginningOfTest.plusYears(2);
+    clock.setTo(testTime);
     recurring = persistResource(recurring.asBuilder()
         // Set between event time and billing time (i.e. before the grace period expires) for 2000.
         // We should still expect a billing event.
@@ -481,19 +543,19 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(testTime)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
     assertBillingEventsForResource(domain, recurring, expected);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(testTime);
   }
 
   @Test
   public void testSuccess_expandSingleEvent_billingTimeOnLeapYear() throws Exception {
-    recurring = persistResource(recurring.asBuilder()
-        .setEventTime(DateTime.parse("2000-01-15T00:00:00Z"))
-        .build());
+    recurring =
+        persistResource(
+            recurring.asBuilder().setEventTime(DateTime.parse("2000-01-15T00:00:00Z")).build());
     action.cursorTimeParam = Optional.of(START_OF_TIME);
     runMapreduce();
     BillingEvent.OneTime expected = new BillingEvent.OneTime.Builder()
@@ -506,38 +568,39 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
     assertBillingEventsForResource(domain, expected, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
   }
 
   @Test
   public void testSuccess_expandSingleEvent_billingTimeNotOnLeapYear() throws Exception {
-    recurring = persistResource(recurring.asBuilder()
-        .setEventTime(DateTime.parse("1999-01-15T00:00:00Z"))
-        .build());
+    DateTime testTime = DateTime.parse("2001-12-01T00:00:00Z");
+    recurring =
+        persistResource(
+            recurring.asBuilder().setEventTime(DateTime.parse("2001-01-15T00:00:00Z")).build());
     action.cursorTimeParam = Optional.of(START_OF_TIME);
-    clock.setTo(DateTime.parse("1999-12-01T00:00:00Z"));
+    clock.setTo(testTime);
     runMapreduce();
     BillingEvent.OneTime expected = new BillingEvent.OneTime.Builder()
         // Default renew grace period of 45 days.
-        .setBillingTime(DateTime.parse("1999-03-01T00:00:00Z"))
+        .setBillingTime(DateTime.parse("2001-03-01T00:00:00Z"))
         .setClientId("TheRegistrar")
         .setCost(Money.of(USD, 11))
-        .setEventTime(DateTime.parse("1999-01-15T00:00:00Z"))
+        .setEventTime(DateTime.parse("2001-01-15T00:00:00Z"))
         .setFlags(ImmutableSet.of(Flag.AUTO_RENEW, Flag.SYNTHETIC))
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(testTime)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
     assertBillingEventsForResource(domain, expected, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(testTime);
   }
 
   @Test
@@ -559,7 +622,7 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
@@ -573,12 +636,12 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring2))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
     assertBillingEventsForResource(domain, expected, expected2, recurring, recurring2);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
   }
 
   @Test
@@ -601,16 +664,17 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(beginningOfTest)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
     assertBillingEventsForResource(domain, expected, recurring);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(beginningOfTest);
   }
 
   @Test
   public void testSuccess_varyingRenewPrices() throws Exception {
+    DateTime testTime = beginningOfTest.plusYears(1);
     persistResource(
         Registry.get("tld")
             .asBuilder()
@@ -619,7 +683,7 @@ public class ExpandRecurringBillingEventsActionTest
                     START_OF_TIME, Money.of(USD, 8),
                     DateTime.parse("2000-06-01T00:00:00Z"), Money.of(USD, 10)))
             .build());
-    clock.setTo(clock.nowUtc().plusYears(1));
+    clock.setTo(testTime);
     persistResource(recurring);
     action.cursorTimeParam = Optional.of(START_OF_TIME);
     runMapreduce();
@@ -635,7 +699,7 @@ public class ExpandRecurringBillingEventsActionTest
         .setParent(historyEntry)
         .setPeriodYears(1)
         .setReason(Reason.RENEW)
-        .setSyntheticCreationTime(clock.nowUtc())
+        .setSyntheticCreationTime(testTime)
         .setCancellationMatchingBillingEvent(Key.create(recurring))
         .setTargetId(domain.getFullyQualifiedDomainName())
         .build();
@@ -645,7 +709,7 @@ public class ExpandRecurringBillingEventsActionTest
         .setEventTime(eventDate.plusYears(1))
         .build();
     assertBillingEventsForResource(domain, recurring, cheaper, expensive);
-    assertCursorAt(clock.nowUtc());
+    assertCursorAt(testTime);
   }
 
   @Test

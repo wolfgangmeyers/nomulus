@@ -24,7 +24,6 @@ import static google.registry.util.DateTimeUtils.START_OF_TIME;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableMap;
 import com.googlecode.objectify.VoidWork;
-import google.registry.config.TestRegistryConfig;
 import google.registry.model.common.Cursor;
 import google.registry.model.common.Cursor.CursorType;
 import google.registry.model.ofy.CommitLogBucket;
@@ -34,7 +33,6 @@ import google.registry.model.registry.Registry;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.FakeClock;
 import google.registry.testing.InjectRule;
-import google.registry.testing.RegistryConfigRule;
 import org.joda.time.DateTime;
 import org.joda.time.Duration;
 import org.junit.Before;
@@ -54,9 +52,6 @@ public class CommitLogCheckpointStrategyTest {
 
   @Rule
   public final InjectRule inject = new InjectRule();
-
-  @Rule
-  public final RegistryConfigRule configRule = new RegistryConfigRule();
 
   final FakeClock clock = new FakeClock(DateTime.parse("2000-01-01TZ"));
   final Ofy ofy = new Ofy(clock);
@@ -92,13 +87,6 @@ public class CommitLogCheckpointStrategyTest {
   public void before() throws Exception {
     strategy.clock = clock;
     strategy.ofy = ofy;
-
-    // Use three commit log buckets for easier but sufficiently complex testing.
-    configRule.override(new TestRegistryConfig() {
-      @Override
-      public int getCommitLogBucketCount() {
-        return 3;
-      }});
 
     // Need to inject clock into Ofy so that createTld() below will get the right time.
     inject.setStaticField(Ofy.class, "clock", clock);

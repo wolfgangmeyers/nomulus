@@ -15,17 +15,18 @@
 package google.registry.tools;
 
 import dagger.Component;
-import domains.donuts.keyring.DonutsKeyringModule;
-import google.registry.config.ConfigModule;
+import google.registry.config.RegistryConfig.ConfigModule;
 import google.registry.dns.writer.VoidDnsWriterModule;
 import google.registry.dns.writer.clouddns.CloudDnsWriterModule;
 import google.registry.dns.writer.dnsupdate.DnsUpdateWriterModule;
+import google.registry.keyring.api.DummyKeyringModule;
 import google.registry.keyring.api.KeyModule;
 import google.registry.request.Modules.DatastoreServiceModule;
 import google.registry.request.Modules.Jackson2Module;
 import google.registry.request.Modules.URLFetchServiceModule;
 import google.registry.util.SystemClock.SystemClockModule;
 import google.registry.util.SystemSleeper.SystemSleeperModule;
+import javax.inject.Singleton;
 
 /**
  * Dagger component for Registry Tool.
@@ -33,13 +34,15 @@ import google.registry.util.SystemSleeper.SystemSleeperModule;
  * <p>Any command class with {@code @Inject} fields <i>must</i> be listed as a method here.
  * Otherwise {@link RegistryCli} will not be able to populate those fields after its instantiation.
  */
+@Singleton
 @Component(
   modules = {
+    AppEngineConnectionFlagsModule.class,
     ConfigModule.class,
     DatastoreServiceModule.class,
     CloudDnsWriterModule.class,
     DnsUpdateWriterModule.class,
-    DonutsKeyringModule.class,
+    DummyKeyringModule.class,
     Jackson2Module.class,
     KeyModule.class,
     RegistryToolModule.class,
@@ -47,6 +50,9 @@ import google.registry.util.SystemSleeper.SystemSleeperModule;
     SystemSleeperModule.class,
     URLFetchServiceModule.class,
     VoidDnsWriterModule.class,
+  },
+  dependencies = {
+    HttpRequestFactoryComponent.class,
   }
 )
 interface RegistryToolComponent {
@@ -68,4 +74,6 @@ interface RegistryToolComponent {
   void inject(UpdateTldCommand command);
   void inject(ValidateEscrowDepositCommand command);
   void inject(WhoisQueryCommand command);
+
+  AppEngineConnection appEngineConnection();
 }

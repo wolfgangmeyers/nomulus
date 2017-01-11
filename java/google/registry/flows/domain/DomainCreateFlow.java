@@ -34,15 +34,15 @@ import static google.registry.flows.domain.DomainFlowUtils.verifyLaunchPhaseMatc
 import static google.registry.flows.domain.DomainFlowUtils.verifyNoCodeMarks;
 import static google.registry.flows.domain.DomainFlowUtils.verifyNotReserved;
 import static google.registry.flows.domain.DomainFlowUtils.verifyPremiumNameIsNotBlocked;
-import static google.registry.flows.domain.DomainFlowUtils.verifySignedMarks;
 import static google.registry.flows.domain.DomainFlowUtils.verifyUnitIsYears;
-import static google.registry.model.EppResourceUtils.createDomainRoid;
+import static google.registry.model.EppResourceUtils.createDomainRepoId;
 import static google.registry.model.index.DomainApplicationIndex.loadActiveApplicationsByDomainName;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.registry.label.ReservedList.matchesAnchorTenantReservation;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
 import static google.registry.util.DateTimeUtils.leapSafeAddYears;
 
+import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Sets;
@@ -74,7 +74,6 @@ import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.Period;
 import google.registry.model.domain.fee.FeeCreateCommandExtension;
 import google.registry.model.domain.fee.FeeTransformResponseExtension;
-import google.registry.model.domain.flags.FlagsCreateCommandExtension;
 import google.registry.model.domain.launch.LaunchCreateExtension;
 import google.registry.model.domain.metadata.MetadataExtension;
 import google.registry.model.domain.rgp.GracePeriodStatus;
@@ -165,6 +164,7 @@ public class DomainCreateFlow implements TransactionalFlow {
   @Inject HistoryEntry.Builder historyBuilder;
   @Inject EppResponse.Builder responseBuilder;
   @Inject DomainCreateFlowCustomLogic customLogic;
+  @Inject DomainFlowTmchUtils tmchUtils;
   @Inject DomainPricingLogic pricingLogic;
   @Inject DnsQueue dnsQueue;
   @Inject DomainCreateFlow() {}
@@ -174,7 +174,6 @@ public class DomainCreateFlow implements TransactionalFlow {
     extensionManager.register(
         FeeCreateCommandExtension.class,
         SecDnsCreateExtension.class,
-        FlagsCreateCommandExtension.class,
         MetadataExtension.class,
         LaunchCreateExtension.class);
     customLogic.beforeValidation();
@@ -202,16 +201,6 @@ public class DomainCreateFlow implements TransactionalFlow {
       validateLaunchCreateNotice(launchCreate.getNotice(), domainLabel, isSuperuser, now);
     }
     boolean isSunriseCreate = hasSignedMarks && SUNRISE_STATES.contains(tldState);
-    customLogic.afterValidation(
-        DomainCreateFlowCustomLogic.AfterValidationParameters.newBuilder()
-            .setDomainName(domainName)
-            .setYears(years)
-            .build());
-
-    FeeCreateCommandExtension feeCreate =
-        eppInput.getSingleExtension(FeeCreateCommandExtension.class);
-    FeesAndCredits feesAndCredits = pricingLogic.getCreatePrice(registry, targetId, now, years);
-    validateFeeChallenge(targetId, registry.getTldStr(), now, feeCreate, feesAndCredits);
     // Superusers can create reserved domains, force creations on domains that require a claims
     // notice without specifying a claims key, ignore the registry phase, and override blocks on
     // registering premium domains.
@@ -233,9 +222,24 @@ public class DomainCreateFlow implements TransactionalFlow {
       verifyNoOpenApplications(now);
       verifyIsGaOrIsSpecialCase(tldState, isAnchorTenant);
     }
+    String signedMarkId = hasSignedMarks
+        // If a signed mark was provided, then it must match the desired domain label. Get the mark
+        // at this point so that we can verify it before the "after validation" extension point.
+        ? tmchUtils.verifySignedMarks(launchCreate.getSignedMarks(), domainLabel, now).getId()
+        : null;
+    customLogic.afterValidation(
+        DomainCreateFlowCustomLogic.AfterValidationParameters.newBuilder()
+            .setDomainName(domainName)
+            .setYears(years)
+            .setSignedMarkId(Optional.fromNullable(signedMarkId))
+            .build());
+    FeeCreateCommandExtension feeCreate =
+        eppInput.getSingleExtension(FeeCreateCommandExtension.class);
+    FeesAndCredits feesAndCredits = pricingLogic.getCreatePrice(registry, targetId, now, years);
+    validateFeeChallenge(targetId, registry.getTldStr(), now, feeCreate, feesAndCredits);
     SecDnsCreateExtension secDnsCreate =
         validateSecDnsExtension(eppInput.getSingleExtension(SecDnsCreateExtension.class));
-    String repoId = createDomainRoid(ObjectifyService.allocateId(), registry.getTldStr());
+    String repoId = createDomainRepoId(ObjectifyService.allocateId(), registry.getTldStr());
     DateTime registrationExpirationTime = leapSafeAddYears(now, years);
     HistoryEntry historyEntry = buildHistory(repoId, period, now);
     // Bill for the create.
@@ -266,10 +270,7 @@ public class DomainCreateFlow implements TransactionalFlow {
         .setAutorenewBillingEvent(Key.create(autorenewBillingEvent))
         .setAutorenewPollMessage(Key.create(autorenewPollMessage))
         .setLaunchNotice(hasClaimsNotice ? launchCreate.getNotice() : null)
-        .setSmdId(hasSignedMarks
-            // If a signed mark was provided, then it must match the desired domain label.
-            ? verifySignedMarks(launchCreate.getSignedMarks(), domainLabel, now).getId()
-            : null)
+        .setSmdId(signedMarkId)
         .setDsData(secDnsCreate == null ? null : secDnsCreate.getDsData())
         .setRegistrant(command.getRegistrant())
         .setAuthInfo(command.getAuthInfo())

@@ -16,6 +16,8 @@ package google.registry.export.sheet;
 
 import static com.google.common.collect.Iterables.getOnlyElement;
 import static com.google.common.truth.Truth.assertThat;
+import static google.registry.config.RegistryConfig.getRegistrarDefaultReferralUrl;
+import static google.registry.config.RegistryConfig.getRegistrarDefaultWhoisServer;
 import static google.registry.model.common.Cursor.CursorType.SYNC_REGISTRAR_SHEET;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.testing.DatastoreHelper.createTld;
@@ -30,7 +32,6 @@ import static org.mockito.Mockito.verify;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import google.registry.config.RegistryEnvironment;
 import google.registry.model.common.Cursor;
 import google.registry.model.ofy.Ofy;
 import google.registry.model.registrar.Registrar;
@@ -52,8 +53,6 @@ import org.mockito.runners.MockitoJUnitRunner;
 /** Unit tests for {@link SyncRegistrarsSheet}. */
 @RunWith(MockitoJUnitRunner.class)
 public class SyncRegistrarsSheetTest {
-
-  private static final RegistryEnvironment ENVIRONMENT = RegistryEnvironment.get();
 
   @Rule
   public final AppEngineRule appEngine = AppEngineRule.builder()
@@ -263,10 +262,8 @@ public class SyncRegistrarsSheetTest {
     assertThat(row).containsEntry("ipAddressWhitelist", "");
     assertThat(row).containsEntry("url", "http://www.example.org/aaa_registrar");
     assertThat(row).containsEntry("icannReferralEmail", "");
-    assertThat(row).containsEntry("whoisServer",
-        ENVIRONMENT.config().getRegistrarDefaultWhoisServer());
-    assertThat(row).containsEntry("referralUrl",
-        ENVIRONMENT.config().getRegistrarDefaultReferralUrl().toString());
+    assertThat(row).containsEntry("whoisServer", getRegistrarDefaultWhoisServer());
+    assertThat(row).containsEntry("referralUrl", getRegistrarDefaultReferralUrl().toString());
 
     row = rows.get(1);
     assertThat(row).containsEntry("clientIdentifier", "anotherregistrar");
@@ -298,8 +295,7 @@ public class SyncRegistrarsSheetTest {
     assertThat(row).containsEntry("blockPremiumNames", "false");
     assertThat(row).containsEntry("ipAddressWhitelist", "");
     assertThat(row).containsEntry("url", "http://www.example.org/another_registrar");
-    assertThat(row).containsEntry("referralUrl",
-        ENVIRONMENT.config().getRegistrarDefaultReferralUrl().toString());
+    assertThat(row).containsEntry("referralUrl", getRegistrarDefaultReferralUrl().toString());
     assertThat(row).containsEntry("icannReferralEmail", "jim@example.net");
 
     Cursor cursor = ofy().load().key(Cursor.createGlobalKey(SYNC_REGISTRAR_SHEET)).now();
@@ -342,13 +338,11 @@ public class SyncRegistrarsSheetTest {
     assertThat(row).containsEntry("phoneNumber", "");
     assertThat(row).containsEntry("faxNumber", "");
     assertThat(row).containsEntry("allowedTlds", "");
-    assertThat(row).containsEntry("whoisServer",
-        ENVIRONMENT.config().getRegistrarDefaultWhoisServer());
+    assertThat(row).containsEntry("whoisServer", getRegistrarDefaultWhoisServer());
     assertThat(row).containsEntry("blockPremiumNames", "false");
     assertThat(row).containsEntry("ipAddressWhitelist", "");
     assertThat(row).containsEntry("url", "");
-    assertThat(row).containsEntry("referralUrl",
-        ENVIRONMENT.config().getRegistrarDefaultReferralUrl().toString());
+    assertThat(row).containsEntry("referralUrl", getRegistrarDefaultReferralUrl().toString());
     assertThat(row).containsEntry("icannReferralEmail", "");
   }
 }

@@ -16,7 +16,7 @@ package google.registry.model.registry.label;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
-import static com.google.common.base.Preconditions.checkState;
+import static google.registry.config.RegistryConfig.getDomainLabelListCacheDuration;
 import static google.registry.model.common.EntityGroupRoot.getCrossTldKey;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.model.ofy.Ofy.RECOMMENDED_MEMCACHE_EXPIRATION;
@@ -36,20 +36,16 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.net.InternetDomainName;
 import com.google.common.util.concurrent.UncheckedExecutionException;
 import com.googlecode.objectify.Key;
-import com.googlecode.objectify.VoidWork;
 import com.googlecode.objectify.annotation.Cache;
 import com.googlecode.objectify.annotation.Embed;
 import com.googlecode.objectify.annotation.Entity;
 import com.googlecode.objectify.annotation.Mapify;
 import com.googlecode.objectify.mapper.Mapper;
-import google.registry.config.RegistryEnvironment;
 import google.registry.model.registry.Registry;
-
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.ExecutionException;
-
 import javax.annotation.Nullable;
 
 /**
@@ -76,8 +72,9 @@ public final class ReservedList
     ReservationType reservationType;
 
     /**
-     * Contains the auth code necessary to register a domain with this label. Note that this field
-     * will only ever be populated for entries with type RESERVED_FOR_ANCHOR_TENANT.
+     * Contains the auth code necessary to register a domain with this label.
+     * Note that this field will only ever be populated for entries with type
+     * RESERVED_FOR_ANCHOR_TENANT.
      */
     String authCode;
 
@@ -90,14 +87,15 @@ public final class ReservedList
     }
 
     public static ReservedListEntry create(
-        String label, ReservationType reservationType, @Nullable String authCode, String comment) {
+        String label,
+        ReservationType reservationType,
+        @Nullable String authCode,
+        String comment) {
       if (authCode != null) {
-        checkArgument(
-            reservationType == RESERVED_FOR_ANCHOR_TENANT,
+        checkArgument(reservationType == RESERVED_FOR_ANCHOR_TENANT,
             "Only anchor tenant reservations should have an auth code configured");
       } else {
-        checkArgument(
-            reservationType != RESERVED_FOR_ANCHOR_TENANT,
+        checkArgument(reservationType != RESERVED_FOR_ANCHOR_TENANT,
             "Anchor tenant reservations must have an auth code configured");
       }
       ReservedListEntry entry = new ReservedListEntry();
@@ -147,10 +145,10 @@ public final class ReservedList
   /**
    * Gets a ReservedList by name using the caching layer.
    *
-   * @return An Optional<ReservedList> that has a value if a reserved list exists by the given name,
-   *     or absent if not.
+   * @return An Optional<ReservedList> that has a value if a reserved list exists by the given
+   *         name, or absent if not.
    * @throws UncheckedExecutionException if some other error occurs while trying to load the
-   *     ReservedList from the cache or Datastore.
+   *         ReservedList from the cache or Datastore.
    */
   public static Optional<ReservedList> get(String listName) {
     return getFromCache(listName, cache);
@@ -191,8 +189,8 @@ public final class ReservedList
   }
 
   /**
-   * Returns true if the given label and TLD is reserved for an anchor tenant, and the given auth
-   * code matches the one set on the reservation.
+   * Returns true if the given label and TLD is reserved for an anchor tenant, and the given
+   * auth code matches the one set on the reservation.
    */
   public static boolean matchesAnchorTenantReservation(
       InternetDomainName domainName, String authCode) {
@@ -234,10 +232,8 @@ public final class ReservedList
       try {
         builder.add(cache.get(listKey.getName()));
       } catch (ExecutionException e) {
-        throw new UncheckedExecutionException(
-            String.format(
-                "Could not load the reserved list '%s' from the cache", listKey.getName()),
-            e);
+        throw new UncheckedExecutionException(String.format(
+            "Could not load the reserved list '%s' from the cache", listKey.getName()), e);
       }
     }
 
@@ -246,9 +242,7 @@ public final class ReservedList
 
   private static LoadingCache<String, ReservedList> cache =
       CacheBuilder.newBuilder()
-          .expireAfterWrite(
-              RegistryEnvironment.get().config().getDomainLabelListCacheDuration().getMillis(),
-              MILLISECONDS)
+          .expireAfterWrite(getDomainLabelListCacheDuration().getMillis(), MILLISECONDS)
           .build(
               new CacheLoader<String, ReservedList>() {
                 @Override
@@ -259,30 +253,11 @@ public final class ReservedList
                       .parent(getCrossTldKey())
                       .id(listName)
                       .now();
-                }
-              });
-
-  /** Deletes the ReservedList with the given name. */
-  public static void delete(final String listName) {
-    final ReservedList reservedList = ReservedList.get(listName).orNull();
-    checkState(
-        reservedList != null, "Attempted to delete reserved list %s which doesn't exist", listName);
-    ofy()
-        .transactNew(
-            new VoidWork() {
-              @Override
-              public void vrun() {
-                ofy().delete().entity(reservedList).now();
-              }
-            });
-    cache.invalidate(listName);
-  }
+                }});
 
   /**
    * Gets the {@link ReservationType} of a label in a single ReservedList, or returns an absent
    * Optional if none exists in the list.
-   *
-   * <p>
    *
    * <p>Note that this logic is significantly less complicated than the getReservation() methods,
    * which are applicable to an entire Registry, and need to check across multiple reserved lists.
@@ -302,10 +277,8 @@ public final class ReservedList
     String line = lineAndComment.get(0);
     String comment = lineAndComment.get(1);
     List<String> parts = Splitter.on(',').trimResults().splitToList(line);
-    checkArgument(
-        parts.size() == 2 || parts.size() == 3,
-        "Could not parse line in reserved list: %s",
-        originalLine);
+    checkArgument(parts.size() == 2 || parts.size() == 3,
+        "Could not parse line in reserved list: %s", originalLine);
     String label = parts.get(0);
     ReservationType reservationType = ReservationType.valueOf(parts.get(1));
     String authCode = (parts.size() > 2) ? parts.get(2) : null;
@@ -317,7 +290,9 @@ public final class ReservedList
     return new Builder(clone(this));
   }
 
-  /** A builder for constructing {@link ReservedList} objects, since they are immutable. */
+  /**
+   * A builder for constructing {@link ReservedList} objects, since they are immutable.
+   */
   public static class Builder extends BaseDomainLabelList.Builder<ReservedList, Builder> {
     public Builder() {}
 

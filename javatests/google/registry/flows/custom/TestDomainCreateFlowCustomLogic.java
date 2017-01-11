@@ -14,48 +14,36 @@
 
 package google.registry.flows.custom;
 
-import com.google.common.base.Joiner;
-import com.google.common.net.InternetDomainName;
-import google.registry.flows.SessionMetadata;
-import google.registry.flows.domain.DomainCreateFlow;
-import google.registry.model.domain.flags.FlagsCreateCommandExtension;
-import google.registry.model.eppinput.EppInput;
-import google.registry.model.eppoutput.CreateData.DomainCreateData;
+import static google.registry.model.ofy.ObjectifyService.ofy;
 
-/** A class to customize {@link DomainCreateFlow} for testing. */
+import google.registry.flows.EppException;
+import google.registry.flows.SessionMetadata;
+import google.registry.model.eppinput.EppInput;
+import google.registry.model.poll.PollMessage;
+
+/** A class to customize {@link DomainCreateFlowCustomLogic} for testing. */
 public class TestDomainCreateFlowCustomLogic extends DomainCreateFlowCustomLogic {
 
   protected TestDomainCreateFlowCustomLogic(EppInput eppInput, SessionMetadata sessionMetadata) {
     super(eppInput, sessionMetadata);
   }
 
-  private String getTld() {
-    return InternetDomainName.from(getEppInput().getTargetIds().get(0)).parent().toString();
-  }
-
   @Override
-  public BeforeResponseReturnData beforeResponse(BeforeResponseParameters parameters) {
-    if (getTld().equals("flags")) {
-      String flagsPrefix =
-          Joiner.on('-')
-              .join(getEppInput().getSingleExtension(FlagsCreateCommandExtension.class).getFlags());
-
-      DomainCreateData resData = (DomainCreateData) parameters.resData();
-      resData =
-          DomainCreateData.create(
-              Joiner.on('-').join(flagsPrefix, resData.name()),
-              resData.creationDate(),
-              resData.expirationDate());
-
-      return BeforeResponseReturnData.newBuilder()
-          .setResData(resData)
-          .setResponseExtensions(parameters.responseExtensions())
-          .build();
-    } else {
-      return BeforeResponseReturnData.newBuilder()
-          .setResData(parameters.resData())
-          .setResponseExtensions(parameters.responseExtensions())
+  public EntityChanges beforeSave(BeforeSaveParameters parameters) throws EppException {
+    if (parameters.newDomain().getFullyQualifiedDomainName().startsWith("custom-logic-test")) {
+      PollMessage extraPollMessage =
+          new PollMessage.OneTime.Builder()
+              .setParent(parameters.historyEntry())
+              .setEventTime(ofy().getTransactionTime())
+              .setClientId(getSessionMetadata().getClientId())
+              .setMsg("Custom logic was triggered")
+              .build();
+      return EntityChanges.newBuilder()
+          .setSaves(parameters.entityChanges().getSaves())
+          .addSave(extraPollMessage)
+          .setDeletes(parameters.entityChanges().getDeletes())
           .build();
     }
+    return parameters.entityChanges();
   }
 }

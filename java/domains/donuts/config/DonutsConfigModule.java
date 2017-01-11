@@ -15,7 +15,9 @@
 package domains.donuts.config;
 
 import static google.registry.config.ConfigUtils.makeUrl;
+import static org.joda.time.Duration.standardDays;
 
+import com.google.appengine.api.utils.SystemProperty;
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -28,11 +30,9 @@ import javax.inject.Singleton;
 
 import domains.donuts.external.ExternalDpmlLookup;
 import domains.donuts.flows.DpmlLookup;
-import google.registry.config.ConfigModule.Config;
-import google.registry.config.ProductionRegistryConfigExample;
 import google.registry.config.RdapNoticeDescriptor;
 import google.registry.config.RegistryConfig;
-import google.registry.config.RegistryConfigLoader;
+import google.registry.config.RegistryConfig.Config;
 import google.registry.config.RegistryEnvironment;
 import org.joda.money.CurrencyUnit;
 import org.joda.time.DateTimeConstants;
@@ -57,10 +57,6 @@ import org.joda.time.Duration;
  * in the user's repository. For this to work, other files need to be copied too, such as the
  * {@code @Component} instances under {@code google.registry.module}.  This allows modules to be
  * substituted at the {@code @Component} level.
- *
- * <p>There's also a deprecated configuration class that needs to be overridden and supplied via a
- * system property. See the instructions in {@link ProductionRegistryConfigExample} and
- * {@link RegistryConfigLoader}.
  */
 @Module
 public final class DonutsConfigModule {
@@ -70,11 +66,6 @@ public final class DonutsConfigModule {
   @Provides
   public static RegistryEnvironment provideRegistryEnvironment() {
     return REGISTRY_ENVIRONMENT;
-  }
-
-  @Provides
-  public static RegistryConfig provideConfig(RegistryEnvironment environment) {
-    return environment.config();
   }
 
   /**
@@ -96,8 +87,8 @@ public final class DonutsConfigModule {
 
   @Provides
   @Config("projectId")
-  public static String provideProjectId(RegistryConfig config) {
-    return config.getProjectId();
+  public static String provideProjectId() {
+    return DonutsRegistryConfig.getProjectId();
   }
 
   /**
@@ -128,6 +119,19 @@ public final class DonutsConfigModule {
   public static String provideProductName(RegistryEnvironment environment) {
     // Change this to the name of your product.
     return "Nomulus";
+  }
+
+  /**
+   * Returns the roid suffix to be used for the roids of all contacts and hosts.  E.g. a value of
+   * "ROID" would end up creating roids that look like "ABC123-ROID".
+   *
+   * @see <a href="http://www.iana.org/assignments/epp-repository-ids/epp-repository-ids.xhtml">
+   *      Extensible Provisioning Protocol (EPP) Repository Identifiers</a>
+   */
+  @Provides
+  @Config("contactAndHostRoidSuffix")
+  public static String provideContactAndHostRoidSuffix(RegistryEnvironment environment) {
+    return RegistryConfig.LocalTestConfig.CONTACT_AND_HOST_ROID_SUFFIX;
   }
 
   /**
@@ -218,8 +222,8 @@ public final class DonutsConfigModule {
   /** @see RegistryConfig#getCommitLogDatastoreRetention() */
   @Provides
   @Config("commitLogDatastoreRetention")
-  public static Duration provideCommitLogDatastoreRetention(RegistryConfig config) {
-    return config.getCommitLogDatastoreRetention();
+  public static Duration provideCommitLogDatastoreRetention() {
+    return DonutsRegistryConfig.getCommitLogDatastoreRetention();
   }
 
   /**
@@ -359,8 +363,8 @@ public final class DonutsConfigModule {
    */
   @Provides
   @Config("eppResourceIndexBucketCount")
-  public static int provideEppResourceIndexBucketCount(RegistryConfig config) {
-    return config.getEppResourceIndexBucketCount();
+  public static int provideEppResourceIndexBucketCount() {
+    return DonutsRegistryConfig.getEppResourceIndexBucketCount();
   }
 
   /**
@@ -427,8 +431,8 @@ public final class DonutsConfigModule {
    */
   @Provides
   @Config("tmchCaTestingMode")
-  public static boolean provideTmchCaTestingMode(RegistryConfig config) {
-    return config.getTmchCaTestingMode();
+  public static boolean provideTmchCaTestingMode() {
+    return DonutsRegistryConfig.getTmchCaTestingMode();
   }
 
   /**
@@ -469,6 +473,29 @@ public final class DonutsConfigModule {
       default:
         return "https://test.ry.marksdb.org";
     }
+  }
+
+  /**
+   * The email address that outgoing emails from the app are sent from.
+   *
+   * @see google.registry.util.SendEmailUtils
+   */
+  @Provides
+  @Config("googleAppsSendFromEmailAddress")
+  public static String provideGoogleAppsSendFromEmailAddress() {
+    return String.format("noreply@%s.appspotmail.com", SystemProperty.applicationId.get());
+  }
+
+  /**
+   * The display name that is used on outgoing emails sent by Nomulus.
+   *
+   * @see google.registry.util.SendEmailUtils
+   */
+  @Provides
+  @Config("googleAppsAdminEmailDisplayName")
+  public static String provideGoogleAppsAdminEmailDisplayName() {
+    // Production example: "Example Registry"
+    return "Donuts Domain Registry";
   }
 
   /**
@@ -886,8 +913,8 @@ public final class DonutsConfigModule {
    */
   @Provides
   @Config("contactAutomaticTransferLength")
-  public static Duration provideContactAutomaticTransferLength(RegistryConfig config) {
-    return config.getContactAutomaticTransferLength();
+  public static Duration provideContactAutomaticTransferLength() {
+    return standardDays(5);
   }
 
   /**
@@ -940,6 +967,33 @@ public final class DonutsConfigModule {
   @Config("customLogicFactoryClass")
   public static String provideCustomLogicFactoryClass() {
     return "domains.donuts.flows.custom.DonutsCustomLogicFactory";
+  }
+
+  private static final String RESERVED_TERMS_EXPORT_DISCLAIMER = ""
+     + "# This list contains reserve terms for the TLD. Other terms may be reserved\n"
+     + "# but not included in this list, including terms EXAMPLE REGISTRY chooses not\n"
+     + "# to publish, and terms that ICANN commonly mandates to be reserved. This\n"
+     + "# list is subject to change and the most up-to-date source is always to\n"
+     + "# check availability directly with the Registry server.\n";
+
+  /**
+   * Returns the header text at the top of the reserved terms exported list.
+   *
+   * @see google.registry.export.ExportUtils#exportReservedTerms
+   */
+  @Provides
+  @Config("reservedTermsExportDisclaimer")
+  public static String provideReservedTermsExportDisclaimer() {
+    return RESERVED_TERMS_EXPORT_DISCLAIMER;
+  }
+
+  /**
+   * Returns the clientId of the registrar used by the {@code CheckApiServlet}.
+   */
+  @Provides
+  @Config("checkApiServletRegistrarClientId")
+  public static String provideCheckApiServletRegistrarClientId() {
+    return "TheRegistrar";
   }
 
   /**
