@@ -26,6 +26,7 @@ import dagger.Provides;
 import java.net.URI;
 import java.net.URL;
 import javax.annotation.Nullable;
+import javax.inject.Named;
 import javax.inject.Singleton;
 
 import domains.donuts.external.ExternalDpmlLookup;
@@ -734,10 +735,13 @@ public final class DonutsConfigModule {
    *
    * <p>The number of milliseconds it'll sleep before giving up is {@code 2^n - 2}.
    *
+   * <p>Note that this uses {@code @Named} instead of {@code @Config} so that it can be used from
+   * the low-level util package, which cannot have a dependency on the config package.
+   *
    * @see google.registry.util.TaskEnqueuer
    */
   @Provides
-  @Config("transientFailureRetries")
+  @Named("transientFailureRetries")
   public static int provideTransientFailureRetries() {
     return 12;  // Four seconds.
   }
