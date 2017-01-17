@@ -2,6 +2,7 @@ package domains.donuts.flows;
 
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.flows.EppXmlTransformer.marshal;
+import static google.registry.testing.DatastoreHelper.persistResource;
 import static java.nio.charset.StandardCharsets.UTF_8;
 
 import domains.donuts.flows.DonutsEppTestComponent.FakesAndMocksModule;
@@ -10,9 +11,13 @@ import google.registry.flows.ResourceFlowTestCase;
 import google.registry.flows.picker.FlowPicker;
 import google.registry.model.EppResource;
 import google.registry.model.eppoutput.EppOutput;
+import google.registry.model.external.BlockedLabel;
+import google.registry.model.external.BlockedLabel.Builder;
 import google.registry.util.TypeUtils;
 import google.registry.xml.ValidationMode;
 import google.registry.xml.XmlException;
+import java.lang.reflect.Field;
+import org.joda.time.DateTime;
 
 public abstract class DonutsResourceFlowTestCase<
         F extends Flow, R extends EppResource>
@@ -48,7 +53,34 @@ public abstract class DonutsResourceFlowTestCase<
         String.format("Class [%s] does not exist in class [%s]", className, containingClass.getSimpleName()));
   }
 
+  /** Method used to return field data using reflection **/
+  @SuppressWarnings("unchecked")
+  protected static <T> T getField(final Class clazz, final String fieldName, final Object instance)
+      throws Exception {
+    try {
+      final Field declaredField = clazz.getDeclaredField(fieldName);
+      declaredField.setAccessible(true);
+      return (T) declaredField.get(instance);
+    } catch (NoSuchFieldException e) {
+      Class superClass = clazz.getSuperclass();
+      if (superClass == null) {
+        throw e;
+      } else {
+        return getField(superClass, fieldName, instance);
+      }
+    }
+  }
+
   protected String serialize(final EppOutput eppOutput) throws XmlException {
     return new String(marshal(eppOutput, ValidationMode.LENIENT), UTF_8);
+  }
+
+  protected BlockedLabel persistExternalDPMLBlock(final String label) throws Exception {
+    return persistResource(
+        new Builder()
+            .setLabel(label)
+            .setDateCreated(DateTime.now())
+            .setDateModified(DateTime.now())
+            .build());
   }
 }

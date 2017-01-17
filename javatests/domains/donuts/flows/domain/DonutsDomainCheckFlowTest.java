@@ -5,13 +5,19 @@ import static domains.donuts.config.DonutsConfigModule.provideDpmlCreateOverride
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistActiveDomain;
+import static google.registry.testing.DatastoreHelper.persistReservedList;
 import static google.registry.testing.DatastoreHelper.persistResource;
 
+import com.google.appengine.labs.repackaged.com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableList;
 import com.googlecode.objectify.Work;
+import google.registry.model.domain.fee.FeeCheckResponseExtension;
+import google.registry.model.domain.fee.FeeCheckResponseExtensionItem;
 import google.registry.model.eppoutput.CheckData;
-import google.registry.model.external.BlockedLabel;
-import org.joda.time.DateTime;
+import google.registry.model.eppoutput.EppResponse;
+import google.registry.model.registry.Registry;
+import google.registry.model.registry.label.ReservedList;
+import java.math.BigDecimal;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -36,7 +42,7 @@ public class DonutsDomainCheckFlowTest extends DonutsDomainCheckFlowTestCase {
     persistActiveDomain("example1.dpml.zone");
     persistActiveDomain("example3.dpml.zone");
 
-    final CheckData result = runDonutsCheckFlow();
+    final CheckData result = runCheckFlow();
 
     // Verify the 2 labels registered in the dpml tld are unavailable and have
     // a reason string of 'DPML block'
@@ -50,23 +56,9 @@ public class DonutsDomainCheckFlowTest extends DonutsDomainCheckFlowTestCase {
 
   @Test
   public void testSuccess_external_dpmlBlock() throws Exception {
-    persistResource(
-      new BlockedLabel.Builder()
-        .setLabel("example1")
-        .setDateCreated(DateTime.now())
-        .setDateModified(DateTime.now())
-        .build());
+    persistExternalDPMLBlock("example1");
 
-    final CheckData result = ofy().transact(new Work<CheckData>() {
-      @Override
-      public CheckData run() {
-        try {
-          return runDonutsCheckFlow();
-        } catch (Exception e) {
-          throw new RuntimeException(e.getMessage(), e);
-        }
-      }
-    });
+    final CheckData result = runCheckFlow();
 
     // Verify the label is unavailable if it exists in the BlockedLabel entity
     assertThat(result.getChecks())
@@ -79,12 +71,7 @@ public class DonutsDomainCheckFlowTest extends DonutsDomainCheckFlowTestCase {
 
   @Test
   public void testSuccess_external_dpmlBlock_fee() throws Exception {
-    persistResource(
-      new BlockedLabel.Builder()
-        .setLabel("example1")
-        .setDateCreated(DateTime.now())
-        .setDateModified(DateTime.now())
-        .build());
+    persistExternalDPMLBlock("example1");
 
     final String result = ofy().transact(new Work<String>() {
       @Override
@@ -101,5 +88,50 @@ public class DonutsDomainCheckFlowTest extends DonutsDomainCheckFlowTestCase {
       String.format(
         "<fee:fee description=\"DPML Override\">%s</fee:fee>",
         provideDpmlCreateOverridePrice().getAmount()));
+  }
+
+  @Test
+  public void testReserved_IsNotBlockedByDpml() throws Exception {
+    persistExternalDPMLBlock("example1");
+
+    final ReservedList reservedList =
+        persistReservedList("tld", "example1,FULLY_BLOCKED");
+    final Registry tld = Registry.get("tld").asBuilder().setReservedLists(reservedList).build();
+    persistResource(tld);
+
+    final CheckData result = runCheckFlow();
+
+    // Verify the label 'example1.tld' is unavailable due to being 'Reserved'
+    assertThat(result.getChecks())
+        .containsExactlyElementsIn(
+            ImmutableList.of(
+                unavailableCheck("example1.tld", "Reserved"),
+                availableCheck("example2.tld"),
+                availableCheck("example3.tld")));
+  }
+
+  @Test
+  public void testPremium_IsNotBlockedByDpml() throws Exception {
+    setEppInput("domain_check_premium_tlds.xml",
+        ImmutableMap.of(
+            "FEE_VERSION",
+            "0.12"));
+
+    // 'rich.tld' is created by default in `create(tld)` and can be found in
+    // DatastoreHelper.java specifically this file `default_premium_list_testdata.csv`
+    // and is defined as such [rich,USD 100]
+    persistExternalDPMLBlock("rich");
+    final EppResponse response = runDonutsCheckFlow();
+
+    assertThat(response.getResult().getCode().isSuccess()).isTrue();
+
+    final FeeCheckResponseExtension extension =
+        (FeeCheckResponseExtension) response.getExtensions().get(0);
+
+    final FeeCheckResponseExtensionItem extensionItem =
+        (FeeCheckResponseExtensionItem) extension.getItems().get(0);
+
+    assertThat(extensionItem.getFees().get(0).getCost()).isEqualTo(new BigDecimal("100.00"));
+    assertThat(extensionItem.getFeeClass().toLowerCase()).isEqualTo("premium");
   }
 }

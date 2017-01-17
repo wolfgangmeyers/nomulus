@@ -25,7 +25,7 @@ public abstract class DonutsDomainCreateFlowTestCase
    * Create host and contact entries for testing.
    * @param hostTld the TLD of the host (which might be an external TLD)
    */
-  protected void persistContactsAndHosts(String hostTld) {
+  protected void persistContactsAndHosts(final String hostTld) {
     for (int i = 1; i <= 14; ++i) {
       persistActiveHost(String.format("ns%d.example.%s", i, hostTld));
     }

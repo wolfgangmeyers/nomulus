@@ -6,6 +6,7 @@ import static domains.donuts.config.DonutsConfigModule.provideDpmlTld;
 import static google.registry.model.eppoutput.Result.Code.SUCCESS;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistActiveDomain;
+import static google.registry.testing.DatastoreHelper.persistReservedList;
 import static google.registry.testing.DatastoreHelper.persistResource;
 
 import com.google.appengine.labs.repackaged.com.google.common.collect.ImmutableMap;
@@ -13,10 +14,15 @@ import domains.donuts.flows.custom.DonutsDomainCreateFlowCustomLogic.DpmlBlocked
 import domains.donuts.flows.custom.DonutsDomainCreateFlowCustomLogic.SignedMarksRequiredException;
 import google.registry.flows.domain.DomainFlowUtils;
 import google.registry.flows.domain.DomainFlowUtils.FeesMismatchException;
+import google.registry.model.domain.fee.Fee;
+import google.registry.model.domain.fee.FeeTransformResponseExtension;
+import google.registry.model.eppoutput.EppOutput;
 import google.registry.model.eppoutput.Result;
-import google.registry.model.external.BlockedLabel;
+import google.registry.model.registry.Registry;
+import google.registry.model.registry.label.ReservedList;
+import java.math.BigDecimal;
+import java.util.List;
 import org.joda.money.Money;
-import org.joda.time.DateTime;
 import org.junit.Before;
 import org.junit.Ignore;
 import org.junit.Test;
@@ -48,12 +54,7 @@ public class DonutsDomainCreateFlowTest extends DonutsDomainCreateFlowTestCase {
   @Test
   public void testCreate_external_BlockedByDpml() throws Exception {
     setEppInput("domain_create.xml");
-    persistResource(
-        new BlockedLabel.Builder()
-            .setLabel("example")
-            .setDateCreated(DateTime.now())
-            .setDateModified(DateTime.now())
-            .build());
+    persistExternalDPMLBlock("example");
     thrown.expect(DpmlBlockedException.class, "The requested domain name is blocked by DPML");
     runDonutsFlow();
   }
@@ -69,12 +70,7 @@ public class DonutsDomainCreateFlowTest extends DonutsDomainCreateFlowTestCase {
   @Test
   public void testDpmlOverrideBlockedNoFee() throws Exception {
     setEppInput("domain_create_dpml_phase_encoded_smd_no_fee.xml");
-    persistResource(
-        new BlockedLabel.Builder()
-            .setLabel("test-validate")
-            .setDateCreated(DateTime.now())
-            .setDateModified(DateTime.now())
-            .build());
+    persistExternalDPMLBlock("test-validate");
     thrown.expect(
         getNestedPrivateThrowableClass(
             "FeesRequiredForNonFreeOperationException", DomainFlowUtils.class),
@@ -91,12 +87,7 @@ public class DonutsDomainCreateFlowTest extends DonutsDomainCreateFlowTestCase {
             "0.12",
             "DPML_OVERRIDE_PRICE",
             dpmlOverridePrice.plus(1.00).getAmount().toString()));
-    persistResource(
-        new BlockedLabel.Builder()
-            .setLabel("test-validate")
-            .setDateCreated(DateTime.now())
-            .setDateModified(DateTime.now())
-            .build());
+    persistExternalDPMLBlock("test-validate");
     thrown.expect(
         FeesMismatchException.class,
         "The fees passed in the transform command do not match the expected total");
@@ -112,13 +103,52 @@ public class DonutsDomainCreateFlowTest extends DonutsDomainCreateFlowTestCase {
             "0.12",
             "DPML_OVERRIDE_PRICE",
             dpmlOverridePrice.getAmount().toString()));
-    persistResource(
-        new BlockedLabel.Builder()
-            .setLabel("test-validate")
-            .setDateCreated(DateTime.now())
-            .setDateModified(DateTime.now())
-            .build());
+    persistExternalDPMLBlock("test-validate");
     final Result result = runDonutsFlow().getResponse().getResult();
     assertThat(result).isEqualTo(Result.create(SUCCESS));
+  }
+
+  @Test
+  public void testReserved_ShouldThrowReservedError() throws Exception {
+    setEppInput("domain_create.xml");
+    persistExternalDPMLBlock("example");
+    final ReservedList reservedList =
+        persistReservedList("tld", "example,FULLY_BLOCKED");
+    final Registry tld = Registry.get("tld").asBuilder().setReservedLists(reservedList).build();
+    persistResource(tld);
+    thrown.expect(
+        getNestedPrivateThrowableClass(
+            "DomainReservedException", DomainFlowUtils.class),
+        "example.tld is a reserved domain");
+    runDonutsFlow();
+  }
+
+  @Test
+  public void testUnreserved_ShouldNotThrowReservedError() throws Exception {
+    persistExternalDPMLBlock("example");
+    final ReservedList reservedList =
+        persistReservedList("tld", "example,UNRESERVED");
+    final Registry tld = Registry.get("tld").asBuilder().setReservedLists(reservedList).build();
+    persistResource(tld);
+    thrown.expect(DpmlBlockedException.class,
+        "The requested domain name is blocked by DPML");
+    runDonutsFlow();
+  }
+
+  @Test
+  public void testPremium_ShouldNotThrowError() throws Exception {
+    setEppInput("domain_create_premium_domain.xml", ImmutableMap.of("FEE_VERSION", "0.12"));
+
+    // 'rich.tld' is created by default in `create(tld)` and can be found in
+    // DatastoreHelper.java specifically this file `default_premium_list_testdata.csv`
+    persistExternalDPMLBlock("rich");
+
+    final EppOutput result = runDonutsFlow();
+    final FeeTransformResponseExtension extension =
+        (FeeTransformResponseExtension) result.getResponse().getExtensions().get(0);
+    assertThat(result.getResponse().getResult()).isEqualTo(Result.create(SUCCESS));
+
+    final List<Fee> fees = getField(FeeTransformResponseExtension.class, "fees", extension);
+    assertThat(fees.get(0).getCost()).isEqualTo(new BigDecimal("100.00"));
   }
 }
