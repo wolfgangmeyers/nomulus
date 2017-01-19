@@ -117,7 +117,7 @@ public class RdeHostImportAction implements Runnable {
     public void map(JaxbFragment<XjcRdeHostElement> fragment) {
       final XjcRdeHost xjcHost = fragment.getInstance().getValue();
       try {
-        logger.infofmt("Converting xml for host %s", xjcHost.getName());
+        logger.infofmt("Starting transaction for host %s", xjcHost.getName());
         // Record number of attempted map operations
         getContext().incrementCounter("host imports attempted");
         logger.infofmt("Saving host %s", xjcHost.getName());

@@ -76,6 +76,8 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
       new Function<String, Key<HostResource>>() {
         @Override
         public Key<HostResource> apply(String fullyQualifiedHostName) {
+          // host names are always lower case
+          fullyQualifiedHostName = fullyQualifiedHostName.toLowerCase();
           Key<HostResource> key =
               ForeignKeyIndex.loadAndGetKey(
                   HostResource.class, fullyQualifiedHostName, DateTime.now());
@@ -172,7 +174,7 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
         new GracePeriodConverter(domain, Key.create(autoRenewBillingEvent));
     DomainResource.Builder builder =
         new DomainResource.Builder()
-            .setFullyQualifiedDomainName(domain.getName())
+            .setFullyQualifiedDomainName(domain.getName().toLowerCase())
             .setRepoId(domain.getRoid())
             .setIdnTableName(domain.getIdnTableId())
             .setCurrentSponsorClientId(domain.getClID())

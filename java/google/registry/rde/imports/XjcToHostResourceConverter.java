@@ -69,7 +69,7 @@ public class XjcToHostResourceConverter extends XjcToEppResourceConverter {
             .setParent(Key.create(null, HostResource.class, host.getRoid()))
             .build());
     return new HostResource.Builder()
-        .setFullyQualifiedHostName(host.getName())
+        .setFullyQualifiedHostName(host.getName().toLowerCase())
         .setRepoId(host.getRoid())
         .setCurrentSponsorClientId(host.getClID())
         .setLastTransferTime(host.getTrDate())
