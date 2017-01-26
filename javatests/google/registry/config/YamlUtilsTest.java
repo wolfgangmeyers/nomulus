@@ -17,6 +17,7 @@ package google.registry.config;
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.config.YamlUtils.mergeYaml;
 
+import com.google.common.base.Joiner;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.junit.runners.JUnit4;
@@ -49,6 +50,6 @@ public class YamlUtilsTest {
   }
 
   private static String join(CharSequence... strings) {
-    return String.join("\n", strings) + "\n";
+    return Joiner.on("\n").join(strings) + "\n";
   }
 }

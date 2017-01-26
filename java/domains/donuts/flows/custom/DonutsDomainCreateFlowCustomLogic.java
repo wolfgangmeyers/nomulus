@@ -10,6 +10,7 @@ import domains.donuts.flows.DpmlLookup;
 import google.registry.flows.EppException;
 import google.registry.flows.EppException.ParameterValuePolicyErrorException;
 import google.registry.flows.EppException.StatusProhibitsOperationException;
+import google.registry.flows.FlowMetadata;
 import google.registry.flows.SessionMetadata;
 import google.registry.flows.custom.DomainCreateFlowCustomLogic;
 import google.registry.model.domain.launch.LaunchCreateExtension;
@@ -25,8 +26,8 @@ public class DonutsDomainCreateFlowCustomLogic extends DomainCreateFlowCustomLog
   private final DonutsLaunchCreateWrapper launchCreateWrapper;
 
   DonutsDomainCreateFlowCustomLogic(
-      final EppInput eppInput, final SessionMetadata sessionMetadata) {
-    super(eppInput, sessionMetadata);
+    final EppInput eppInput, final SessionMetadata sessionMetadata, final FlowMetadata flowMetadata) {
+    super(eppInput, sessionMetadata, flowMetadata);
     this.launchCreateWrapper =
         new DonutsLaunchCreateWrapper(eppInput.getSingleExtension(LaunchCreateExtension.class));
   }

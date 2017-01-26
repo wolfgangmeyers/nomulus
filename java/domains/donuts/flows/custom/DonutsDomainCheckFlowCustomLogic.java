@@ -7,6 +7,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.net.InternetDomainName;
 import domains.donuts.flows.DpmlLookup;
 import google.registry.flows.EppException;
+import google.registry.flows.FlowMetadata;
 import google.registry.flows.SessionMetadata;
 import google.registry.flows.custom.DomainCheckFlowCustomLogic;
 import google.registry.model.eppinput.EppInput;
@@ -20,8 +21,9 @@ public class DonutsDomainCheckFlowCustomLogic extends DomainCheckFlowCustomLogic
   // TODO: Dagger inject this. https://groups.google.com/forum/#!topic/nomulus-discuss/4GkhC9naJmU
   private final DpmlLookup dpmlLookup = provideDpmlLookup();
 
-  DonutsDomainCheckFlowCustomLogic(final EppInput eppInput, final SessionMetadata sessionMetadata) {
-    super(eppInput, sessionMetadata);
+  DonutsDomainCheckFlowCustomLogic(
+    final EppInput eppInput, final SessionMetadata sessionMetadata, final FlowMetadata flowMetadata) {
+    super(eppInput, sessionMetadata, flowMetadata);
   }
 
   @Override

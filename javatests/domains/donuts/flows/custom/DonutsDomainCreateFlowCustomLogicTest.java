@@ -17,6 +17,7 @@ import com.googlecode.objectify.VoidWork;
 import domains.donuts.flows.custom.DonutsDomainCreateFlowCustomLogic.DpmlBlockedException;
 import domains.donuts.flows.custom.DonutsDomainCreateFlowCustomLogic.SignedMarksRequiredException;
 import google.registry.flows.EppException;
+import google.registry.flows.FlowMetadata;
 import google.registry.flows.SessionMetadata;
 import google.registry.flows.custom.DomainCreateFlowCustomLogic.AfterValidationParameters;
 import google.registry.model.domain.launch.LaunchCreateExtension;
@@ -46,6 +47,7 @@ public class DonutsDomainCreateFlowCustomLogicTest {
   @Mock private LaunchCreateExtension launchCreate;
   @Mock private AfterValidationParameters afterParameters;
   @Mock private AbstractSignedMark signedMark;
+  @Mock private FlowMetadata flowMetadata;
 
   private DonutsDomainCreateFlowCustomLogic tested;
 
@@ -54,7 +56,7 @@ public class DonutsDomainCreateFlowCustomLogicTest {
     createTld("tld");
     doReturn(Optional.absent()).when(afterParameters).signedMarkId();
     doReturn(launchCreate).when(eppInput).getSingleExtension(LaunchCreateExtension.class);
-    tested = spy(new DonutsDomainCreateFlowCustomLogic(eppInput, sessionMetadata));
+    tested = spy(new DonutsDomainCreateFlowCustomLogic(eppInput, sessionMetadata, flowMetadata));
   }
 
   @Test

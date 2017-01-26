@@ -14,19 +14,12 @@
 
 package domains.donuts.config;
 
-import static com.google.common.base.Preconditions.checkNotNull;
-import static google.registry.config.ConfigUtils.makeUrl;
-import static org.joda.time.Duration.standardDays;
+import static domains.donuts.config.DonutsConfigModule.CONFIG_SETTINGS;
 
-import com.google.appengine.api.utils.SystemProperty;
-import com.google.common.base.Ascii;
 import com.google.common.base.Joiner;
-import com.google.common.base.Optional;
-import com.google.common.collect.ImmutableList;
 import com.google.common.net.HostAndPort;
 import google.registry.config.RegistryConfig;
 import google.registry.config.RegistryEnvironment;
-import java.net.URL;
 import javax.annotation.concurrent.Immutable;
 import org.joda.time.Duration;
 
@@ -43,15 +36,7 @@ public final class DonutsRegistryConfig {
 
 
   public static String getProjectId() {
-    // TODO: Create App Engine projects named mercury-donuts-alpha, mercury-donuts-sandbox, etc.
-    String prodProjectId = "mercury-donuts";
-    RegistryEnvironment environment = RegistryEnvironment.get();
-    switch (environment) {
-      case PRODUCTION:
-        return prodProjectId;
-      default:
-        return prodProjectId + "-" + Ascii.toLowerCase(environment.name());
-    }
+    return CONFIG_SETTINGS.get().appEngine.projectId;
   }
 
   /**

@@ -14,11 +14,14 @@
 
 package domains.donuts.config;
 
+import static com.google.common.base.Suppliers.memoize;
+import static domains.donuts.config.DonutsYamlUtils.getConfigSettings;
 import static google.registry.config.ConfigUtils.makeUrl;
 import static org.joda.time.Duration.standardDays;
 
 import com.google.appengine.api.utils.SystemProperty;
 import com.google.common.base.Optional;
+import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import dagger.Module;
@@ -34,6 +37,7 @@ import domains.donuts.flows.DpmlLookup;
 import google.registry.config.RdapNoticeDescriptor;
 import google.registry.config.RegistryConfig;
 import google.registry.config.RegistryConfig.Config;
+import google.registry.config.RegistryConfigSettings;
 import google.registry.config.RegistryEnvironment;
 import org.joda.money.CurrencyUnit;
 import org.joda.money.Money;
@@ -95,8 +99,8 @@ public final class DonutsConfigModule {
 
   @Provides
   @Config("projectId")
-  public static String provideProjectId() {
-    return DonutsRegistryConfig.getProjectId();
+  public static String provideProjectId(RegistryConfigSettings config) {
+    return config.appEngine.projectId;
   }
 
   /**
@@ -106,15 +110,8 @@ public final class DonutsConfigModule {
    */
   @Provides
   @Config("logoFilename")
-  public static String provideLogoFilename(RegistryEnvironment environment) {
-    switch (environment) {
-      case UNITTEST:
-      case LOCAL:
-        return "logo.png";
-      default:
-        // Change this to the filename of your logo.
-        return "google_registry.png";
-    }
+  public static String provideLogoFilename(RegistryConfigSettings config) {
+    return config.registrarConsole.logoFilename;
   }
 
   /**
@@ -124,9 +121,8 @@ public final class DonutsConfigModule {
    */
   @Provides
   @Config("productName")
-  public static String provideProductName(RegistryEnvironment environment) {
-    // Change this to the name of your product.
-    return "Nomulus";
+  public static String provideProductName(RegistryConfigSettings config) {
+    return config.registryPolicy.productName;
   }
 
   /**
@@ -138,8 +134,8 @@ public final class DonutsConfigModule {
    */
   @Provides
   @Config("contactAndHostRoidSuffix")
-  public static String provideContactAndHostRoidSuffix(RegistryEnvironment environment) {
-    return RegistryConfig.LocalTestConfig.CONTACT_AND_HOST_ROID_SUFFIX;
+  public static String provideContactAndHostRoidSuffix(RegistryConfigSettings config) {
+    return config.registryPolicy.contactAndHostRoidSuffix;
   }
 
   /**
@@ -371,8 +367,8 @@ public final class DonutsConfigModule {
    */
   @Provides
   @Config("eppResourceIndexBucketCount")
-  public static int provideEppResourceIndexBucketCount() {
-    return DonutsRegistryConfig.getEppResourceIndexBucketCount();
+  public static int provideEppResourceIndexBucketCount(RegistryConfigSettings config) {
+    return config.datastore.eppResourceIndexBucketsNum;
   }
 
   /**
@@ -433,14 +429,29 @@ public final class DonutsConfigModule {
   }
 
   /**
-   * Returns {@code true} if TMCH certificate authority should be in testing mode.
+   * Returns the mode that TMCH certificate authority should run in.
    *
-   * @see RegistryConfig#getTmchCaTestingMode()
+   * @see google.registry.tmch.TmchCertificateAuthority
    */
   @Provides
-  @Config("tmchCaTestingMode")
-  public static boolean provideTmchCaTestingMode() {
-    return DonutsRegistryConfig.getTmchCaTestingMode();
+  @Config("tmchCaMode")
+  public static RegistryConfig.ConfigModule.TmchCaMode provideTmchCaMode() {
+    switch (RegistryEnvironment.get()) {
+      case PRODUCTION:
+        return RegistryConfig.ConfigModule.TmchCaMode.PRODUCTION;
+      default:
+        return RegistryConfig.ConfigModule.TmchCaMode.PILOT;
+    }
+  }
+
+  /** The mode that the {@code TmchCertificateAuthority} operates in. */
+  public enum TmchCaMode {
+
+    /** Production mode, suitable for live environments hosting TLDs. */
+    PRODUCTION,
+
+    /** Pilot mode, for everything else (e.g. sandbox). */
+    PILOT;
   }
 
   /**
@@ -486,7 +497,7 @@ public final class DonutsConfigModule {
   /**
    * The email address that outgoing emails from the app are sent from.
    *
-   * @see google.registry.util.SendEmailUtils
+   * @see google.registry.ui.server.registrar.SendEmailUtils
    */
   @Provides
   @Config("googleAppsSendFromEmailAddress")
@@ -497,7 +508,7 @@ public final class DonutsConfigModule {
   /**
    * The display name that is used on outgoing emails sent by Nomulus.
    *
-   * @see google.registry.util.SendEmailUtils
+   * @see google.registry.ui.server.registrar.SendEmailUtils
    */
   @Provides
   @Config("googleAppsAdminEmailDisplayName")
@@ -889,8 +900,8 @@ public final class DonutsConfigModule {
    */
   @Provides
   @Config("stackdriverMaxQps")
-  public static int provideStackdriverMaxQps() {
-    return 30;
+  public static int provideStackdriverMaxQps(RegistryConfigSettings config) {
+    return config.monitoring.stackdriverMaxQps;
   }
 
   /**
@@ -901,8 +912,8 @@ public final class DonutsConfigModule {
    */
   @Provides
   @Config("stackdriverMaxPointsPerRequest")
-  public static int provideStackdriverMaxPointsPerRequest() {
-    return 200;
+  public static int provideStackdriverMaxPointsPerRequest(RegistryConfigSettings config) {
+    return config.monitoring.stackdriverMaxPointsPerRequest;
   }
 
   /**
@@ -913,8 +924,8 @@ public final class DonutsConfigModule {
    */
   @Provides
   @Config("metricsWriteInterval")
-  public static Duration provideMetricsWriteInterval() {
-    return Duration.standardSeconds(60);
+  public static Duration provideMetricsWriteInterval(RegistryConfigSettings config) {
+    return Duration.standardSeconds(config.monitoring.writeIntervalSeconds);
   }
 
   /**
@@ -980,6 +991,13 @@ public final class DonutsConfigModule {
     return "domains.donuts.flows.custom.DonutsCustomLogicFactory";
   }
 
+  @Provides
+  @Config("whoisCommandFactoryClass")
+  public static String provideWhoisCommandFactoryClass() {
+    // TODO(b/32875427): This will be converted to YAML configuration in a future refactor.
+    return "google.registry.whois.WhoisCommandFactory";
+  }
+
   private static final String RESERVED_TERMS_EXPORT_DISCLAIMER = ""
      + "# This list contains reserve terms for the TLD. Other terms may be reserved\n"
      + "# but not included in this list, including terms EXAMPLE REGISTRY chooses not\n"
@@ -1005,6 +1023,12 @@ public final class DonutsConfigModule {
   @Config("checkApiServletRegistrarClientId")
   public static String provideCheckApiServletRegistrarClientId() {
     return "TheRegistrar";
+  }
+
+  @Singleton
+  @Provides
+  static RegistryConfigSettings provideRegistryConfigSettings() {
+    return CONFIG_SETTINGS.get();
   }
 
   /**
@@ -1091,4 +1115,17 @@ public final class DonutsConfigModule {
             .build())
         .build();
   }
+
+  /**
+   * Memoizes loading of the {@link RegistryConfigSettings} POJO.
+   *
+   * <p>Memoizing without cache expiration is used because the app must be re-deployed in order to
+   * change the contents of the YAML config files.
+   */
+  public static final Supplier<RegistryConfigSettings> CONFIG_SETTINGS =
+    memoize(new Supplier<RegistryConfigSettings>() {
+      @Override
+      public RegistryConfigSettings get() {
+        return getConfigSettings();
+      }});
 }
