@@ -14,24 +14,25 @@
 
 package google.registry.whois;
 
+import static google.registry.model.EppResourceUtils.loadByForeignKey;
+
+import com.google.common.base.Optional;
 import com.google.common.net.InternetDomainName;
 import google.registry.model.host.HostResource;
-import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 
 /** Represents a WHOIS lookup on a nameserver based on its hostname. */
-final class NameserverLookupByHostCommand extends DomainOrHostLookupCommand<HostResource> {
+public class NameserverLookupByHostCommand extends DomainOrHostLookupCommand {
 
   NameserverLookupByHostCommand(InternetDomainName hostName) {
-    this(hostName, null);
-  }
-
-  NameserverLookupByHostCommand(InternetDomainName hostName, @Nullable InternetDomainName tld) {
-    super(hostName, tld, "Nameserver");
+    super(hostName, "Nameserver");
   }
 
   @Override
-  WhoisResponse getSuccessResponse(HostResource host, DateTime now) {
-    return new NameserverWhoisResponse(host, now);
+  protected Optional<WhoisResponse> getResponse(InternetDomainName hostName, DateTime now) {
+    final HostResource hostResource =
+        loadByForeignKey(HostResource.class, hostName.toString(), now);
+    return Optional.<WhoisResponse>fromNullable(
+        hostResource == null ? null : new NameserverWhoisResponse(hostResource, now));
   }
 }

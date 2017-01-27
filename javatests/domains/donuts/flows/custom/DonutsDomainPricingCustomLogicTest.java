@@ -11,6 +11,7 @@ import static org.mockito.Mockito.doReturn;
 import com.google.appengine.labs.repackaged.com.google.common.collect.Range;
 import com.google.common.collect.ImmutableList;
 import com.google.common.net.InternetDomainName;
+import google.registry.flows.FlowMetadata;
 import google.registry.flows.SessionMetadata;
 import google.registry.flows.custom.DomainPricingCustomLogic.CreatePriceParameters;
 import google.registry.flows.domain.FeesAndCredits;
@@ -40,6 +41,7 @@ public class DonutsDomainPricingCustomLogicTest {
   @Mock private EppInput eppInput;
   @Mock private SessionMetadata sessionMetadata;
   @Mock private CreatePriceParameters priceParameters;
+  @Mock private FlowMetadata flowMetadata;
 
   private FeesAndCredits createFees;
   private DonutsDomainPricingCustomLogic tested;
@@ -55,7 +57,7 @@ public class DonutsDomainPricingCustomLogicTest {
       .setCurrency(USD)
       .build();
     doReturn(createFees).when(priceParameters).feesAndCredits();
-    tested = new DonutsDomainPricingCustomLogic(eppInput, sessionMetadata);
+    tested = new DonutsDomainPricingCustomLogic(eppInput, sessionMetadata, flowMetadata);
   }
 
   @Test

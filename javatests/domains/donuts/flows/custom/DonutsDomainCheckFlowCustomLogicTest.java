@@ -7,6 +7,7 @@ import static google.registry.testing.DatastoreHelper.persistResource;
 import static org.mockito.Mockito.doReturn;
 
 import com.google.common.collect.ImmutableList;
+import google.registry.flows.FlowMetadata;
 import google.registry.flows.SessionMetadata;
 import google.registry.flows.custom.DomainCheckFlowCustomLogic.BeforeResponseParameters;
 import google.registry.flows.custom.DomainCheckFlowCustomLogic.BeforeResponseReturnData;
@@ -37,9 +38,10 @@ public class DonutsDomainCheckFlowCustomLogicTest {
   @Mock private CheckData.DomainCheck domainCheck;
   @Mock private CheckData.CheckName checkName;
   @Mock private EppResponse.ResponseExtension responseExtension;
+  @Mock private FlowMetadata flowMetadata;
 
   private final DonutsDomainCheckFlowCustomLogic tested =
-      new DonutsDomainCheckFlowCustomLogic(eppInput, sessionMetadata);
+      new DonutsDomainCheckFlowCustomLogic(eppInput, sessionMetadata, flowMetadata);
 
   @Before
   public void setUp() throws Exception {

@@ -33,6 +33,7 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.collect.Maps;
+import google.registry.config.RegistryConfig.ConfigModule.TmchCaMode;
 import google.registry.flows.EppTestComponent.FakesAndMocksModule;
 import google.registry.flows.picker.FlowPicker;
 import google.registry.model.billing.BillingEvent;
@@ -156,7 +157,7 @@ public abstract class FlowTestCase<F extends Flow> extends ShardableTestCase {
     }
   }
 
-  public void assertNoHistory() throws Exception {
+  protected void assertNoHistory() throws Exception {
     assertThat(ofy().load().type(HistoryEntry.class)).isEmpty();
   }
 
@@ -277,7 +278,7 @@ public abstract class FlowTestCase<F extends Flow> extends ShardableTestCase {
         .isEqualTo(new TypeInstantiator<F>(getClass()){}.getExactType());
     // Run the flow.
     return DaggerEppTestComponent.builder()
-        .fakesAndMocksModule(new FakesAndMocksModule(clock, tmchCaTestingMode))
+        .fakesAndMocksModule(new FakesAndMocksModule(clock, tmchCaMode))
         .build()
         .startRequest()
         .flowComponentBuilder()
@@ -309,6 +310,11 @@ public abstract class FlowTestCase<F extends Flow> extends ShardableTestCase {
   /** Shortcut to call {@link #runFlow(CommitMode, UserPrivileges)} as normal user and live run. */
   public EppOutput runFlow() throws Exception {
     return runFlow(CommitMode.LIVE, UserPrivileges.NORMAL);
+  }
+
+  /** Shortcut to call {@link #runFlow(CommitMode, UserPrivileges)} as super user and live run. */
+  public EppOutput runFlowAsSuperuser() throws Exception {
+    return runFlow(CommitMode.LIVE, UserPrivileges.SUPERUSER);
   }
 
   /** Run a flow, marshal the result to EPP, and assert that the output is as expected. */
@@ -343,10 +349,10 @@ public abstract class FlowTestCase<F extends Flow> extends ShardableTestCase {
     return output;
   }
 
-  private boolean tmchCaTestingMode = true;
+  private TmchCaMode tmchCaMode = TmchCaMode.PILOT;
 
   protected void useTmchProdCert() {
-    tmchCaTestingMode = false;
+    tmchCaMode = TmchCaMode.PRODUCTION;
   }
 
   public EppOutput dryRunFlowAssertResponse(String xml, String... ignoredPaths) throws Exception {

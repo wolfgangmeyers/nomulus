@@ -81,6 +81,7 @@ ext {
     jacksonVersion = '2.8.3'
     minaCoreVersion = '2.0.0'
     slf4jVersion = '1.7.14'
+    yamlVersion = '1.17'
 }
 
 dependencies {
@@ -202,6 +203,8 @@ dependencies {
     testCompile "org.apache.ftpserver:ftpserver-core:$ftpServerCoreVersion"
     compile("it.unimi.dsi:fastutil:$fastUtilVersion") { force = true }
     compile("org.slf4j:slf4j-api:$slf4jVersion") { force = true }
+    
+    compile "org.yaml:snakeyaml:$yamlVersion"
 }
 
 test {
