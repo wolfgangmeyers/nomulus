@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2016 Donuts Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,8 +24,7 @@ import static google.registry.request.RequestParameters.extractRequiredParameter
 import com.google.common.base.Optional;
 import dagger.Module;
 import dagger.Provides;
-import domains.donuts.external.BlockedLabelConstants;
-import domains.donuts.external.BlockedLabelConstants.Action;
+
 import google.registry.batch.ExpandRecurringBillingEventsAction;
 import google.registry.request.Parameter;
 import google.registry.request.RequestParameters;

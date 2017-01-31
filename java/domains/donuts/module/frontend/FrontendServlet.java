@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2016 Donuts Inc. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 package domains.donuts.module.frontend;
 
 import google.registry.monitoring.metrics.MetricReporter;
-import google.registry.request.RequestModule;
 import google.registry.util.FormattingLogger;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
