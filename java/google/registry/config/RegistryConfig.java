@@ -626,7 +626,7 @@ public final class RegistryConfig {
     @Config("rdeSshIdentity")
     public static String provideSshIdentity() {
       // Change this to your RDE identity.
-      return "rde@example.com";
+      return "mercury-donuts-test@example.test";
     }
 
     /**
@@ -643,7 +643,7 @@ public final class RegistryConfig {
         case PRODUCTION:
           return URI.create("sftp://GoogleTLD@sftpipm2.ironmountain.com/Outbox");
         default:
-          return URI.create("sftp://google@ppftpipm.ironmountain.com/Outbox");
+          return URI.create("sftp://mercury-donuts-test@104.196.228.43");
       }
     }
 
@@ -963,7 +963,7 @@ public final class RegistryConfig {
     @Config("customLogicFactoryClass")
     public static String provideCustomLogicFactoryClass() {
       // TODO(b/32875427): This will be converted to YAML configuration in a future refactor.
-      return "google.registry.flows.custom.CustomLogicFactory";
+      return "domains.donuts.flows.custom.DonutsCustomLogicFactory";
     }
 
     @Provides

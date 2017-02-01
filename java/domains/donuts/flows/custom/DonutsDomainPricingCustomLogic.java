@@ -14,8 +14,8 @@
 
 package domains.donuts.flows.custom;
 
-import static domains.donuts.config.DonutsConfigModule.provideDpmlCreateOverridePrice;
-import static domains.donuts.config.DonutsConfigModule.provideDpmlLookup;
+import static domains.donuts.config.DpmlModule.provideDpmlCreateOverridePrice;
+import static domains.donuts.config.DpmlModule.provideDpmlLookup;
 
 import domains.donuts.flows.DpmlLookup;
 import google.registry.flows.EppException;

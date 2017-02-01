@@ -14,12 +14,11 @@
 
 package domains.donuts.module.backend;
 
-import domains.donuts.config.DonutsConfigModule;
-import domains.donuts.keyring.DonutsKeyringModule;
-
 import dagger.Component;
+import domains.donuts.keyring.DonutsKeyringModule;
 import domains.donuts.module.backend.BackendRequestComponent.BackendRequestComponentModule;
 import google.registry.bigquery.BigqueryModule;
+import google.registry.config.RegistryConfig;
 import google.registry.dns.writer.dnsupdate.DnsUpdateConfigModule;
 import google.registry.dns.writer.dnsupdate.DnsUpdateWriterModule;
 import google.registry.export.DriveModule;
@@ -43,7 +42,6 @@ import google.registry.request.Modules.UseAppIdentityCredentialForGoogleApisModu
 import google.registry.request.Modules.UserServiceModule;
 import google.registry.util.SystemClock.SystemClockModule;
 import google.registry.util.SystemSleeper.SystemSleeperModule;
-
 import javax.inject.Singleton;
 
 /** Dagger component with instance lifetime for "backend" App Engine module. */
@@ -53,7 +51,7 @@ import javax.inject.Singleton;
         AppIdentityCredentialModule.class,
         BackendRequestComponentModule.class,
         BigqueryModule.class,
-        DonutsConfigModule.class,
+        RegistryConfig.ConfigModule.class,
         DatastoreServiceModule.class,
         DirectoryModule.class,
         DnsUpdateConfigModule.class,

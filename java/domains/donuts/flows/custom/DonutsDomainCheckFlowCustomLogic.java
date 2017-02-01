@@ -14,7 +14,7 @@
 
 package domains.donuts.flows.custom;
 
-import static domains.donuts.config.DonutsConfigModule.provideDpmlLookup;
+import static domains.donuts.config.DpmlModule.provideDpmlLookup;
 import static google.registry.model.registry.label.ReservationType.UNRESERVED;
 
 import com.google.common.collect.ImmutableList;

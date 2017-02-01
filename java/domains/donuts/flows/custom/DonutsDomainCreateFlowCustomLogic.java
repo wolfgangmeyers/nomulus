@@ -14,7 +14,7 @@
 
 package domains.donuts.flows.custom;
 
-import static domains.donuts.config.DonutsConfigModule.provideDpmlLookup;
+import static domains.donuts.config.DpmlModule.provideDpmlLookup;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 
 import com.google.common.annotations.VisibleForTesting;
