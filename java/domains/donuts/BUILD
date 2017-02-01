@@ -9,6 +9,7 @@ java_library(
         "external/*.java",
         "flows/**/*.java",
         "keyring/*.java",
+        "whois/*.java",
     ]),
     resources = glob([
         "**/*.asc",
@@ -32,6 +33,7 @@ java_library(
         "//java/google/registry/pricing",
         "//java/google/registry/request",
         "//java/google/registry/util",
+        "//java/google/registry/whois",
         "//third_party/java/objectify:objectify-v4_1",
     ],
 )

@@ -36,7 +36,7 @@ import javax.annotation.Nullable;
 import org.joda.time.DateTime;
 
 /** Base class for responses to WHOIS queries. */
-abstract class WhoisResponseImpl implements WhoisResponse {
+public abstract class WhoisResponseImpl implements WhoisResponse {
 
   /** Field name for ICANN problem reporting URL appended to all WHOIS responses. */
   private static final String ICANN_REPORTING_URL_FIELD =
@@ -55,7 +55,7 @@ abstract class WhoisResponseImpl implements WhoisResponse {
   /** The time at which this response was created. */
   private final DateTime timestamp;
 
-  WhoisResponseImpl(DateTime timestamp) {
+  protected WhoisResponseImpl(DateTime timestamp) {
     this.timestamp = checkNotNull(timestamp, "timestamp");
   }
 
@@ -83,7 +83,7 @@ abstract class WhoisResponseImpl implements WhoisResponse {
   }
 
   /** Writer for outputting data in the WHOIS format. */
-  abstract static class Emitter<E extends Emitter<E>> {
+  public abstract static class Emitter<E extends Emitter<E>> {
 
     private final StringBuilder stringBuilder = new StringBuilder();
 
@@ -92,7 +92,7 @@ abstract class WhoisResponseImpl implements WhoisResponse {
       return (E) this;
     }
 
-    E emitNewline() {
+    public E emitNewline() {
       stringBuilder.append("\r\n");
       return thisCastToDerived();
     }
@@ -103,7 +103,7 @@ abstract class WhoisResponseImpl implements WhoisResponse {
      * textual output is deterministic (which is important for unit tests). The ideal solution would
      * be to use {@link java.util.SortedSet} but that would require reworking the models.
      */
-    <T> E emitSet(String title, Set<T> values, Function<T, String> transform) {
+    public <T> E emitSet(String title, Set<T> values, Function<T, String> transform) {
       return emitList(title, FluentIterable
           .from(values)
           .transform(transform)
@@ -111,7 +111,7 @@ abstract class WhoisResponseImpl implements WhoisResponse {
     }
 
     /** Helper method that loops over a list of values and calls {@link #emitField}. */
-    E emitList(String title, Iterable<String> values) {
+    public E emitList(String title, Iterable<String> values) {
       for (String value : values) {
         emitField(title, value);
       }
@@ -119,7 +119,7 @@ abstract class WhoisResponseImpl implements WhoisResponse {
     }
 
     /** Emit the field name and value followed by a newline. */
-    E emitField(String name, @Nullable String value) {
+    public E emitField(String name, @Nullable String value) {
       stringBuilder.append(cleanse(name)).append(':');
       if (!isNullOrEmpty(value)) {
         stringBuilder.append(' ').append(cleanse(value));
@@ -128,14 +128,14 @@ abstract class WhoisResponseImpl implements WhoisResponse {
     }
 
     /** Emit a multi-part field name and value followed by a newline. */
-    E emitField(String... namePartsAndValue) {
+    public E emitField(String... namePartsAndValue) {
       List<String> parts = Arrays.asList(namePartsAndValue);
       return emitField(
           Joiner.on(' ').join(parts.subList(0, parts.size() - 1)), Iterables.getLast(parts));
     }
 
     /** Emit a contact address. */
-    E emitAddress(@Nullable String prefix, @Nullable Address address) {
+    public E emitAddress(@Nullable String prefix, @Nullable Address address) {
       prefix = isNullOrEmpty(prefix) ? "" : prefix + " ";
       if (address != null) {
         emitList(prefix + "Street", address.getStreet());
@@ -148,7 +148,7 @@ abstract class WhoisResponseImpl implements WhoisResponse {
     }
 
     /** Returns raw text that should be appended to the end of ALL WHOIS responses. */
-    E emitLastUpdated(DateTime timestamp) {
+    public E emitLastUpdated(DateTime timestamp) {
       // We are assuming that our WHOIS database is always completely up to date, since it's
       // querying the live backend datastore.
       stringBuilder
@@ -159,14 +159,14 @@ abstract class WhoisResponseImpl implements WhoisResponse {
     }
 
     /** Returns raw text that should be appended to the end of ALL WHOIS responses. */
-    E emitFooter(String disclaimer) {
+    public E emitFooter(String disclaimer) {
       emitField(ICANN_REPORTING_URL_FIELD, ICANN_REPORTING_URL);
       stringBuilder.append("\r\n").append(disclaimer).append("\r\n");
       return thisCastToDerived();
     }
 
     /** Emits a string directly, followed by a newline. */
-    protected E emitRawLine(String string) {
+    public E emitRawLine(String string) {
       stringBuilder.append(string);
       return emitNewline();
     }

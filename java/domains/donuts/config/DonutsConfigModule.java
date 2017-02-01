@@ -994,8 +994,7 @@ public final class DonutsConfigModule {
   @Provides
   @Config("whoisCommandFactoryClass")
   public static String provideWhoisCommandFactoryClass() {
-    // TODO(b/32875427): This will be converted to YAML configuration in a future refactor.
-    return "google.registry.whois.WhoisCommandFactory";
+    return "domains.donuts.whois.DonutsWhoisCommandFactory";
   }
 
   private static final String RESERVED_TERMS_EXPORT_DISCLAIMER = ""
