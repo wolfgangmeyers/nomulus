@@ -135,4 +135,15 @@ public class DonutsDomainCreateFlowCustomLogicTest {
     thrown.expectMessage("SMD required for DPML block registration");
     tested.verifySignedMarkProvided();
   }
+
+  @Test
+  public void testAfterValidation_DpmlBlockSuperuser() throws Exception {
+    doReturn(true).when(flowMetadata).isSuperuser();
+    persistResource(new BlockedLabel.Builder()
+      .setLabel("sld")
+      .setDateCreated(DateTime.now())
+      .setDateModified(DateTime.now())
+      .build());
+    tested.afterValidation(afterParameters);
+  }
 }

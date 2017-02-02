@@ -48,12 +48,15 @@ public class DonutsDomainCreateFlowCustomLogic extends DomainCreateFlowCustomLog
 
   @Override
   public void afterValidation(final AfterValidationParameters parameters) throws EppException {
-    if (launchCreateWrapper.isDpmlRegistration()) {
-      verifySignedMarkProvided();
-    }
+    // Allow a superuser to create DPML labels without providing an SMD
+    if (!getFlowMetadata().isSuperuser()) {
+      if (launchCreateWrapper.isDpmlRegistration()) {
+        verifySignedMarkProvided();
+      }
 
-    verifyDpmlAllows(
+      verifyDpmlAllows(
         parameters.domainName(), parameters.signedMarkId().isPresent(), ofy().getTransactionTime());
+    }
   }
 
   @VisibleForTesting
