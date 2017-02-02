@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package google.registry.monitoring.metrics;
+package google.registry.monitoring.metrics.stackdriver;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkNotNull;
@@ -40,7 +40,15 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.util.concurrent.RateLimiter;
+import google.registry.monitoring.metrics.CustomFitter;
+import google.registry.monitoring.metrics.DistributionFitter;
+import google.registry.monitoring.metrics.ExponentialFitter;
+import google.registry.monitoring.metrics.IncrementableMetric;
+import google.registry.monitoring.metrics.LinearFitter;
+import google.registry.monitoring.metrics.MetricPoint;
+import google.registry.monitoring.metrics.MetricRegistryImpl;
 import google.registry.monitoring.metrics.MetricSchema.Kind;
+import google.registry.monitoring.metrics.MetricWriter;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -71,8 +79,8 @@ import org.joda.time.format.ISODateTimeFormat;
 public class StackdriverWriter implements MetricWriter {
 
   /**
-   * A counter representing the total number of points pushed. Has {@link MetricSchema.Kind} and
-   * metric value types as labels.
+   * A counter representing the total number of points pushed. Has {@link Kind} and metric value
+   * types as labels.
    */
   private static final IncrementableMetric pushedPoints =
       MetricRegistryImpl.getDefault()
@@ -164,8 +172,8 @@ public class StackdriverWriter implements MetricWriter {
   }
 
   @VisibleForTesting
-  static <V> MetricDescriptor encodeMetricDescriptor(
-      google.registry.monitoring.metrics.Metric<V> metric) {
+  static MetricDescriptor encodeMetricDescriptor(
+      google.registry.monitoring.metrics.Metric<?> metric) {
     return new MetricDescriptor()
         .setType(METRIC_DOMAIN + metric.getMetricSchema().name())
         .setDescription(metric.getMetricSchema().description())

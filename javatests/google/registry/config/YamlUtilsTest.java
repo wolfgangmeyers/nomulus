@@ -49,7 +49,14 @@ public class YamlUtilsTest {
         .isEqualTo(join("non: ay", "list: [crackle, pop var]"));
   }
 
+  @Test
+  public void testSuccess_mergeEmptyMap_isNoop() {
+    String defaultYaml = join("one: ay", "two: bee", "three: sea");
+    assertThat(mergeYaml(defaultYaml, "# Just a comment\n"))
+      .isEqualTo("{one: ay, two: bee, three: sea}\n");
+  }
+
   private static String join(CharSequence... strings) {
-    return Joiner.on("\n").join(strings) + "\n";
+    return Joiner.on('\n').join(strings) + "\n";
   }
 }

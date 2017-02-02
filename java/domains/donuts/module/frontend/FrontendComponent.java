@@ -14,10 +14,10 @@
 
 package domains.donuts.module.frontend;
 
-import domains.donuts.config.DonutsConfigModule;
-import domains.donuts.keyring.DonutsKeyringModule;
+import static google.registry.config.RegistryConfig.ConfigModule;
 
 import dagger.Component;
+import domains.donuts.keyring.DonutsKeyringModule;
 import domains.donuts.module.frontend.FrontendRequestComponent.FrontendRequestComponentModule;
 import google.registry.braintree.BraintreeModule;
 import google.registry.flows.custom.CustomLogicFactoryModule;
@@ -33,7 +33,6 @@ import google.registry.request.Modules.UserServiceModule;
 import google.registry.ui.ConsoleConfigModule;
 import google.registry.util.SystemClock.SystemClockModule;
 import google.registry.util.SystemSleeper.SystemSleeperModule;
-
 import javax.inject.Singleton;
 
 /** Dagger component with instance lifetime for "default" App Engine module. */
@@ -42,7 +41,7 @@ import javax.inject.Singleton;
     modules = {
         AppIdentityCredentialModule.class,
         BraintreeModule.class,
-        DonutsConfigModule.class,
+        ConfigModule.class,
         ConsoleConfigModule.class,
         CustomLogicFactoryModule.class,
         DonutsKeyringModule.class,

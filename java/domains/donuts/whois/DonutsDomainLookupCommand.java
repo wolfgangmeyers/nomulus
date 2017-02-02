@@ -14,7 +14,7 @@
 
 package domains.donuts.whois;
 
-import static domains.donuts.config.DonutsConfigModule.provideDpmlLookup;
+import static domains.donuts.config.DpmlModule.provideDpmlLookup;
 
 import com.google.common.base.Optional;
 import com.google.common.net.InternetDomainName;

@@ -21,8 +21,8 @@ import dagger.Component;
 import dagger.Module;
 import dagger.Provides;
 import dagger.Subcomponent;
-import domains.donuts.config.DonutsConfigModule;
 import domains.donuts.flows.custom.DonutsCustomLogicFactory;
+import google.registry.config.RegistryConfig;
 import google.registry.dns.DnsQueue;
 import google.registry.flows.EppController;
 import google.registry.flows.FlowComponent;
@@ -34,14 +34,13 @@ import google.registry.testing.FakeClock;
 import google.registry.testing.FakeSleeper;
 import google.registry.util.Clock;
 import google.registry.util.Sleeper;
-
 import javax.inject.Singleton;
 
 /** Dagger component for running EPP tests. */
 @Singleton
 @Component(
     modules = {
-        DonutsConfigModule.class,
+        RegistryConfig.ConfigModule.class,
         DonutsEppTestComponent.FakesAndMocksModule.class,
     }
 )

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package google.registry.monitoring.metrics;
+package google.registry.monitoring.metrics.stackdriver;
 
 import static com.google.common.truth.Truth.assertThat;
 import static java.nio.charset.StandardCharsets.UTF_8;
@@ -40,7 +40,16 @@ import com.google.api.services.monitoring.v3.model.Point;
 import com.google.api.services.monitoring.v3.model.TimeSeries;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
+import google.registry.monitoring.metrics.CustomFitter;
+import google.registry.monitoring.metrics.Distribution;
+import google.registry.monitoring.metrics.ExponentialFitter;
+import google.registry.monitoring.metrics.LabelDescriptor;
+import google.registry.monitoring.metrics.LinearFitter;
+import google.registry.monitoring.metrics.Metric;
+import google.registry.monitoring.metrics.MetricPoint;
+import google.registry.monitoring.metrics.MetricSchema;
 import google.registry.monitoring.metrics.MetricSchema.Kind;
+import google.registry.monitoring.metrics.MutableDistribution;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.util.List;
@@ -64,11 +73,9 @@ public class StackdriverWriterTest {
   @Mock private Monitoring.Projects.TimeSeries timeSeries;
   @Mock private Monitoring.Projects.MetricDescriptors.Create metricDescriptorCreate;
   @Mock private Monitoring.Projects.TimeSeries.Create timeSeriesCreate;
-  @Mock private Metric<Long> mockMetric;
-  @Mock private MetricSchema schema;
-  @Mock MetricPoint<Long> metricPoint;
-  private Counter metric;
-  private MetricDescriptor descriptor;
+  @Mock private Metric<Long> metric;
+  @Mock private Metric<Boolean> boolMetric;
+  @Mock private Metric<Distribution> distributionMetric;
   private static final String PROJECT = "PROJECT";
   private static final int MAX_QPS = 10;
   private static final int MAX_POINTS_PER_REQUEST = 10;
@@ -76,13 +83,49 @@ public class StackdriverWriterTest {
 
   @Before
   public void setUp() throws Exception {
-    metric =
-        new Counter(
-            "/name",
-            "desc",
-            "vdn",
-            ImmutableSet.of(LabelDescriptor.create("label", "description")));
-    descriptor = StackdriverWriter.encodeMetricDescriptor(metric);
+    when(metric.getValueClass()).thenReturn(Long.class);
+    when(metric.getCardinality()).thenReturn(1);
+    when(metric.getMetricSchema())
+        .thenReturn(
+            MetricSchema.create(
+                "/name",
+                "desc",
+                "vdn",
+                Kind.CUMULATIVE,
+                ImmutableSet.of(LabelDescriptor.create("label1", "desc1"))));
+    // Store in an intermediate value, because Mockito hates when mocks are evaluated inside of
+    // thenReturn() methods.
+    MetricPoint<Long> longPoint =
+        MetricPoint.create(
+            metric, ImmutableList.of("value1"), new Instant(1337), new Instant(1338), 5L);
+    when(metric.getTimestampedValues()).thenReturn(ImmutableList.of(longPoint));
+
+    when(boolMetric.getValueClass()).thenReturn(Boolean.class);
+    when(boolMetric.getMetricSchema())
+        .thenReturn(
+            MetricSchema.create(
+                "/name",
+                "desc",
+                "vdn",
+                Kind.GAUGE,
+                ImmutableSet.of(LabelDescriptor.create("label1", "desc1"))));
+    // Store in an intermediate value, because Mockito hates when mocks are evaluated inside of
+    // thenReturn() methods.
+    MetricPoint<Boolean> boolPoint =
+        MetricPoint.create(boolMetric, ImmutableList.of("foo"), new Instant(1337), true);
+    when(boolMetric.getTimestampedValues()).thenReturn(ImmutableList.of(boolPoint));
+
+    when(distributionMetric.getMetricSchema())
+        .thenReturn(
+            MetricSchema.create(
+                "/name",
+                "desc",
+                "vdn",
+                Kind.GAUGE,
+                ImmutableSet.of(LabelDescriptor.create("label1", "desc1"))));
+    when(distributionMetric.getValueClass()).thenReturn(Distribution.class);
+
+    MetricDescriptor descriptor = StackdriverWriter.encodeMetricDescriptor(metric);
     when(client.projects()).thenReturn(projects);
     when(projects.metricDescriptors()).thenReturn(metricDescriptors);
     when(projects.timeSeries()).thenReturn(timeSeries);
@@ -97,15 +140,14 @@ public class StackdriverWriterTest {
 
   @Test
   public void testWrite_maxPoints_flushes() throws Exception {
-    // The counter must be set once in order for there to be values to send.
-    metric.set(0L, new Instant(1337), ImmutableList.of("some_value"));
     StackdriverWriter writer =
         spy(
             new StackdriverWriter(
                 client, PROJECT, MONITORED_RESOURCE, MAX_QPS, MAX_POINTS_PER_REQUEST));
 
+
     for (int i = 0; i < MAX_POINTS_PER_REQUEST; i++) {
-      for (MetricPoint<?> point : metric.getTimestampedValues(new Instant(1337))) {
+      for (MetricPoint<?> point : metric.getTimestampedValues()) {
         writer.write(point);
       }
     }
@@ -115,15 +157,12 @@ public class StackdriverWriterTest {
 
   @Test
   public void testWrite_lessThanMaxPoints_doesNotFlush() throws Exception {
-    // The counter must be set once in order for there to be values to send.
-    metric.set(0L, new Instant(1337), ImmutableList.of("some_value"));
     StackdriverWriter writer =
         spy(
             new StackdriverWriter(
                 client, PROJECT, MONITORED_RESOURCE, MAX_QPS, MAX_POINTS_PER_REQUEST));
-
     for (int i = 0; i < MAX_POINTS_PER_REQUEST - 1; i++) {
-      for (MetricPoint<?> point : metric.getTimestampedValues(new Instant(1337))) {
+      for (MetricPoint<?> point : metric.getTimestampedValues()) {
         writer.write(point);
       }
     }
@@ -133,7 +172,7 @@ public class StackdriverWriterTest {
 
   @Test
   public void testWrite_invalidMetricType_throwsException() throws Exception {
-    when(mockMetric.getValueClass())
+    when(metric.getValueClass())
         .thenAnswer(
             new Answer<Class<?>>() {
               @Override
@@ -141,14 +180,10 @@ public class StackdriverWriterTest {
                 return Object.class;
               }
             });
-    when(mockMetric.getMetricSchema()).thenReturn(schema);
-    when(mockMetric.getTimestampedValues()).thenReturn(ImmutableList.of(metricPoint));
-    when(schema.kind()).thenReturn(Kind.CUMULATIVE);
-    when(metricPoint.metric()).thenReturn(mockMetric);
     StackdriverWriter writer =
         new StackdriverWriter(client, PROJECT, MONITORED_RESOURCE, MAX_QPS, MAX_POINTS_PER_REQUEST);
 
-    for (MetricPoint<?> point : mockMetric.getTimestampedValues()) {
+    for (MetricPoint<?> point : metric.getTimestampedValues()) {
       try {
         writer.write(point);
         fail("expected IllegalArgumentException");
@@ -158,15 +193,13 @@ public class StackdriverWriterTest {
 
   @Test
   public void testWrite_ManyPoints_flushesTwice() throws Exception {
-    // The counter must be set once in order for there to be values to send.
-    metric.set(0L, new Instant(1337), ImmutableList.of("some_value"));
     StackdriverWriter writer =
         spy(
             new StackdriverWriter(
                 client, PROJECT, MONITORED_RESOURCE, MAX_QPS, MAX_POINTS_PER_REQUEST));
 
     for (int i = 0; i < MAX_POINTS_PER_REQUEST * 2; i++) {
-      for (MetricPoint<?> point : metric.getTimestampedValues(new Instant(1337))) {
+      for (MetricPoint<?> point : metric.getTimestampedValues()) {
         writer.write(point);
       }
     }
@@ -283,8 +316,8 @@ public class StackdriverWriterTest {
         .containsExactly(
             new com.google.api.services.monitoring.v3.model.LabelDescriptor()
                 .setValueType("STRING")
-                .setKey("label")
-                .setDescription("description"));
+                .setKey("label1")
+                .setDescription("desc1"));
   }
 
   @Test
@@ -354,17 +387,25 @@ public class StackdriverWriterTest {
   @Test
   public void getEncodedTimeSeries_gaugeMetricPoint_zeroInterval_encodesSameInterval()
       throws Exception {
+    when(metric.getMetricSchema())
+        .thenReturn(
+            MetricSchema.create(
+                "/name",
+                "desc",
+                "vdn",
+                Kind.GAUGE,
+                ImmutableSet.of(LabelDescriptor.create("label1", "desc1"))));
+    // Store in an intermediate value, because Mockito hates when mocks are evaluated inside of
+    // thenReturn() methods.
+    MetricPoint<Long> testPoint =
+        MetricPoint.create(metric, ImmutableList.of("foo"), new Instant(1337), 10L);
+    when(metric.getTimestampedValues()).thenReturn(ImmutableList.of(testPoint));
+    // Store in an intermediate value, because Mockito hates when mocks are evaluated inside of
+    // thenReturn() methods.
+    MetricDescriptor descriptor = StackdriverWriter.encodeMetricDescriptor(metric);
+    when(metricDescriptorCreate.execute()).thenReturn(descriptor);
     StackdriverWriter writer =
         new StackdriverWriter(client, PROJECT, MONITORED_RESOURCE, MAX_QPS, MAX_POINTS_PER_REQUEST);
-    Metric<Long> metric =
-        new StoredMetric<>(
-            "/name",
-            "desc",
-            "vdn",
-            ImmutableSet.of(LabelDescriptor.create("label", "description")),
-            Long.class);
-    when(metricDescriptorCreate.execute())
-        .thenReturn(StackdriverWriter.encodeMetricDescriptor(metric));
     MetricPoint<Long> nativePoint =
         MetricPoint.create(
             metric, ImmutableList.of("foo"), new Instant(1337), new Instant(1337), 10L);
@@ -385,13 +426,7 @@ public class StackdriverWriterTest {
   public void getEncodedTimeSeries_booleanMetric_encodes() throws Exception {
     StackdriverWriter writer =
         new StackdriverWriter(client, PROJECT, MONITORED_RESOURCE, MAX_QPS, MAX_POINTS_PER_REQUEST);
-    Metric<Boolean> boolMetric =
-        new StoredMetric<>(
-            "/name",
-            "desc",
-            "vdn",
-            ImmutableSet.of(LabelDescriptor.create("label", "description")),
-            Boolean.class);
+
     MetricDescriptor boolDescriptor = StackdriverWriter.encodeMetricDescriptor(boolMetric);
     when(metricDescriptorCreate.execute()).thenReturn(boolDescriptor);
     MetricPoint<Boolean> nativePoint =
@@ -413,21 +448,16 @@ public class StackdriverWriterTest {
   public void getEncodedTimeSeries_distributionMetricCustomFitter_encodes() throws Exception {
     StackdriverWriter writer =
         new StackdriverWriter(client, PROJECT, MONITORED_RESOURCE, MAX_QPS, MAX_POINTS_PER_REQUEST);
-    Metric<Distribution> metric =
-        new StoredMetric<>(
-            "/name",
-            "desc",
-            "vdn",
-            ImmutableSet.of(LabelDescriptor.create("label", "description")),
-            Distribution.class);
-    MetricDescriptor descriptor = StackdriverWriter.encodeMetricDescriptor(metric);
+
+    MetricDescriptor descriptor = StackdriverWriter.encodeMetricDescriptor(distributionMetric);
     when(metricDescriptorCreate.execute()).thenReturn(descriptor);
     MutableDistribution distribution =
         new MutableDistribution(CustomFitter.create(ImmutableSet.of(5.0)));
     distribution.add(10.0, 5L);
     distribution.add(0.0, 5L);
     MetricPoint<Distribution> nativePoint =
-        MetricPoint.create(metric, ImmutableList.of("foo"), new Instant(1337), distribution);
+        MetricPoint.create(
+            distributionMetric, ImmutableList.of("foo"), new Instant(1337), distribution);
 
     TimeSeries timeSeries = writer.getEncodedTimeSeries(nativePoint);
 
@@ -454,14 +484,8 @@ public class StackdriverWriterTest {
   public void getEncodedTimeSeries_distributionMetricLinearFitter_encodes() throws Exception {
     StackdriverWriter writer =
         new StackdriverWriter(client, PROJECT, MONITORED_RESOURCE, MAX_QPS, MAX_POINTS_PER_REQUEST);
-    Metric<Distribution> metric =
-        new StoredMetric<>(
-            "/name",
-            "desc",
-            "vdn",
-            ImmutableSet.of(LabelDescriptor.create("label", "description")),
-            Distribution.class);
-    MetricDescriptor descriptor = StackdriverWriter.encodeMetricDescriptor(metric);
+
+    MetricDescriptor descriptor = StackdriverWriter.encodeMetricDescriptor(distributionMetric);
     when(metricDescriptorCreate.execute()).thenReturn(descriptor);
     MutableDistribution distribution = new MutableDistribution(LinearFitter.create(2, 5.0, 3.0));
     distribution.add(0.0, 1L);
@@ -469,7 +493,9 @@ public class StackdriverWriterTest {
     distribution.add(10.0, 5L);
     distribution.add(20.0, 5L);
     MetricPoint<Distribution> nativePoint =
-        MetricPoint.create(metric, ImmutableList.of("foo"), new Instant(1337), distribution);
+        MetricPoint.create(
+            distributionMetric, ImmutableList.of("foo"), new Instant(1337), distribution);
+
 
     TimeSeries timeSeries = writer.getEncodedTimeSeries(nativePoint);
 
@@ -497,14 +523,8 @@ public class StackdriverWriterTest {
   public void getEncodedTimeSeries_distributionMetricExponentialFitter_encodes() throws Exception {
     StackdriverWriter writer =
         new StackdriverWriter(client, PROJECT, MONITORED_RESOURCE, MAX_QPS, MAX_POINTS_PER_REQUEST);
-    Metric<Distribution> metric =
-        new StoredMetric<>(
-            "/name",
-            "desc",
-            "vdn",
-            ImmutableSet.of(LabelDescriptor.create("label", "description")),
-            Distribution.class);
-    MetricDescriptor descriptor = StackdriverWriter.encodeMetricDescriptor(metric);
+
+    MetricDescriptor descriptor = StackdriverWriter.encodeMetricDescriptor(distributionMetric);
     when(metricDescriptorCreate.execute()).thenReturn(descriptor);
     MutableDistribution distribution =
         new MutableDistribution(ExponentialFitter.create(2, 3.0, 0.5));
@@ -513,7 +533,8 @@ public class StackdriverWriterTest {
     distribution.add(10.0, 5L);
     distribution.add(20.0, 5L);
     MetricPoint<Distribution> nativePoint =
-        MetricPoint.create(metric, ImmutableList.of("foo"), new Instant(1337), distribution);
+        MetricPoint.create(
+            distributionMetric, ImmutableList.of("foo"), new Instant(1337), distribution);
 
     TimeSeries timeSeries = writer.getEncodedTimeSeries(nativePoint);
 

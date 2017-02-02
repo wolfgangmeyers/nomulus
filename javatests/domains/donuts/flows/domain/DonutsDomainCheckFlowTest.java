@@ -15,7 +15,7 @@
 package domains.donuts.flows.domain;
 
 import static com.google.common.truth.Truth.assertThat;
-import static domains.donuts.config.DonutsConfigModule.provideDpmlCreateOverridePrice;
+import static domains.donuts.config.DpmlModule.provideDpmlCreateOverridePrice;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.persistActiveDomain;
