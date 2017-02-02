@@ -137,7 +137,7 @@ public class DonutsDomainCreateFlowCustomLogicTest {
   }
 
   @Test
-  public void testAfterValidation_DpmlBlockSuperuser() throws Exception {
+  public void testAfterValidation_DpmlBlockSuperuser_ShouldNotThrowException() throws Exception {
     doReturn(true).when(flowMetadata).isSuperuser();
     persistResource(new BlockedLabel.Builder()
       .setLabel("sld")

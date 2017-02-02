@@ -36,7 +36,6 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSortedMap;
 import com.google.common.collect.Maps;
 import com.google.common.util.concurrent.UncheckedExecutionException;
-
 import com.googlecode.objectify.Key;
 import com.googlecode.objectify.VoidWork;
 import com.googlecode.objectify.Work;
@@ -47,22 +46,17 @@ import com.googlecode.objectify.annotation.Ignore;
 import com.googlecode.objectify.annotation.Mapify;
 import com.googlecode.objectify.annotation.Parent;
 import com.googlecode.objectify.cmd.Query;
-
-import google.registry.config.RegistryEnvironment;
 import google.registry.model.Buildable;
 import google.registry.model.common.TimedTransitionProperty;
 import google.registry.model.pricing.PricingCategory;
 import google.registry.util.DateTimeUtils;
-
-import org.joda.money.Money;
-import org.joda.time.DateTime;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
-
 import javax.annotation.Nullable;
+import org.joda.money.Money;
+import org.joda.time.DateTime;
 
 @Entity
 @Cache(expirationSeconds = RECOMMENDED_MEMCACHE_EXPIRATION)
@@ -514,7 +508,6 @@ public class CategorizedPremiumList
       // Remove the existing CategorizedListEntry and replace with the updated entry
       final Map<String, CategorizedListEntry> newEntries = new HashMap<>();
       newEntries.putAll(existingEntries); // copy over old entries
-      newEntries.remove(oldEntry); // remove old one
       newEntries.put(updatedEntry.getLabel(), updatedEntry); // add new one
 
       // Returns the PremiumList based upon new entries
