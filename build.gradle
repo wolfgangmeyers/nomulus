@@ -34,7 +34,7 @@ configurations { soyGenerator }
 
 ext {
     // Dependency Versions
-    daggerVersion = '2.7'
+    daggerVersion = '2.8'
 
     autoCommonVersion = '0.7'
     autoFactoryVersion = '1.0-beta3'
@@ -53,7 +53,7 @@ ext {
     appEngineMapReduceVersion = '0.8.5'
     appEngineGcsClientVersion = '0.5'
 
-    guavaVersion = '19.0'
+    guavaVersion = '20.0'
     re2jVersion = '1.1'
     soyVersion = '2015-04-10'
     closureCompilerVersion = 'v20160315'
