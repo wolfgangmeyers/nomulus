@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,8 +18,8 @@ import static com.google.common.base.Suppliers.memoize;
 import static google.registry.config.ConfigUtils.makeUrl;
 import static google.registry.config.YamlUtils.getConfigSettings;
 import static java.lang.annotation.RetentionPolicy.RUNTIME;
-import static org.joda.time.Duration.standardDays;
 
+import com.google.common.base.Ascii;
 import com.google.common.base.Optional;
 import com.google.common.base.Supplier;
 import com.google.common.collect.ImmutableList;
@@ -31,6 +31,8 @@ import java.lang.annotation.Documented;
 import java.lang.annotation.Retention;
 import java.net.URI;
 import java.net.URL;
+import java.util.Map;
+import java.util.Map.Entry;
 import javax.annotation.Nullable;
 import javax.inject.Named;
 import javax.inject.Qualifier;
@@ -285,20 +287,6 @@ public final class RegistryConfig {
     }
 
     /**
-     * Returns {@code true} if the target zone should be created in DNS if it does not exist.
-     */
-    @Provides
-    @Config("dnsCreateZone")
-    public static boolean provideDnsCreateZone(RegistryEnvironment environment) {
-      switch (environment) {
-        case PRODUCTION:
-          return false;
-        default:
-          return true;
-      }
-    }
-
-    /**
      * The maximum number of domain and host updates to batch together to send to
      * PublishDnsUpdatesAction, to avoid exceeding AppEngine's limits.
      *
@@ -409,13 +397,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("tmchCaMode")
-    public static TmchCaMode provideTmchCaMode() {
-      switch (RegistryEnvironment.get()) {
-        case PRODUCTION:
-          return TmchCaMode.PRODUCTION;
-        default:
-          return TmchCaMode.PILOT;
-      }
+    public static TmchCaMode provideTmchCaMode(RegistryConfigSettings config) {
+      return TmchCaMode.valueOf(config.registryPolicy.tmchCaMode);
     }
 
     /** The mode that the {@code TmchCertificateAuthority} operates in. */
@@ -440,13 +423,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("tmchCrlUrl")
-    public static URL provideTmchCrlUrl(RegistryEnvironment environment) {
-      switch (environment) {
-        case PRODUCTION:
-          return makeUrl("http://crl.icann.org/tmch.crl");
-        default:
-          return makeUrl("http://crl.icann.org/tmch_pilot.crl");
-      }
+    public static URL provideTmchCrlUrl(RegistryConfigSettings config) {
+      return makeUrl(config.registryPolicy.tmchCrlUrl);
     }
 
     /**
@@ -459,14 +437,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("tmchMarksdbUrl")
-    public static String provideTmchMarksdbUrl(RegistryEnvironment environment) {
-      switch (environment) {
-        case PRODUCTION:
-        case UNITTEST:
-          return "https://ry.marksdb.org";
-        default:
-          return "https://test.ry.marksdb.org";
-      }
+    public static String provideTmchMarksdbUrl(RegistryConfigSettings config) {
+      return config.registryPolicy.tmchMarksDbUrl;
     }
 
     /**
@@ -558,13 +530,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("rdeReportUrlPrefix")
-    public static String provideRdeReportUrlPrefix(RegistryEnvironment environment) {
-      switch (environment) {
-        case PRODUCTION:
-          return "https://ry-api.icann.org/report/registry-escrow-report";
-        default:
-          return "https://test-ry-api.icann.org:8543/report/registry-escrow-report";
-      }
+    public static String provideRdeReportUrlPrefix(RegistryConfigSettings config) {
+      return config.rde.reportUrlPrefix;
     }
 
     /**
@@ -624,9 +591,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("rdeSshIdentity")
-    public static String provideSshIdentity() {
-      // Change this to your RDE identity.
-      return "mercury-donuts-test@example.test";
+    public static String provideSshIdentity(RegistryConfigSettings config) {
+      return config.rde.sshIdentityEmailAddress;
     }
 
     /**
@@ -638,13 +604,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("rdeUploadUrl")
-    public static URI provideRdeUploadUrl(RegistryEnvironment environment) {
-      switch (environment) {
-        case PRODUCTION:
-          return URI.create("sftp://GoogleTLD@sftpipm2.ironmountain.com/Outbox");
-        default:
-          return URI.create("sftp://mercury-donuts-test@104.196.228.43");
-      }
+    public static URI provideRdeUploadUrl(RegistryConfigSettings config) {
+      return URI.create(config.rde.uploadUrl);
     }
 
     /**
@@ -678,20 +639,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("sheetRegistrarId")
-    public static Optional<String> provideSheetRegistrarId(RegistryEnvironment environment) {
-      switch (environment) {
-        case PRODUCTION:
-          return Optional.of("1n2Gflqsgo9iDXcdt9VEskOVySZ8qIhQHJgjqsleCKdE");
-        case ALPHA:
-        case CRASH:
-          return Optional.of("16BwRt6v11Iw-HujCbAkmMxqw3sUG13B8lmXLo-uJTsE");
-        case SANDBOX:
-          return Optional.of("1TlR_UMCtfpkxT9oUEoF5JEbIvdWNkLRuURltFkJ_7_8");
-        case QA:
-          return Optional.of("1RoY1XZhLLwqBkrz0WbEtaT9CU6c8nUAXfId5BtM837o");
-        default:
-          return Optional.absent();
-      }
+    public static Optional<String> provideSheetRegistrarId(RegistryConfigSettings config) {
+      return Optional.fromNullable(config.misc.sheetExportId);
     }
 
     /**
@@ -761,8 +710,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("rdapLinkBase")
-    public static String provideRdapLinkBase() {
-      return "https://nic.google/rdap/";
+    public static String provideRdapLinkBase(RegistryConfigSettings config) {
+      return config.rdap.baseUrl;
     }
 
     /**
@@ -788,17 +737,13 @@ public final class RegistryConfig {
     @Provides
     @Config("braintreeMerchantAccountIds")
     public static ImmutableMap<CurrencyUnit, String> provideBraintreeMerchantAccountId(
-        RegistryEnvironment environment) {
-      switch (environment) {
-        case PRODUCTION:
-          return ImmutableMap.of(
-              CurrencyUnit.USD, "charlestonregistryUSD",
-              CurrencyUnit.JPY, "charlestonregistryJPY");
-        default:
-          return ImmutableMap.of(
-              CurrencyUnit.USD, "google",
-              CurrencyUnit.JPY, "google-jpy");
+        RegistryConfigSettings config) {
+      Map<String, String> merchantAccountIds = config.braintree.merchantAccountIdsMap;
+      ImmutableMap.Builder<CurrencyUnit, String> builder = new ImmutableMap.Builder<>();
+      for (Entry<String, String> entry : merchantAccountIds.entrySet()) {
+        builder.put(CurrencyUnit.of(entry.getKey()), entry.getValue());
       }
+      return builder.build();
     }
 
     /**
@@ -810,14 +755,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("braintreeMerchantId")
-    public static String provideBraintreeMerchantId(RegistryEnvironment environment) {
-      switch (environment) {
-        case PRODUCTION:
-          return "6gm2mm48k9ty4zmx";
-        default:
-          // Valentine: Nomulus Braintree Sandbox
-          return "vqgn8khkq2cs6y9s";
-      }
+    public static String provideBraintreeMerchantId(RegistryConfigSettings config) {
+      return config.braintree.merchantId;
     }
 
     /**
@@ -830,14 +769,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("braintreePublicKey")
-    public static String provideBraintreePublicKey(RegistryEnvironment environment) {
-      switch (environment) {
-        case PRODUCTION:
-          return "tzcfxggzgbh2jg5x";
-        default:
-          // Valentine: Nomulus Braintree Sandbox
-          return "tzcyzvm3mn7zkdnx";
-      }
+    public static String provideBraintreePublicKey(RegistryConfigSettings config) {
+      return config.braintree.publicKey;
     }
 
     /**
@@ -847,20 +780,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("whoisDisclaimer")
-    public static String provideWhoisDisclaimer() {
-      return "WHOIS information is provided by Charleston Road Registry Inc. (CRR) solely for\n"
-          + "query-based, informational purposes. By querying our WHOIS database, you are\n"
-          + "agreeing to comply with these terms\n"
-          + "(http://www.registry.google/about/whois-disclaimer.html) so please read them\n"
-          + "carefully.  Any information provided is \"as is\" without any guarantee of\n"
-          + "accuracy. You may not use such information to (a) allow, enable, or otherwise\n"
-          + "support the transmission of mass unsolicited, commercial advertising or\n"
-          + "solicitations; (b) enable high volume, automated, electronic processes that\n"
-          + "access the systems of CRR or any ICANN-Accredited Registrar, except as\n"
-          + "reasonably necessary to register domain names or modify existing registrations;\n"
-          + "or (c) engage in or support unlawful behavior. CRR reserves the right to\n"
-          + "restrict or deny your access to the Whois database, and may modify these terms\n"
-          + "at any time.\n";
+    public static String provideWhoisDisclaimer(RegistryConfigSettings config) {
+      return config.registryPolicy.whoisDisclaimer;
     }
 
     /**
@@ -907,8 +828,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("contactAutomaticTransferLength")
-    public static Duration provideContactAutomaticTransferLength() {
-      return standardDays(5);
+    public static Duration provideContactAutomaticTransferLength(RegistryConfigSettings config) {
+      return Duration.standardDays(config.registryPolicy.contactAutomaticTransferDays);
     }
 
     /**
@@ -955,30 +876,21 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("greetingServerId")
-    public static String provideGreetingServerId() {
-      return "Charleston Road Registry";
+    public static String provideGreetingServerId(RegistryConfigSettings config) {
+      return config.registryPolicy.greetingServerId;
     }
 
     @Provides
     @Config("customLogicFactoryClass")
-    public static String provideCustomLogicFactoryClass() {
-      // TODO(b/32875427): This will be converted to YAML configuration in a future refactor.
-      return "domains.donuts.flows.custom.DonutsCustomLogicFactory";
+    public static String provideCustomLogicFactoryClass(RegistryConfigSettings config) {
+      return config.registryPolicy.customLogicFactoryClass;
     }
 
     @Provides
     @Config("whoisCommandFactoryClass")
-    public static String provideWhoisCommandFactoryClass() {
-      // TODO(b/32875427): This will be converted to YAML configuration in a future refactor.
-      return "google.registry.whois.WhoisCommandFactory";
+    public static String provideWhoisCommandFactoryClass(RegistryConfigSettings config) {
+      return config.registryPolicy.whoisCommandFactoryClass;
     }
-
-    private static final String RESERVED_TERMS_EXPORT_DISCLAIMER = ""
-                                                                       + "# This list contains reserve terms for the TLD. Other terms may be reserved\n"
-                                                                       + "# but not included in this list, including terms EXAMPLE REGISTRY chooses not\n"
-                                                                       + "# to publish, and terms that ICANN commonly mandates to be reserved. This\n"
-                                                                       + "# list is subject to change and the most up-to-date source is always to\n"
-                                                                       + "# check availability directly with the Registry server.\n";
 
     /**
      * Returns the header text at the top of the reserved terms exported list.
@@ -987,8 +899,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("reservedTermsExportDisclaimer")
-    public static String provideReservedTermsExportDisclaimer() {
-      return RESERVED_TERMS_EXPORT_DISCLAIMER;
+    public static String provideReservedTermsExportDisclaimer(RegistryConfigSettings config) {
+      return config.registryPolicy.reservedTermsExportDisclaimer;
     }
 
     /**
@@ -996,8 +908,8 @@ public final class RegistryConfig {
      */
     @Provides
     @Config("checkApiServletRegistrarClientId")
-    public static String provideCheckApiServletRegistrarClientId() {
-      return "TheRegistrar";
+    public static String provideCheckApiServletRegistrarClientId(RegistryConfigSettings config) {
+      return config.registryPolicy.checkApiServletClientId;
     }
 
     @Singleton
@@ -1144,27 +1056,27 @@ public final class RegistryConfig {
    * <p>This is used by the {@code nomulus} tool to connect to the App Engine remote API.
    */
   public static HostAndPort getServer() {
+    // TODO(b/33386530): Make this configurable in a way that is accessible from the nomulus
+    // command-line tool.
     switch (RegistryEnvironment.get()) {
+      case PRODUCTION:
+        return HostAndPort.fromParts("tools-dot-domain-registry.appspot.com", 443);
       case LOCAL:
         return HostAndPort.fromParts("localhost", 8080);
       case UNITTEST:
         throw new UnsupportedOperationException("Unit tests can't spin up a full server");
       default:
         return HostAndPort.fromParts(
-            String.format("tools-dot-%s.appspot.com", getProjectId()), 443);
+            String.format(
+                "tools-dot-domain-registry-%s.appspot.com",
+                Ascii.toLowerCase(RegistryEnvironment.get().name())),
+            443);
     }
   }
 
   /** Returns the amount of time a singleton should be cached, before expiring. */
   public static Duration getSingletonCacheRefreshDuration() {
-    switch (RegistryEnvironment.get()) {
-      case UNITTEST:
-        // All cache durations are set to zero so that unit tests can update and then retrieve data
-        // immediately without failure.
-        return Duration.ZERO;
-      default:
-        return Duration.standardMinutes(10);
-    }
+    return Duration.standardSeconds(CONFIG_SETTINGS.get().caching.singletonCacheRefreshSeconds);
   }
 
   /**
@@ -1174,22 +1086,22 @@ public final class RegistryConfig {
    * @see google.registry.model.registry.label.PremiumList
    */
   public static Duration getDomainLabelListCacheDuration() {
-    switch (RegistryEnvironment.get()) {
-      case UNITTEST:
-        return Duration.ZERO;
-      default:
-        return Duration.standardHours(1);
-    }
+    return Duration.standardSeconds(CONFIG_SETTINGS.get().caching.domainLabelCachingSeconds);
   }
 
   /** Returns the amount of time a singleton should be cached in persist mode, before expiring. */
   public static Duration getSingletonCachePersistDuration() {
-    switch (RegistryEnvironment.get()) {
-      case UNITTEST:
-        return Duration.ZERO;
-      default:
-        return Duration.standardDays(365);
-    }
+    return Duration.standardSeconds(CONFIG_SETTINGS.get().caching.singletonCachePersistSeconds);
+  }
+
+  /** Returns the email address that outgoing emails from the app are sent from. */
+  public static String getGSuiteOutgoingEmailAddress() {
+    return CONFIG_SETTINGS.get().gSuite.outgoingEmailAddress;
+  }
+
+  /** Returns the display name that outgoing emails from the app are sent from. */
+  public static String getGSuiteOutgoingEmailDisplayName() {
+    return CONFIG_SETTINGS.get().gSuite.outgoingEmailDisplayName;
   }
 
   /**
@@ -1220,17 +1132,17 @@ public final class RegistryConfig {
    * Returns the base retry duration that gets doubled after each failure within {@code Ofy}.
    */
   public static Duration getBaseOfyRetryDuration() {
-    switch (RegistryEnvironment.get()) {
-      case UNITTEST:
-        return Duration.ZERO;
-      default:
-        return Duration.millis(100);
-    }
+    return Duration.millis(CONFIG_SETTINGS.get().datastore.baseOfyRetryMillis);
   }
 
   /** Returns the roid suffix to be used for the roids of all contacts and hosts. */
   public static String getContactAndHostRoidSuffix() {
     return CONFIG_SETTINGS.get().registryPolicy.contactAndHostRoidSuffix;
+  }
+
+  /** Returns the global automatic transfer length for contacts. */
+  public static Duration getContactAutomaticTransferLength() {
+    return Duration.standardDays(CONFIG_SETTINGS.get().registryPolicy.contactAutomaticTransferDays);
   }
 
   /**
@@ -1245,18 +1157,6 @@ public final class RegistryConfig {
         public RegistryConfigSettings get() {
           return getConfigSettings();
         }});
-
-  /** Config values used for local and unit test environments. */
-  public static class LocalTestConfig {
-
-    public static final String RESERVED_TERMS_TEST_EXPORT_DISCLAIMER = "This is a disclaimer.\n";
-
-    public static final String GOOGLE_APPS_SEND_FROM_EMAIL_ADDRESS = "noreply@testing.example";
-
-    public static final String GOOGLE_APPS_ADMIN_EMAIL_DISPLAY_NAME = "Testing Nomulus";
-
-    public static final Duration CONTACT_AUTOMATIC_TRANSFER_LENGTH = standardDays(5);
-  }
 
   private RegistryConfig() {}
 }

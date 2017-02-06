@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -275,7 +275,7 @@ public final class AppEngineRule extends ExternalResource {
     }
     if (withTaskQueue) {
       File queueFile = temporaryFolder.newFile("queue.xml");
-      Files.write(taskQueueXml, queueFile, UTF_8);
+      Files.asCharSink(queueFile, UTF_8).write(taskQueueXml);
       configs.add(new LocalTaskQueueTestConfig()
           .setQueueXmlPath(queueFile.getAbsolutePath()));
     }
@@ -329,8 +329,8 @@ public final class AppEngineRule extends ExternalResource {
     helper = null;
     // Test that the datastore didn't need any indexes we don't have listed in our index file.
     try {
-      Set<String> autoIndexes = getIndexXmlStrings(Files.toString(
-          new File(temporaryFolder.getRoot(), "datastore-indexes-auto.xml"), UTF_8));
+      Set<String> autoIndexes = getIndexXmlStrings(Files.asCharSource(
+          new File(temporaryFolder.getRoot(), "datastore-indexes-auto.xml"), UTF_8).read());
       Set<String> missingIndexes = Sets.difference(autoIndexes, MANUAL_INDEXES);
       if (!missingIndexes.isEmpty()) {
         assert_().fail("Missing indexes:\n%s", Joiner.on('\n').join(missingIndexes));

@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,7 +41,6 @@ import google.registry.xjc.rdeheader.XjcRdeHeader;
 import google.registry.xjc.rdereport.XjcRdeReportReport;
 import google.registry.xml.XmlException;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.net.MalformedURLException;
 import java.net.SocketTimeoutException;
 import java.net.URL;
@@ -68,7 +67,7 @@ public class RdeReporter {
   @Inject RdeReporter() {}
 
   /** Uploads {@code reportBytes} to ICANN. */
-  public void send(byte[] reportBytes) throws IOException, XmlException {
+  public void send(byte[] reportBytes) throws XmlException {
     XjcRdeReportReport report = XjcXmlTransformer.unmarshal(
         XjcRdeReportReport.class, new ByteArrayInputStream(reportBytes));
     XjcRdeHeader header = report.getHeader().getValue();

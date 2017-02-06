@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -99,7 +99,7 @@ public final class RegistryTestServer {
 
   private final TestServer server;
 
-  /** @see TestServer#TestServer(HostAndPort, java.util.Map, Iterable, Iterable) */
+  /** @see TestServer#TestServer(HostAndPort, ImmutableMap, ImmutableList, ImmutableList) */
   public RegistryTestServer(HostAndPort address) {
     server = new TestServer(address, RUNFILES, ROUTES, FILTERS);
   }

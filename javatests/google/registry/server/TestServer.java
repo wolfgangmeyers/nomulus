@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,11 +15,12 @@
 package google.registry.server;
 
 import static com.google.common.base.Preconditions.checkArgument;
+import static com.google.common.base.Throwables.throwIfUnchecked;
 import static com.google.common.util.concurrent.Runnables.doNothing;
 import static google.registry.util.NetworkUtils.getCanonicalHostName;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.net.HostAndPort;
 import com.google.common.util.concurrent.SimpleTimeLimiter;
 import java.net.MalformedURLException;
@@ -84,7 +85,7 @@ public final class TestServer {
    */
   public TestServer(
       HostAndPort address,
-      Map<String, Path> runfiles,
+      ImmutableMap<String, Path> runfiles,
       ImmutableList<Route> routes,
       ImmutableList<Class<? extends Filter>> filters) {
     urlAddress = createUrlAddress(address);
@@ -97,7 +98,8 @@ public final class TestServer {
     try {
       server.start();
     } catch (Exception e) {
-      throw Throwables.propagate(e);
+      throwIfUnchecked(e);
+      throw new RuntimeException(e);
     }
     UrlChecker.waitUntilAvailable(getUrl("/healthz"), STARTUP_TIMEOUT_MS);
   }
@@ -135,7 +137,8 @@ public final class TestServer {
         }
       }, SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS, true);
     } catch (Exception e) {
-      throw Throwables.propagate(e);
+      throwIfUnchecked(e);
+      throw new RuntimeException(e);
     }
   }
 
@@ -177,20 +180,20 @@ public final class TestServer {
 
   private static Connector createConnector(HostAndPort address) {
     SocketConnector connector = new SocketConnector();
-    connector.setHost(address.getHostText());
+    connector.setHost(address.getHost());
     connector.setPort(address.getPortOrDefault(DEFAULT_PORT));
     return connector;
   }
 
   /** Converts a bind address into an address that other machines can use to connect here. */
   private static HostAndPort createUrlAddress(HostAndPort address) {
-    if (address.getHostText().equals("::") || address.getHostText().equals("0.0.0.0")) {
+    if (address.getHost().equals("::") || address.getHost().equals("0.0.0.0")) {
       return address.getPortOrDefault(DEFAULT_PORT) == DEFAULT_PORT
           ? HostAndPort.fromHost(getCanonicalHostName())
           : HostAndPort.fromParts(getCanonicalHostName(), address.getPort());
     } else {
       return address.getPortOrDefault(DEFAULT_PORT) == DEFAULT_PORT
-          ? HostAndPort.fromHost(address.getHostText())
+          ? HostAndPort.fromHost(address.getHost())
           : address;
     }
   }

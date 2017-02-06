@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -41,8 +41,9 @@ public abstract class CreateOrUpdateReservedListCommandTestCase
     File invalidReservedTermsFile = tmpDir.newFile("reserved-terms-wontparse.csv");
     String reservedTermsCsv = readResourceUtf8(
         CreateOrUpdateReservedListCommandTestCase.class, "testdata/example_reserved_terms.csv");
-    Files.write(reservedTermsCsv, reservedTermsFile, UTF_8);
-    Files.write("sdfgagmsdgs,sdfgsd\nasdf234tafgs,asdfaw\n\n", invalidReservedTermsFile, UTF_8);
+    Files.asCharSink(reservedTermsFile, UTF_8).write(reservedTermsCsv);
+    Files.asCharSink(invalidReservedTermsFile, UTF_8)
+        .write("sdfgagmsdgs,sdfgsd\nasdf234tafgs,asdfaw\n\n");
     reservedTermsPath = reservedTermsFile.getPath();
     invalidReservedTermsPath = invalidReservedTermsFile.getPath();
   }

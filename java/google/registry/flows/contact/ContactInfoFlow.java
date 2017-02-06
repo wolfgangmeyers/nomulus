@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -18,7 +18,6 @@ import static google.registry.flows.FlowUtils.validateClientIsLoggedIn;
 import static google.registry.flows.ResourceFlowUtils.loadAndVerifyExistence;
 import static google.registry.flows.ResourceFlowUtils.verifyOptionalAuthInfo;
 import static google.registry.model.EppResourceUtils.isLinked;
-import static google.registry.util.CollectionUtils.difference;
 
 import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableSet;
@@ -67,8 +66,7 @@ public final class ContactInfoFlow implements Flow {
     boolean includeAuthInfo =
         clientId.equals(contact.getCurrentSponsorClientId()) || authInfo.isPresent();
     ImmutableSet.Builder<StatusValue> statusValues = new ImmutableSet.Builder<>();
-    // TODO(b/34664935): When LINKED is no longer persisted we won't need to filter it out.
-    statusValues.addAll(difference(contact.getStatusValues(), StatusValue.LINKED));
+    statusValues.addAll(contact.getStatusValues());
     if (isLinked(Key.create(contact), now)) {
       statusValues.add(StatusValue.LINKED);
     }

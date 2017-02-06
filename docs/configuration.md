@@ -78,6 +78,9 @@ description of each option:
 ```yaml
 appEngine:
   projectId: # Your App Engine project ID
+  toolsServiceUrl:
+    hostName: tools-dot-PROJECT-ID.appspot.com  # Insert your project ID
+    port: 443
 
 gSuite:
   domainName: # Your G Suite domain name
@@ -86,12 +89,8 @@ gSuite:
 
 For fully-featured production environments that need the full range of features
 (e.g. RDE, correct contact information on the registrar console, etc.) you will
-need to provide configuration for the settings in the following sections:
-
-* `appEngine:`
-* `gSuite:`
-* `registryPolicy:`
-* `registrarConsole:`
+need to specify more settings. The `nomulus-config-production-sample.yaml` file
+contains an exhaustive list of all settings to override.
 
 From a code perspective, all configuration settings ultimately come through the
 `[RegistryConfig][registry-config]` class. This includes a Dagger module called

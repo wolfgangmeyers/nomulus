@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -118,19 +118,9 @@ final class RegistryCli {
     }
     loggingParams.configureLogging();  // Must be called after parameters are parsed.
 
-    // Decide which HTTP connection to use for App Engine
-    HttpRequestFactoryComponent requestFactoryComponent;
-    if (appEngineConnectionFlags.getServer().getHostText().equals("localhost")) {
-      requestFactoryComponent = new LocalhostRequestFactoryComponent();
-    } else {
-      requestFactoryComponent = new BasicHttpRequestFactoryComponent();
-    }
-
     // Create the main component and use it to inject the command class.
     RegistryToolComponent component = DaggerRegistryToolComponent.builder()
-        .httpRequestFactoryComponent(requestFactoryComponent)
-        .appEngineConnectionFlagsModule(
-            new AppEngineConnectionFlagsModule(appEngineConnectionFlags))
+        .flagsModule(new AppEngineConnectionFlags.FlagsModule(appEngineConnectionFlags))
         .build();
     injectReflectively(RegistryToolComponent.class, component, command);
 
@@ -147,7 +137,7 @@ final class RegistryCli {
     // RemoteApiCommands need to have the remote api installed to work.
     RemoteApiInstaller installer = new RemoteApiInstaller();
     RemoteApiOptions options = new RemoteApiOptions();
-    options.server(connection.getServer().getHostText(), connection.getServer().getPort());
+    options.server(connection.getServer().getHost(), connection.getServer().getPort());
     if (connection.isLocalhost()) {
       // Use dev credentials for localhost.
       options.useDevelopmentServerCredential();

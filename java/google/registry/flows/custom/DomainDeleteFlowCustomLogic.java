@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,8 +67,8 @@ public class DomainDeleteFlowCustomLogic extends BaseFlowCustomLogic {
   /**
    * A hook that runs before the response is returned.
    *
-   * <p>This takes the {@link Result.Code} and {@link ResponseExtension}s as input and returns them,
-   * potentially with modifications.
+   * <p>This takes the {@link google.registry.model.eppoutput.Result.Code} and
+   * {@link ResponseExtension}s as input and returns them, potentially with modifications.
    */
   @SuppressWarnings("unused")
   public BeforeResponseReturnData beforeResponse(BeforeResponseParameters parameters)

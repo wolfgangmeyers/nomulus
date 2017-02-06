@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -562,6 +562,8 @@ public class HostUpdateFlowTest extends ResourceFlowTestCase<HostUpdateFlow, Hos
     // The last transfer time should be what was on the superordinate domain at the time of the host
     // update, not what it is later changed to.
     assertThat(renamedHost.getLastTransferTime()).isEqualTo(lastTransferTime);
+    // External hosts should always have null lastSuperordinateChange.
+    assertThat(renamedHost.getLastSuperordinateChange()).isNull();
   }
 
   @Test
