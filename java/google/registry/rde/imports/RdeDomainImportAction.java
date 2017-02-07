@@ -157,14 +157,8 @@ public class RdeDomainImportAction implements Runnable {
         logger.infofmt("Domain %s already exists", xjcDomain.getName());
       } catch (Exception e) {
         getContext().incrementCounter("domain import errors");
-        throw new DomainImportException(xjcDomain.getName(), xjcDomain.toString(), e);
+        logger.severefmt(e, "Error processing domain %s; xml=%s", xjcDomain.getName(), xjcDomain);
       }
-    }
-  }
-
-  private static class DomainImportException extends RuntimeException {
-    DomainImportException(String domainName, String xml, Throwable cause) {
-      super(String.format("Error processing domain %s; xml=%s", domainName, xml), cause);
     }
   }
 }

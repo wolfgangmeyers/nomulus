@@ -153,14 +153,8 @@ public class RdeContactImportAction implements Runnable {
       } catch (Exception e) {
         // Record the number of contacts with unexpected errors
         getContext().incrementCounter("contact import errors");
-        throw new ContactImportException(xjcContact.getId(), xjcContact.toString(), e);
+        logger.severefmt(e, "Error importing contact %s; xml=%s", xjcContact.getId(), xjcContact);
       }
-    }
-  }
-
-  private static class ContactImportException extends RuntimeException {
-    ContactImportException(String contactId, String xml, Throwable cause) {
-      super(String.format("Error importing contact %s; xml=%s", contactId, xml), cause);
     }
   }
 }
