@@ -43,6 +43,7 @@ import google.registry.xjc.rdehost.XjcRdeHost;
 import google.registry.xjc.rdehost.XjcRdeHostElement;
 import org.joda.time.DateTime;
 
+import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 /**
@@ -89,6 +90,7 @@ public class RdeHostLinkAction implements Runnable {
    *
    * @throws {@link IllegalStateException} for hosts without superordinate domains
    */
+  @Nullable
   private static DomainResource lookupSuperordinateDomain(InternetDomainName hostName, DateTime now) {
     Optional<InternetDomainName> tld = findTldForName(hostName);
     // out of zone hosts cannot be linked
@@ -101,7 +103,7 @@ public class RdeHostLinkAction implements Runnable {
     DomainResource superordinateDomain = loadByForeignKey(DomainResource.class, domainName, now);
     // Hosts can't be linked if domains import hasn't been run
     checkState(superordinateDomain != null,
-      "Superordinate domain not found: %s",
+      "Superordinate domain does not exist: %s",
       domainName);
     return superordinateDomain;
   }
