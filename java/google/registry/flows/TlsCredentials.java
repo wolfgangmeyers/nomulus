@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -76,7 +76,7 @@ public class TlsCredentials implements TransportCredentials {
 
   static InetAddress parseInetAddress(String asciiAddr) {
     try {
-      return InetAddresses.forString(HostAndPort.fromString(asciiAddr).getHostText());
+      return InetAddresses.forString(HostAndPort.fromString(asciiAddr).getHost());
     } catch (IllegalArgumentException e) {
       return null;
     }

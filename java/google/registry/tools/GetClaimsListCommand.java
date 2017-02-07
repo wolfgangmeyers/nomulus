@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -46,6 +46,6 @@ final class GetClaimsListCommand implements RemoteApiCommand {
   public void run() throws Exception {
     ClaimsListShard cl = checkNotNull(ClaimsListShard.get(), "Couldn't load ClaimsList");
     String csv = Joiner.on('\n').withKeyValueSeparator(",").join(cl.getLabelsToKeys()) + "\n";
-    Files.write(csv, output.toFile(), UTF_8);
+    Files.asCharSink(output.toFile(), UTF_8).write(csv);
   }
 }

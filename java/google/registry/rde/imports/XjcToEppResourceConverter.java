@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,49 +14,24 @@
 
 package google.registry.rde.imports;
 
-import com.google.common.base.Joiner;
+import static java.nio.charset.StandardCharsets.UTF_8;
+
 import google.registry.model.EppResource;
+import google.registry.xjc.XjcXmlTransformer;
+import google.registry.xml.XmlException;
 import java.io.ByteArrayOutputStream;
-import java.util.Arrays;
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBElement;
-import javax.xml.bind.JAXBException;
-import javax.xml.bind.Marshaller;
 
 /**
  * Base class for Jaxb object to {@link EppResource} converters
  */
 public abstract class XjcToEppResourceConverter {
 
-  /** List of packages to initialize JAXBContext. **/
-  private static final String JAXB_CONTEXT_PACKAGES = Joiner.on(":")
-      .join(Arrays.asList(
-          "google.registry.xjc.contact",
-          "google.registry.xjc.domain",
-          "google.registry.xjc.host",
-          "google.registry.xjc.mark",
-          "google.registry.xjc.rde",
-          "google.registry.xjc.rdecontact",
-          "google.registry.xjc.rdedomain",
-          "google.registry.xjc.rdeeppparams",
-          "google.registry.xjc.rdeheader",
-          "google.registry.xjc.rdeidn",
-          "google.registry.xjc.rdenndn",
-          "google.registry.xjc.rderegistrar",
-          "google.registry.xjc.smd"));
-
-  /** Creates a {@link Marshaller} for serializing Jaxb objects */
-  private static Marshaller createMarshaller() throws JAXBException {
-    return JAXBContext.newInstance(JAXB_CONTEXT_PACKAGES).createMarshaller();
-  }
-
-  protected static byte[] getObjectXml(JAXBElement<?> jaxbElement) {
+  protected static byte[] getObjectXml(Object jaxbElement) {
     try {
-      Marshaller marshaller = createMarshaller();
       ByteArrayOutputStream bout = new ByteArrayOutputStream();
-      marshaller.marshal(jaxbElement, bout);
+      XjcXmlTransformer.marshalLenient(jaxbElement, bout, UTF_8);
       return bout.toByteArray();
-    } catch (JAXBException e) {
+    } catch (XmlException e) {
       throw new RuntimeException(e);
     }
   }

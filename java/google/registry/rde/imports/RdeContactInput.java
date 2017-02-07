@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -30,6 +30,8 @@ import google.registry.config.RegistryConfig.ConfigModule;
 import google.registry.gcs.GcsUtils;
 import google.registry.model.contact.ContactResource;
 import google.registry.rde.imports.RdeParser.RdeHeader;
+import google.registry.xjc.JaxbFragment;
+import google.registry.xjc.rdecontact.XjcRdeContactElement;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
@@ -41,7 +43,7 @@ import java.util.List;
  * so that each map shard has one reader. If a mapShards parameter has not been specified, a
  * default number of readers will be created.
  */
-public class RdeContactInput extends Input<ContactResource> {
+public class RdeContactInput extends Input<JaxbFragment<XjcRdeContactElement>> {
 
   private static final long serialVersionUID = -366966393494008712L;
   private static final GcsService GCS_SERVICE =
@@ -64,13 +66,6 @@ public class RdeContactInput extends Input<ContactResource> {
   private final String importBucketName;
   private final String importFileName;
 
-  /**
-   * Creates a new {@link RdeContactInput}
-   *
-   * @param mapShards Number of readers that should be created
-   * @param importBucketName Name of GCS bucket for escrow file imports
-   * @param importFileName Name of escrow file in GCS
-   */
   public RdeContactInput(Optional<Integer> mapShards, String importBucketName,
       String importFileName) {
     this.numReaders = mapShards.or(DEFAULT_READERS);
@@ -79,7 +74,8 @@ public class RdeContactInput extends Input<ContactResource> {
   }
 
   @Override
-  public List<? extends InputReader<ContactResource>> createReaders() throws IOException {
+  public List<? extends InputReader<JaxbFragment<XjcRdeContactElement>>> createReaders()
+      throws IOException {
     int numReaders = this.numReaders;
     RdeHeader header = newParser().getHeader();
     int numberOfContacts = header.getContactCount().intValue();
@@ -99,16 +95,10 @@ public class RdeContactInput extends Input<ContactResource> {
     return builder.build();
   }
 
-  /**
-   * Creates a new instance of {@link RdeContactReader}
-   */
   private RdeContactReader newReader(int offset, int maxResults) {
     return new RdeContactReader(importBucketName, importFileName, offset, maxResults);
   }
 
-  /**
-   * Creates a new instance of {@link RdeParser}
-   */
   private RdeParser newParser() {
     GcsUtils utils = new GcsUtils(GCS_SERVICE, ConfigModule.provideGcsBufferSize());
     GcsFilename filename = new GcsFilename(importBucketName, importFileName);

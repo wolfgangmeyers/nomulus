@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,9 +28,11 @@ import javax.servlet.http.HttpServletRequest;
 @Module
 public final class RdeImportsModule {
 
+  static final String PATH = "path";
+
   @Provides
-  @Parameter("path")
+  @Parameter(PATH)
   static String providePath(HttpServletRequest req) {
-    return RequestParameters.extractRequiredParameter(req, "path");
+    return RequestParameters.extractRequiredParameter(req, PATH);
   }
 }

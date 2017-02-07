@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -24,9 +24,11 @@ import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
 import google.registry.config.RegistryConfig.ConfigModule;
 import google.registry.gcs.GcsUtils;
-import google.registry.model.contact.ContactResource;
 import google.registry.testing.AppEngineRule;
 import google.registry.testing.ExceptionRule;
+import google.registry.xjc.JaxbFragment;
+import google.registry.xjc.rdecontact.XjcRdeContact;
+import google.registry.xjc.rdecontact.XjcRdeContactElement;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
@@ -58,21 +60,16 @@ public class RdeContactReaderTest {
   private static final GcsService GCS_SERVICE =
       GcsServiceFactory.createGcsService(RetryParams.getDefaultInstance());
 
-  @Rule
-  public final AppEngineRule appEngine = AppEngineRule.builder()
-      .withDatastore()
-      .build();
+  @Rule public final AppEngineRule appEngine = AppEngineRule.builder().withDatastore().build();
 
-  @Rule
-  public final ExceptionRule thrown = new ExceptionRule();
+  @Rule public final ExceptionRule thrown = new ExceptionRule();
 
   /** Reads at least one result at 0 offset 1 maxResults */
   @Test
   public void testZeroOffsetOneResult_readsOne() throws Exception {
     pushToGcs(DEPOSIT_1_CONTACT);
     RdeContactReader reader = getReader(0, 1);
-    ContactResource contact1 = reader.next();
-    checkContact(contact1, "contact1", "contact1-TEST");
+    checkContact(reader.next(), "contact1", "contact1-TEST");
   }
 
   /** Reads at most one at 0 offset 1 maxResults */
@@ -182,8 +179,8 @@ public class RdeContactReaderTest {
 
   private void pushToGcs(ByteSource source) throws IOException {
     try (OutputStream outStream =
-          new GcsUtils(GCS_SERVICE, ConfigModule.provideGcsBufferSize())
-          .openOutputStream(new GcsFilename(IMPORT_BUCKET_NAME, IMPORT_FILE_NAME));
+            new GcsUtils(GCS_SERVICE, ConfigModule.provideGcsBufferSize())
+                .openOutputStream(new GcsFilename(IMPORT_BUCKET_NAME, IMPORT_FILE_NAME));
         InputStream inStream = source.openStream()) {
       ByteStreams.copy(inStream, outStream);
     }
@@ -202,10 +199,13 @@ public class RdeContactReaderTest {
   }
 
   /** Verifies that contact id and ROID match expected values */
-  private void checkContact(ContactResource contact, String contactId, String repoId) {
-    assertThat(contact).isNotNull();
-    assertThat(contact.getContactId()).isEqualTo(contactId);
-    assertThat(contact.getRepoId()).isEqualTo(repoId);
+  private void checkContact(
+      JaxbFragment<XjcRdeContactElement> fragment, String contactId, String repoId)
+      throws Exception {
+    assertThat(fragment).isNotNull();
+    XjcRdeContact contact = fragment.getInstance().getValue();
+    assertThat(contact.getId()).isEqualTo(contactId);
+    assertThat(contact.getRoid()).isEqualTo(repoId);
   }
 
   /** Gets a new {@link RdeContactReader} with specified offset and maxResults */

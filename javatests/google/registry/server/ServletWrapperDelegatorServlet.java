@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,9 +15,9 @@
 package google.registry.server;
 
 import static com.google.common.base.Preconditions.checkNotNull;
+import static com.google.common.base.Throwables.throwIfInstanceOf;
 import static google.registry.util.TypeUtils.instantiate;
 
-import com.google.common.base.Throwables;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.Uninterruptibles;
 import java.io.IOException;
@@ -86,9 +86,9 @@ public final class ServletWrapperDelegatorServlet extends HttpServlet {
     try {
       Uninterruptibles.getUninterruptibly(task);
     } catch (ExecutionException e) {
-      Throwables.propagateIfInstanceOf(e.getCause(), ServletException.class);
-      Throwables.propagateIfInstanceOf(e.getCause(), IOException.class);
-      throw Throwables.propagate(e.getCause());
+      throwIfInstanceOf(e.getCause(), ServletException.class);
+      throwIfInstanceOf(e.getCause(), IOException.class);
+      throw new RuntimeException(e.getCause());
     }
   }
 }

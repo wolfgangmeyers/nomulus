@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,8 +14,8 @@
 
 package google.registry.model;
 
-import static com.google.common.base.Predicates.assignableFrom;
 import static com.google.common.base.Predicates.or;
+import static com.google.common.base.Predicates.subtypeOf;
 
 import com.google.common.base.Function;
 import com.google.common.base.Joiner;
@@ -61,7 +61,7 @@ public final class SchemaVersion {
    */
   public static String getSchema() {
     return FluentIterable.from(getAllPersistedTypes())
-        .filter(or(assignableFrom(Enum.class), assignableFrom(ImmutableObject.class)))
+        .filter(or(subtypeOf(Enum.class), subtypeOf(ImmutableObject.class)))
         .transform(new Function<Class<?>, String>() {
             @Override
             public String apply(Class<?> clazz) {

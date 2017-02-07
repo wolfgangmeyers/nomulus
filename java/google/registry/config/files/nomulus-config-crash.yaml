@@ -1,0 +1,11 @@
+# Add environment-specific configuration here.
+
+appEngine:
+  projectId: domain-registry-crash
+
+registryPolicy:
+  contactAndHostRoidSuffix: ROID
+  productName: Google Registry Crash
+
+registrarConsole:
+  logoFilename: google_registry.png

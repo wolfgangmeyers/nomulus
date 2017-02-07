@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -40,7 +40,7 @@ public class EppLoggedOutTest extends EppTestCase {
     assertCommandAndResponse(
         "hello.xml",
         null,
-        "greeting_crr.xml",
+        "greeting.xml",
         ImmutableMap.of("DATE", now.toString(dateTimeNoMillis())),
         now);
   }

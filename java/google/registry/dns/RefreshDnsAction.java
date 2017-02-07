@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -70,7 +70,7 @@ public final class RefreshDnsAction implements Runnable {
   }
 
   private static void verifyHostIsSubordinate(HostResource host) {
-    if (host.getSuperordinateDomain() == null) {
+    if (!host.isSubordinate()) {
       throw new BadRequestException(
           String.format("%s isn't a subordinate hostname", host.getFullyQualifiedHostName()));
     }

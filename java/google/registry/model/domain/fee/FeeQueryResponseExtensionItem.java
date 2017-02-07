@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -79,7 +79,7 @@ public class FeeQueryResponseExtensionItem extends ImmutableObject {
     return feeClass;
   }
 
-  /** Abstract builder for {@link FeeQueryResponseExtensionItemImpl}. */
+  /** Abstract builder for {@link FeeQueryResponseExtensionItem}. */
   public abstract static class
       Builder<T extends FeeQueryResponseExtensionItem, B extends Builder<?, ?>>
           extends GenericBuilder<T, B> {

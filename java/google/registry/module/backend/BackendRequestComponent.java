@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -59,6 +59,7 @@ import google.registry.rde.RdeReporter;
 import google.registry.rde.RdeStagingAction;
 import google.registry.rde.RdeUploadAction;
 import google.registry.rde.imports.RdeContactImportAction;
+import google.registry.rde.imports.RdeDomainImportAction;
 import google.registry.rde.imports.RdeHostImportAction;
 import google.registry.rde.imports.RdeImportsModule;
 import google.registry.request.RequestComponentBuilder;
@@ -114,6 +115,7 @@ interface BackendRequestComponent {
   PublishDnsUpdatesAction publishDnsUpdatesAction();
   ReadDnsQueueAction readDnsQueueAction();
   RdeContactImportAction rdeContactImportAction();
+  RdeDomainImportAction rdeDomainImportAction();
   RdeHostImportAction rdeHostImportAction();
   RdeReportAction rdeReportAction();
   RdeStagingAction rdeStagingAction();

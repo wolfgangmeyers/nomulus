@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -14,7 +14,8 @@
 
 package google.registry.server;
 
-import com.google.common.base.Throwables;
+import static com.google.common.base.Throwables.throwIfUnchecked;
+
 import com.google.common.util.concurrent.SimpleTimeLimiter;
 import java.io.IOException;
 import java.net.HttpURLConnection;
@@ -45,7 +46,8 @@ final class UrlChecker {
         }
       }, timeoutMs, TimeUnit.MILLISECONDS, true);
     } catch (Exception e) {
-      throw Throwables.propagate(e);
+      throwIfUnchecked(e);
+      throw new RuntimeException(e);
     }
   }
 

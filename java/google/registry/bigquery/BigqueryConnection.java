@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -376,8 +376,11 @@ public class BigqueryConnection implements AutoCloseable {
       TableReference ref = table.getTableReference();
       try {
         if (checkTableExists(ref.getDatasetId(), ref.getTableId())) {
+          // Make sure to use patch() rather than update(). The former changes only those properties
+          // which are specified, while the latter would change everything, blanking out unspecified
+          // properties.
           bigquery.tables()
-              .update(ref.getProjectId(), ref.getDatasetId(), ref.getTableId(), table)
+              .patch(ref.getProjectId(), ref.getDatasetId(), ref.getTableId(), table)
               .execute();
         } else {
           bigquery.tables()

@@ -1,4 +1,4 @@
-// Copyright 2016 The Nomulus Authors. All Rights Reserved.
+// Copyright 2017 The Nomulus Authors. All Rights Reserved.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -367,7 +367,7 @@ public class DeleteContactsAndHostsAction implements Runnable {
             historyEntryForDelete);
       } else if (existingResource instanceof HostResource) {
         HostResource host = (HostResource) existingResource;
-        if (host.getSuperordinateDomain() != null) {
+        if (host.isSubordinate()) {
           dnsQueue.addHostRefreshTask(host.getFullyQualifiedHostName());
           ofy().save().entity(
               ofy().load().key(host.getSuperordinateDomain()).now().asBuilder()
