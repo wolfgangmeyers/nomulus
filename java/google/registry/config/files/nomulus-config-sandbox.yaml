@@ -1,1 +1,11 @@
 # Add environment-specific configuration here.
+
+appEngine:
+  projectId: domain-registry-sandbox
+
+registryPolicy:
+  contactAndHostRoidSuffix: ROID
+  productName: Google Registry Sandbox
+
+registrarConsole:
+  logoFilename: google_registry.png
