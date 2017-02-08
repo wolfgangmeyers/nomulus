@@ -43,11 +43,16 @@ import google.registry.xjc.rdehost.XjcRdeHost;
 import google.registry.xjc.rdehost.XjcRdeHostElement;
 import org.joda.time.DateTime;
 
-import javax.annotation.Nullable;
 import javax.inject.Inject;
 
 /**
  * A mapreduce that links hosts from an escrow file to their superordinate domains.
+ *
+ * This mapreduce is run as the last step of the process of importing escrow files. For each host in
+ * the escrow file, the corresponding {@link HostResource} record in the datastore is linked to its
+ * superordinate {@link DomainResource} only if it is an in-zone host. This is necessary because
+ * all hosts must exist before domains can be imported, due to references in host objects, and
+ * domains must exist before hosts can be linked to their superordinate domains.
  *
  * <p>Specify the escrow file to import with the "path" parameter.
  */
@@ -85,31 +90,9 @@ public class RdeHostLinkAction implements Runnable {
             ImmutableList.of(new RdeHostInput(mapShards, importBucketName, importFileName)))));
   }
 
-  /**
-   * Return the {@link DomainResource} this host is subordinate to, or null for out of zone hosts.
-   *
-   * @throws {@link IllegalStateException} for hosts without superordinate domains
-   */
-  @Nullable
-  private static DomainResource lookupSuperordinateDomain(InternetDomainName hostName, DateTime now) {
-    Optional<InternetDomainName> tld = findTldForName(hostName);
-    // out of zone hosts cannot be linked
-    if(!tld.isPresent()) {
-      return null;
-    }
-    // This is a subordinate host
-    String domainName = Joiner.on('.').join(Iterables.skip(
-        hostName.parts(), hostName.parts().size() - (tld.get().parts().size() + 1)));
-    DomainResource superordinateDomain = loadByForeignKey(DomainResource.class, domainName, now);
-    // Hosts can't be linked if domains import hasn't been run
-    checkState(superordinateDomain != null,
-      "Superordinate domain does not exist: %s",
-      domainName);
-    return superordinateDomain;
-  }
-
   /** Mapper to link hosts from an escrow file to their superordinate domains. */
-  public static class RdeHostPostImportMapper extends Mapper<JaxbFragment<XjcRdeHostElement>, Void, Void> {
+  public static class RdeHostPostImportMapper
+      extends Mapper<JaxbFragment<XjcRdeHostElement>, Void, Void> {
 
     private static final long serialVersionUID = -2898753709127134419L;
 
@@ -121,16 +104,17 @@ public class RdeHostLinkAction implements Runnable {
       logger.infofmt("Attempting to link superordinate domain for host %s", xjcHost.getName());
       try {
         InternetDomainName hostName = InternetDomainName.from(xjcHost.getName());
-        DomainResource superordinateDomain = lookupSuperordinateDomain(hostName, DateTime.now());
+        Optional<DomainResource> superordinateDomain =
+            lookupSuperordinateDomain(hostName, DateTime.now());
         // if suporordinateDomain is null, this is an out of zone host and can't be linked
-        if (superordinateDomain == null) {
+        if (!superordinateDomain.isPresent()) {
           getContext().incrementCounter("post-import hosts out of zone");
           logger.infofmt("Host %s is out of zone", xjcHost.getName());
           return;
         }
         // at this point, the host is definitely in zone and should be linked
         getContext().incrementCounter("post-import hosts in zone");
-        final Key<DomainResource> superordinateDomainKey = Key.create(superordinateDomain);
+        final Key<DomainResource> superordinateDomainKey = Key.create(superordinateDomain.get());
         ofy().transact(new VoidWork() {
           @Override
           public void vrun() {
@@ -143,7 +127,7 @@ public class RdeHostLinkAction implements Runnable {
         logger.infofmt(
             "Successfully linked host %s to superordinate domain %s",
             xjcHost.getName(),
-            superordinateDomain.getFullyQualifiedDomainName());
+            superordinateDomain.get().getFullyQualifiedDomainName());
         // Record number of hosts successfully linked
         getContext().incrementCounter("post-import hosts linked");
       } catch (Exception e) {
@@ -151,6 +135,27 @@ public class RdeHostLinkAction implements Runnable {
         getContext().incrementCounter("post-import host errors");
         throw new HostLinkException(xjcHost.getName(), xjcHost.toString(), e);
       }
+    }
+
+    /**
+     * Return the {@link DomainResource} this host is subordinate to, or absent for out of zone hosts.
+     *
+     * @throws {@link IllegalStateException} for hosts without superordinate domains
+     */
+    private static Optional<DomainResource> lookupSuperordinateDomain(InternetDomainName hostName,
+        DateTime now) {
+      Optional<InternetDomainName> tld = findTldForName(hostName);
+      // out of zone hosts cannot be linked
+      if (!tld.isPresent()) {
+        return Optional.absent();
+      }
+      // This is a subordinate host
+      String domainName = Joiner.on('.').join(Iterables.skip(
+          hostName.parts(), hostName.parts().size() - (tld.get().parts().size() + 1)));
+      DomainResource superordinateDomain = loadByForeignKey(DomainResource.class, domainName, now);
+      // Hosts can't be linked if domains import hasn't been run
+      checkState(superordinateDomain != null, "Superordinate domain does not exist: %s", domainName);
+      return Optional.of(superordinateDomain);
     }
   }
 

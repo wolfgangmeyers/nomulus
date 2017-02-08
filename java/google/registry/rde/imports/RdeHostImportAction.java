@@ -117,7 +117,6 @@ public class RdeHostImportAction implements Runnable {
     public void map(JaxbFragment<XjcRdeHostElement> fragment) {
       final XjcRdeHost xjcHost = fragment.getInstance().getValue();
       try {
-        logger.infofmt("Starting transaction for host %s", xjcHost.getName());
         // Record number of attempted map operations
         getContext().incrementCounter("host imports attempted");
         logger.infofmt("Saving host %s", xjcHost.getName());
@@ -134,7 +133,7 @@ public class RdeHostImportAction implements Runnable {
         logger.infofmt("Host %s was imported successfully", xjcHost.getName());
       } catch (ResourceExistsException e) {
         // Record the number of hosts already in the registry
-        getContext().incrementCounter("hosts skipped");
+        getContext().incrementCounter("existing hosts skipped");
         logger.infofmt("Host %s already exists", xjcHost.getName());
       } catch (Exception e) {
         // Record the number of hosts with unexpected errors

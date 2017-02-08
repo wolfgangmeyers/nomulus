@@ -4,7 +4,7 @@
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
 //
-//     http://www.apache.org/licenses/LICENSE-2.0
+// http://www.apache.org/licenses/LICENSE-2.0
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
@@ -65,24 +65,16 @@ public class RdeHostLinkActionTest extends MapreduceTestCase<RdeHostLinkAction> 
     createTld("test");
     response = new FakeResponse();
     mrRunner = new MapreduceRunner(Optional.<Integer>absent(), Optional.<Integer>absent());
-    action = new RdeHostLinkAction(
-        mrRunner,
-        response,
-        IMPORT_BUCKET_NAME,
-        IMPORT_FILE_NAME,
-        mapShards);
+    action =
+        new RdeHostLinkAction(mrRunner, response, IMPORT_BUCKET_NAME, IMPORT_FILE_NAME, mapShards);
   }
 
   @Test
   public void test_mapreduceSuccessfullyLinksHost() throws Exception {
     // Create host and domain first
-    persistResource(
-        newHostResource("ns1.example1.test")
-        .asBuilder()
-        .setRepoId("Hns1_example1_test-TEST")
-        .build());
-    DomainResource superordinateDomain =
-        persistActiveDomain("example1.test");
+    persistResource(newHostResource("ns1.example1.test").asBuilder()
+        .setRepoId("Hns1_example1_test-TEST").build());
+    DomainResource superordinateDomain = persistActiveDomain("example1.test");
     ForeignKeyDomainIndex.create(superordinateDomain, END_OF_TIME);
     Key<DomainResource> superOrdinateDomainKey = Key.create(superordinateDomain);
     pushToGcs(DEPOSIT_1_HOST);
@@ -98,19 +90,11 @@ public class RdeHostLinkActionTest extends MapreduceTestCase<RdeHostLinkAction> 
   }
 
   private void pushToGcs(ByteSource source) throws IOException {
-    try (OutputStream outStream =
-          new GcsUtils(GCS_SERVICE, ConfigModule.provideGcsBufferSize())
-          .openOutputStream(new GcsFilename(IMPORT_BUCKET_NAME, IMPORT_FILE_NAME));
+    try (
+        OutputStream outStream = new GcsUtils(GCS_SERVICE, ConfigModule.provideGcsBufferSize())
+            .openOutputStream(new GcsFilename(IMPORT_BUCKET_NAME, IMPORT_FILE_NAME));
         InputStream inStream = source.openStream()) {
       ByteStreams.copy(inStream, outStream);
     }
-  }
-
-  private static byte[] loadHostXml(ByteSource source) throws IOException {
-    byte[] result = new byte[(int)source.size()];
-    try (InputStream inStream = source.openStream()) {
-      ByteStreams.readFully(inStream, result);
-    }
-    return result;
   }
 }

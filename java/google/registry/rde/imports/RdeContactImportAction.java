@@ -148,7 +148,7 @@ public class RdeContactImportAction implements Runnable {
         logger.infofmt("Contact %s was imported successfully", xjcContact.getId());
       } catch (ResourceExistsException e) {
         // Record the number of contacts already in the registry
-        getContext().incrementCounter("contacts skipped");
+        getContext().incrementCounter("existing contacts skipped");
         logger.infofmt("Contact %s already exists", xjcContact.getId());
       } catch (Exception e) {
         // Record the number of contacts with unexpected errors
