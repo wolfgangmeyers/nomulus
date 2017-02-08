@@ -66,6 +66,7 @@ import java.security.ProviderException;
 import java.security.SecureRandom;
 import java.util.Random;
 import org.joda.time.DateTime;
+import org.joda.time.Years;
 
 /** Utility class that converts an {@link XjcRdeDomainElement} into a {@link DomainResource}. */
 final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
@@ -181,14 +182,10 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
   }
 
   /** Converts {@link XjcRdeDomain} to {@link DomainResource}. */
-  static DomainResource convertDomain(XjcRdeDomain domain) {
-    // First create history entry and autorenew billing event/poll message
-    // Autorenew billing event is required for creating AUTO_RENEW grace period
-    HistoryEntry historyEntry = createHistoryEntry(domain);
-    BillingEvent.Recurring autoRenewBillingEvent =
-        createAutoRenewBillingEvent(domain, historyEntry);
-    PollMessage.Autorenew pollMessage = createAutoRenewPollMessage(domain, historyEntry);
-    ofy().save().<ImmutableObject>entities(historyEntry, autoRenewBillingEvent, pollMessage);
+  static DomainResource convertDomain(
+      XjcRdeDomain domain,
+      BillingEvent.Recurring autoRenewBillingEvent,
+      PollMessage.Autorenew autoRenewPollMessage) {
     GracePeriodConverter gracePeriodConverter =
         new GracePeriodConverter(domain, Key.create(autoRenewBillingEvent));
     DomainResource.Builder builder =
@@ -199,7 +196,7 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
             .setCurrentSponsorClientId(domain.getClID())
             .setCreationClientId(domain.getCrRr().getValue())
             .setCreationTime(domain.getCrDate())
-            .setAutorenewPollMessage(Key.create(pollMessage))
+            .setAutorenewPollMessage(Key.create(autoRenewPollMessage))
             .setAutorenewBillingEvent(Key.create(autoRenewBillingEvent))
             .setRegistrationExpirationTime(domain.getExDate())
             .setLastEppUpdateTime(domain.getUpDate())
@@ -215,7 +212,7 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
                     ? ImmutableSet.<DelegationSignerData>of()
                     : ImmutableSet.copyOf(
                         transform(domain.getSecDNS().getDsDatas(), SECDNS_CONVERTER)))
-            .setTransferData(convertDomainTransferData(domain.getTrnData()))
+            .setTransferData(convertDomainTransferData(domain.getTrnData(), domain.getExDate()))
             // authInfo pw must be a token between 6 and 16 characters in length
             // generate a token of 16 characters as the default authInfo pw
             .setAuthInfo(DomainAuthInfo
@@ -224,51 +221,6 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
         domain.getRegistrant(), "Registrant is missing for domain '%s'", domain.getName());
     builder = builder.setRegistrant(convertRegistrant(domain.getRegistrant()));
     return builder.build();
-  }
-
-  private static BillingEvent.Recurring createAutoRenewBillingEvent(
-      XjcRdeDomain domain, HistoryEntry historyEntry) {
-    final BillingEvent.Recurring billingEvent =
-        new BillingEvent.Recurring.Builder()
-            .setReason(Reason.RENEW)
-            .setFlags(ImmutableSet.of(Flag.AUTO_RENEW))
-            .setTargetId(domain.getRoid())
-            .setClientId(domain.getClID())
-            .setEventTime(domain.getExDate())
-            .setRecurrenceEndTime(END_OF_TIME)
-            .setParent(historyEntry)
-            .build();
-    return billingEvent;
-  }
-
-  private static PollMessage.Autorenew createAutoRenewPollMessage(
-      XjcRdeDomain domain, HistoryEntry historyEntry) {
-    final PollMessage.Autorenew pollMessage =
-        new PollMessage.Autorenew.Builder()
-            .setTargetId(domain.getRoid())
-            .setClientId(domain.getClID())
-            .setEventTime(domain.getExDate())
-            .setMsg("Domain was auto-renewed.")
-            .setParent(historyEntry)
-            .build();
-    return pollMessage;
-  }
-
-  private static HistoryEntry createHistoryEntry(XjcRdeDomain domain) {
-    XjcRdeDomainElement element = new XjcRdeDomainElement(domain);
-    final HistoryEntry historyEntry =
-        new HistoryEntry.Builder()
-            .setType(HistoryEntry.Type.RDE_IMPORT)
-            .setClientId(domain.getClID())
-            .setTrid(generateTridForImport())
-            .setModificationTime(DateTime.now())
-            .setXmlBytes(getObjectXml(element))
-            .setBySuperuser(true)
-            .setReason("RDE Import")
-            .setRequestedByRegistrar(false)
-            .setParent(Key.create(null, DomainResource.class, domain.getRoid()))
-            .build();
-    return historyEntry;
   }
 
   /** Returns {@link Key} for registrant from foreign key */
@@ -293,16 +245,33 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
   }
 
   /** Converts {@link XjcRdeDomainTransferDataType} to {@link TransferData}. */
-  private static TransferData convertDomainTransferData(XjcRdeDomainTransferDataType data) {
+  private static TransferData convertDomainTransferData(XjcRdeDomainTransferDataType data, DateTime domainExpiration) {
     if (data == null) {
       return TransferData.EMPTY;
     }
+    // If the transfer is pending, calculate the number of years to add to the domain expiration
+    // on approval of the transfer.
+    TransferStatus transferStatus = TRANSFER_STATUS_MAPPER.xmlToEnum(data.getTrStatus().value());
+    // Get new expiration date
+    DateTime newExpirationTime = domainExpiration;
+    if (transferStatus == TransferStatus.PENDING) {
+      // Default to domain expiration time plus one year if no expiration is specified
+      if (data.getExDate() == null) {
+        newExpirationTime = newExpirationTime.plusYears(1);
+      } else {
+        newExpirationTime = data.getExDate();
+      }
+    }
     return new TransferData.Builder()
-        .setTransferStatus(TRANSFER_STATUS_MAPPER.xmlToEnum(data.getTrStatus().value()))
+        .setTransferStatus(transferStatus)
         .setGainingClientId(data.getReRr().getValue())
         .setLosingClientId(data.getAcRr().getValue())
         .setTransferRequestTime(data.getReDate())
         .setPendingTransferExpirationTime(data.getAcDate())
+        // This will be wrong for domains that are not in pending transfer,
+        // but there isn't a reliable way to calculate it.
+        .setExtendedRegistrationYears(
+            Years.yearsBetween(domainExpiration, newExpirationTime).getYears())
         .build();
   }
 
