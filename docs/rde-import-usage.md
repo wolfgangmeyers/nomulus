@@ -106,4 +106,11 @@ starts with `/_dr/mapreduce/workerCallback` - the logs provide a detailed view
 of which resources were read from file, which were imported, which had already
 existed before the import, and which failed to import.
 
+## Known Limitations
+
+Currently the ID of all registrars in the escrow file must match those that are
+already configured in the registry. Future work is planned to map between different
+internal and external registrar IDs by using the IANA IDs, which are always
+consistent between registries.
+
 
