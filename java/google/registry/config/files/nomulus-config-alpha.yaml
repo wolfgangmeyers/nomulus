@@ -24,7 +24,7 @@ gSuite:
 rde:
   # URL prefix of ICANN's server to upload RDE reports to. Nomulus adds /TLD/ID
   # to the end of this to construct the full URL.
-  reportUrlPrefix: https://test-ry-api.icann.org:8543/report/registry-escrow-report
+  reportUrlPrefix: https://icann-fake-dot-mercury-donuts-alpha.appspot.com/
 
   # SFTP URL to which RDE deposits are uploaded. This should contain a username
   # but not the password.
