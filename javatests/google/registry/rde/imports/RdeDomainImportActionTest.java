@@ -16,7 +16,6 @@ package google.registry.rde.imports;
 
 import static com.google.common.truth.Truth.assertThat;
 import static google.registry.model.ofy.ObjectifyService.ofy;
-import static google.registry.testing.DatastoreHelper.assertBillingEventsForResource;
 import static google.registry.testing.DatastoreHelper.createTld;
 import static google.registry.testing.DatastoreHelper.getHistoryEntries;
 import static google.registry.testing.DatastoreHelper.getPollMessages;
@@ -25,6 +24,7 @@ import static google.registry.testing.DatastoreHelper.persistActiveContact;
 import static google.registry.testing.DatastoreHelper.persistResource;
 import static google.registry.testing.DatastoreHelper.persistSimpleResource;
 import static google.registry.testing.TaskQueueHelper.assertDnsTasksEnqueued;
+import static google.registry.util.DateTimeUtils.END_OF_TIME;
 import static org.joda.money.CurrencyUnit.USD;
 import static org.junit.Assert.fail;
 
@@ -35,13 +35,11 @@ import com.google.appengine.tools.cloudstorage.RetryParams;
 import com.google.common.base.Optional;
 import com.google.common.io.ByteSource;
 import com.google.common.io.ByteStreams;
-
 import com.googlecode.objectify.Key;
 import google.registry.config.RegistryConfig.ConfigModule;
 import google.registry.gcs.GcsUtils;
 import google.registry.mapreduce.MapreduceRunner;
 import google.registry.model.billing.BillingEvent;
-import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.eppcommon.Trid;
@@ -51,19 +49,17 @@ import google.registry.model.transfer.TransferStatus;
 import google.registry.request.Response;
 import google.registry.testing.FakeResponse;
 import google.registry.testing.mapreduce.MapreduceTestCase;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.util.List;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
-import org.joda.time.Days;
 import org.joda.time.Seconds;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.mockito.runners.MockitoJUnitRunner;
-
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.util.List;
 
 /** Unit tests for {@link RdeDomainImportAction}. */
 @RunWith(MockitoJUnitRunner.class)
@@ -176,6 +172,18 @@ public class RdeDomainImportActionTest extends MapreduceTestCase<RdeDomainImport
         .isEqualTo(DateTime.parse("2015-04-03T22:00:00.0Z"));
     // Domain is not yet in transfer grace period
     assertThat(beforeApproval.getGracePeriodStatuses()).doesNotContain(GracePeriodStatus.TRANSFER);
+    // Check autorenew events - recurrence end is set to transfer approval time,
+    // and client id is set to losing registrar. This is important in case the
+    // transfer is cancelled or rejected.
+    // Event time is set to domain expiration date.
+    checkAutorenewBillingEvent(beforeApproval,
+        "RegistrarX",
+        DateTime.parse("2015-04-03T22:00:00.0Z"),
+        DateTime.parse("2015-01-08T22:00:00.0Z"));
+    checkAutorenewPollMessage(beforeApproval,
+        "RegistrarX",
+        DateTime.parse("2015-04-03T22:00:00.0Z"),
+        DateTime.parse("2015-01-08T22:00:00.0Z"));
 
     // Domain should be assigned to RegistrarY after server approval
     DomainResource afterApproval =
@@ -190,6 +198,19 @@ public class RdeDomainImportActionTest extends MapreduceTestCase<RdeDomainImport
         .isEqualTo(DateTime.parse("2016-04-03T22:00:00.0Z"));
     // Domain should now be in transfer grace period
     assertThat(afterApproval.getGracePeriodStatuses()).contains(GracePeriodStatus.TRANSFER);
+    // Check autorenew events - recurrence end is set to END_OF_TIME,
+    // and client id is set to gaining registrar. This represents the new state of the domain,
+    // unless the transfer is cancelled during the grace period, at which time it will
+    // revert to the previous state.
+    // Event time is set to domain expiration date.
+    checkAutorenewBillingEvent(afterApproval,
+        "RegistrarY",
+        DateTime.parse("2016-04-03T22:00:00.0Z"),
+        END_OF_TIME);
+    checkAutorenewPollMessage(afterApproval,
+        "RegistrarY",
+        DateTime.parse("2016-04-03T22:00:00.0Z"),
+        END_OF_TIME);
   }
 
   @Test
@@ -234,7 +255,9 @@ public class RdeDomainImportActionTest extends MapreduceTestCase<RdeDomainImport
   }
 
   /** Verifies the existence of a transfer request poll message */
-  private void checkTransferServerApprovalPollMessage(DomainResource domain, String clientId, DateTime expectedAt) {
+  private void checkTransferServerApprovalPollMessage(DomainResource domain,
+      String clientId,
+      DateTime expectedAt) {
     for (PollMessage message : getPollMessages(domain)) {
       if (TransferStatus.SERVER_APPROVED.getMessage().equals(message.getMsg())
           && clientId.equals(message.getClientId())
@@ -243,6 +266,30 @@ public class RdeDomainImportActionTest extends MapreduceTestCase<RdeDomainImport
       }
     }
     fail("Expected transfer request poll message");
+  }
+
+  /** Verifies autorenew {@link PollMessage} is correct */
+  private void checkAutorenewPollMessage(DomainResource domain,
+      String clientId,
+      DateTime expectedAt,
+      DateTime recurrenceEndTime) {
+    PollMessage.Autorenew autorenewPollMessage = loadAutorenewPollMessageForDomain(domain);
+    assertThat(autorenewPollMessage).isNotNull();
+    assertThat(autorenewPollMessage.getClientId()).isEqualTo(clientId);
+    assertThat(autorenewPollMessage.getEventTime()).isEqualTo(expectedAt);
+    assertThat(autorenewPollMessage.getAutorenewEndTime()).isEqualTo(recurrenceEndTime);
+  }
+
+  /** Verifies autorenew {@link BillingEvent} is correct */
+  private void checkAutorenewBillingEvent(DomainResource domain,
+      String clientId,
+      DateTime expectedAt,
+      DateTime recurrenceEndTime) {
+    BillingEvent.Recurring autorenewBillingEvent = loadAutorenewBillingEventForDomain(domain);
+    assertThat(autorenewBillingEvent).isNotNull();
+    assertThat(autorenewBillingEvent.getClientId()).isEqualTo(clientId);
+    assertThat(autorenewBillingEvent.getEventTime()).isEqualTo(expectedAt);
+    assertThat(autorenewBillingEvent.getRecurrenceEndTime()).isEqualTo(recurrenceEndTime);
   }
 
   /** Verify history entry fields are correct */
@@ -260,9 +307,6 @@ public class RdeDomainImportActionTest extends MapreduceTestCase<RdeDomainImport
   private void checkDomain(DomainResource domain) {
     assertThat(domain.getFullyQualifiedDomainName()).isEqualTo("example1.test");
     assertThat(domain.getRepoId()).isEqualTo("Dexample1-TEST");
-    // TODO: really test these values
-    assertThat(loadAutorenewBillingEventForDomain(domain)).isNotNull();
-    assertThat(loadAutorenewPollMessageForDomain(domain)).isNotNull();
   }
 
   private void runMapreduce() throws Exception {
