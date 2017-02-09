@@ -17,9 +17,6 @@ package google.registry.rde.imports;
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
 import static com.google.common.collect.Iterables.transform;
-import static google.registry.model.ofy.ObjectifyService.ofy;
-import static google.registry.rde.imports.RdeImportUtils.generateTridForImport;
-import static google.registry.util.DateTimeUtils.END_OF_TIME;
 import static google.registry.util.PreconditionsUtils.checkArgumentNotNull;
 
 import com.google.common.base.Ascii;
@@ -28,10 +25,7 @@ import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 import com.google.common.net.InternetDomainName;
 import com.googlecode.objectify.Key;
-import google.registry.model.ImmutableObject;
 import google.registry.model.billing.BillingEvent;
-import google.registry.model.billing.BillingEvent.Flag;
-import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DesignatedContact;
 import google.registry.model.domain.DomainAuthInfo;
@@ -46,7 +40,6 @@ import google.registry.model.index.ForeignKeyIndex;
 import google.registry.model.poll.PollMessage;
 import google.registry.model.registry.Registries;
 import google.registry.model.registry.Registry;
-import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.transfer.TransferData;
 import google.registry.model.transfer.TransferStatus;
 import google.registry.util.NonFinalForTesting;
@@ -245,7 +238,8 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
   }
 
   /** Converts {@link XjcRdeDomainTransferDataType} to {@link TransferData}. */
-  private static TransferData convertDomainTransferData(XjcRdeDomainTransferDataType data, DateTime domainExpiration) {
+  private static TransferData convertDomainTransferData(XjcRdeDomainTransferDataType data,
+      DateTime domainExpiration) {
     if (data == null) {
       return TransferData.EMPTY;
     }

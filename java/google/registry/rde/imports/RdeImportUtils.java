@@ -83,7 +83,8 @@ public class RdeImportUtils {
     this.escrowBucketName = escrowBucketName;
   }
 
-  public <T extends EppResource> ImmutableSet<Object> getIndexesForEppResource(T resource, String type) {
+  public <T extends EppResource> ImmutableSet<Object> getIndexesForEppResource(T resource,
+      String type) {
     @SuppressWarnings("unchecked")
     Class<T> resourceClass = (Class<T>) resource.getClass();
     Object existing = ofy.load().key(Key.create(resource)).now();
