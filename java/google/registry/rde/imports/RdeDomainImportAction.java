@@ -28,6 +28,7 @@ import com.google.common.collect.ImmutableList;
 import com.googlecode.objectify.VoidWork;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.config.RegistryConfig.ConfigModule;
+import google.registry.dns.DnsQueue;
 import google.registry.gcs.GcsUtils;
 import google.registry.mapreduce.MapreduceRunner;
 import google.registry.model.domain.DomainResource;
@@ -109,6 +110,7 @@ public class RdeDomainImportAction implements Runnable {
 
     private final String importBucketName;
     private transient RdeImportUtils importUtils;
+    private transient DnsQueue dnsQueue;
 
     public RdeDomainImportMapper(String importBucketName) {
       this.importBucketName = importBucketName;
@@ -119,6 +121,13 @@ public class RdeDomainImportAction implements Runnable {
         importUtils = createRdeImportUtils();
       }
       return importUtils;
+    }
+
+    private DnsQueue getDnsQueue() {
+      if (dnsQueue == null) {
+        dnsQueue = DnsQueue.create();
+      }
+      return dnsQueue;
     }
 
     /**
@@ -146,6 +155,7 @@ public class RdeDomainImportAction implements Runnable {
             DomainResource domain =
                 XjcToDomainResourceConverter.convertDomain(xjcDomain);
             getImportUtils().importDomain(domain);
+            getDnsQueue().addDomainRefreshTask(domain.getFullyQualifiedDomainName());
           }
         });
         // Record the number of domains imported
@@ -153,18 +163,12 @@ public class RdeDomainImportAction implements Runnable {
         logger.infofmt("Domain %s was imported successfully", xjcDomain.getName());
       } catch (ResourceExistsException e) {
         // Record the number of domains already in the registry
-        getContext().incrementCounter("domains skipped");
+        getContext().incrementCounter("existing domains skipped");
         logger.infofmt("Domain %s already exists", xjcDomain.getName());
       } catch (Exception e) {
         getContext().incrementCounter("domain import errors");
-        throw new DomainImportException(xjcDomain.getName(), xjcDomain.toString(), e);
+        logger.severefmt(e, "Error processing domain %s; xml=%s", xjcDomain.getName(), xjcDomain);
       }
-    }
-  }
-
-  private static class DomainImportException extends RuntimeException {
-    DomainImportException(String domainName, String xml, Throwable cause) {
-      super(String.format("Error processing domain %s; xml=%s", domainName, xml), cause);
     }
   }
 }
