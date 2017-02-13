@@ -1,10 +1,10 @@
 
 appEngine:
-  projectId: domain-registry-alpha
+  projectId: mercury-donuts-alpha
 
 registryPolicy:
   contactAndHostRoidSuffix: ROID
-  productName: Google Registry Alpha
+  productName: Mercury Donuts Alpha
 
 registrarConsole:
   logoFilename: google_registry.png
@@ -24,7 +24,7 @@ gSuite:
 rde:
   # URL prefix of ICANN's server to upload RDE reports to. Nomulus adds /TLD/ID
   # to the end of this to construct the full URL.
-  reportUrlPrefix: https://icann-fake-dot-mercury-donuts-alpha.appspot.com/
+  reportUrlPrefix: https://icann-fake-dot-mercury-donuts-alpha.appspot.com
 
   # SFTP URL to which RDE deposits are uploaded. This should contain a username
   # but not the password.
