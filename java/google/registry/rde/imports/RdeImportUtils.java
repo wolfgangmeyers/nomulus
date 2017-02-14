@@ -16,19 +16,18 @@ package google.registry.rde.imports;
 
 import static com.google.common.base.Preconditions.checkArgument;
 import static com.google.common.base.Preconditions.checkState;
-import static google.registry.util.DateTimeUtils.START_OF_TIME;
-import static google.registry.rde.imports.RdeImportUtils.generateTridForImport;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
+import static google.registry.util.DateTimeUtils.START_OF_TIME;
 
 import com.google.appengine.tools.cloudstorage.GcsFilename;
 import com.google.common.base.Charsets;
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.io.BaseEncoding;
 import com.googlecode.objectify.Key;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.gcs.GcsUtils;
 import google.registry.model.EppResource;
+import google.registry.model.EppResource.ForeignKeyedEppResource;
 import google.registry.model.billing.BillingEvent;
 import google.registry.model.billing.BillingEvent.Flag;
 import google.registry.model.billing.BillingEvent.Reason;
@@ -52,8 +51,6 @@ import google.registry.xjc.rdedomain.XjcRdeDomain;
 import google.registry.xjc.rdedomain.XjcRdeDomainElement;
 import google.registry.xjc.rderegistrar.XjcRdeRegistrar;
 import google.registry.xml.XmlException;
-import org.joda.time.DateTime;
-
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -61,6 +58,7 @@ import java.util.UUID;
 import javax.inject.Inject;
 import javax.xml.bind.JAXBException;
 import javax.xml.stream.XMLStreamException;
+import org.joda.time.DateTime;
 
 /**
  * Utility functions for escrow file import.
@@ -83,8 +81,8 @@ public class RdeImportUtils {
     this.escrowBucketName = escrowBucketName;
   }
 
-  public <T extends EppResource> ImmutableSet<Object> getIndexesForEppResource(T resource,
-      String type) {
+  public <T extends EppResource & ForeignKeyedEppResource> ImmutableSet<Object>
+      createIndexesForEppResource(T resource) {
     @SuppressWarnings("unchecked")
     Class<T> resourceClass = (Class<T>) resource.getClass();
     Object existing = ofy.load().key(Key.create(resource)).now();
@@ -98,21 +96,22 @@ public class RdeImportUtils {
     checkState(
         existingForeignKeyIndex == null,
         "New %s resource has existing foreign key index; foreignKey=%s, repoId=%s",
-        type,
+        resource.getClass().getCanonicalName(),
         resource.getForeignKey(),
         resource.getRepoId());
     return ImmutableSet.<Object>of(ForeignKeyIndex.create(resource, resource.getDeletionTime()),
         EppResourceIndex.create(Key.create(resource)));
   }
 
-  private <T extends EppResource> void importEppResource(final T resource, final String type) {
+  private <T extends EppResource & ForeignKeyedEppResource> void
+      importEppResource(final T resource) {
     ofy.save().entities(new ImmutableSet.Builder<>()
         .add(resource)
-        .addAll(getIndexesForEppResource(resource, type))
+        .addAll(createIndexesForEppResource(resource))
         .build());
     logger.infofmt(
         "Imported %s resource - ROID=%s, id=%s",
-        type, resource.getRepoId(), resource.getForeignKey());
+        resource.getClass().getCanonicalName(), resource.getRepoId(), resource.getForeignKey());
   }
 
   /**
@@ -124,7 +123,7 @@ public class RdeImportUtils {
    * created.
    */
   public void importHost(final HostResource resource) {
-    importEppResource(resource, "host");
+    importEppResource(resource);
   }
 
   /**
@@ -136,7 +135,7 @@ public class RdeImportUtils {
    * created.
    */
   public void importContact(final ContactResource resource) {
-    importEppResource(resource, "contact");
+    importEppResource(resource);
   }
 
   /**
@@ -148,7 +147,7 @@ public class RdeImportUtils {
    * created.
    */
   public void importDomain(final DomainResource resource) {
-    importEppResource(resource, "domain");
+    importEppResource(resource);
   }
 
   /**

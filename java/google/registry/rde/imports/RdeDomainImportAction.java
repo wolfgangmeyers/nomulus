@@ -55,8 +55,8 @@ import google.registry.util.SystemClock;
 import google.registry.xjc.JaxbFragment;
 import google.registry.xjc.rdedomain.XjcRdeDomain;
 import google.registry.xjc.rdedomain.XjcRdeDomainElement;
-import org.joda.money.Money;
 import javax.inject.Inject;
+import org.joda.money.Money;
 
 /**
  * A mapreduce that imports domains from an escrow file.
@@ -179,7 +179,7 @@ public class RdeDomainImportAction implements Runnable {
             // Keep a list of "extra objects" that need to be saved along with the domain
             // and add to it if necessary.
             ImmutableSet<Object> extraEntitiesToSave =
-                getImportUtils().getIndexesForEppResource(domain, "domain");
+                getImportUtils().createIndexesForEppResource(domain);
             // Create speculative server approval entities for pending transfers
             if (domain.getTransferData().getTransferStatus() == TransferStatus.PENDING) {
               TransferData transferData = domain.getTransferData();
@@ -238,13 +238,6 @@ public class RdeDomainImportAction implements Runnable {
         getContext().incrementCounter("domain import errors");
         throw new DomainImportException(xjcDomain.getName(), xjcDomain.toString(), e);
       }
-    }
-
-    private void setupPendingTransfer(final HistoryEntry historyEntry,
-        DomainResource domain,
-        BillingEvent.Recurring autorenewBillingEvent,
-        PollMessage.Autorenew autorenewPollMessage) {
-
     }
   }
 
