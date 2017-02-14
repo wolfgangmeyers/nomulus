@@ -20,6 +20,7 @@ import static com.google.common.collect.Iterables.transform;
 import static google.registry.model.ofy.ObjectifyService.ofy;
 import static google.registry.rde.imports.RdeImportUtils.generateTridForImport;
 import static google.registry.util.DateTimeUtils.END_OF_TIME;
+import static google.registry.util.DomainNameUtils.canonicalizeDomainName;
 import static google.registry.util.PreconditionsUtils.checkArgumentNotNull;
 
 import com.google.common.base.Ascii;
@@ -34,10 +35,12 @@ import google.registry.model.billing.BillingEvent.Flag;
 import google.registry.model.billing.BillingEvent.Reason;
 import google.registry.model.contact.ContactResource;
 import google.registry.model.domain.DesignatedContact;
+import google.registry.model.domain.DomainAuthInfo;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.domain.GracePeriod;
 import google.registry.model.domain.rgp.GracePeriodStatus;
 import google.registry.model.domain.secdns.DelegationSignerData;
+import google.registry.model.eppcommon.AuthInfo.PasswordAuth;
 import google.registry.model.eppcommon.StatusValue;
 import google.registry.model.host.HostResource;
 import google.registry.model.index.ForeignKeyIndex;
@@ -47,6 +50,9 @@ import google.registry.model.registry.Registry;
 import google.registry.model.reporting.HistoryEntry;
 import google.registry.model.transfer.TransferData;
 import google.registry.model.transfer.TransferStatus;
+import google.registry.util.NonFinalForTesting;
+import google.registry.util.RandomStringGenerator;
+import google.registry.util.StringGenerator;
 import google.registry.util.XmlToEnumMapper;
 import google.registry.xjc.domain.XjcDomainContactType;
 import google.registry.xjc.domain.XjcDomainNsType;
@@ -56,10 +62,26 @@ import google.registry.xjc.rdedomain.XjcRdeDomainElement;
 import google.registry.xjc.rdedomain.XjcRdeDomainTransferDataType;
 import google.registry.xjc.rgp.XjcRgpStatusType;
 import google.registry.xjc.secdns.XjcSecdnsDsDataType;
+import java.security.NoSuchAlgorithmException;
+import java.security.ProviderException;
+import java.security.SecureRandom;
+import java.util.Random;
 import org.joda.time.DateTime;
 
 /** Utility class that converts an {@link XjcRdeDomainElement} into a {@link DomainResource}. */
 final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
+
+  @NonFinalForTesting
+  static StringGenerator stringGenerator = new RandomStringGenerator(
+      StringGenerator.Alphabets.BASE_64, getRandom());
+
+  static Random getRandom() {
+    try {
+      return SecureRandom.getInstance("NativePRNG");
+    } catch (NoSuchAlgorithmException e) {
+      throw new ProviderException(e);
+    }
+  }
 
   private static final XmlToEnumMapper<TransferStatus> TRANSFER_STATUS_MAPPER =
       XmlToEnumMapper.create(TransferStatus.values());
@@ -76,6 +98,8 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
       new Function<String, Key<HostResource>>() {
         @Override
         public Key<HostResource> apply(String fullyQualifiedHostName) {
+          // host names are always lower case
+          fullyQualifiedHostName = canonicalizeDomainName(fullyQualifiedHostName);
           Key<HostResource> key =
               ForeignKeyIndex.loadAndGetKey(
                   HostResource.class, fullyQualifiedHostName, DateTime.now());
@@ -172,7 +196,7 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
         new GracePeriodConverter(domain, Key.create(autoRenewBillingEvent));
     DomainResource.Builder builder =
         new DomainResource.Builder()
-            .setFullyQualifiedDomainName(domain.getName())
+            .setFullyQualifiedDomainName(canonicalizeDomainName(domain.getName()))
             .setRepoId(domain.getRoid())
             .setIdnTableName(domain.getIdnTableId())
             .setCurrentSponsorClientId(domain.getClID())
@@ -194,7 +218,11 @@ final class XjcToDomainResourceConverter extends XjcToEppResourceConverter {
                     ? ImmutableSet.<DelegationSignerData>of()
                     : ImmutableSet.copyOf(
                         transform(domain.getSecDNS().getDsDatas(), SECDNS_CONVERTER)))
-            .setTransferData(convertDomainTransferData(domain.getTrnData()));
+            .setTransferData(convertDomainTransferData(domain.getTrnData()))
+            // authInfo pw must be a token between 6 and 16 characters in length
+            // generate a token of 16 characters as the default authInfo pw
+            .setAuthInfo(DomainAuthInfo
+                .create(PasswordAuth.create(stringGenerator.createString(16), domain.getRoid())));
     checkArgumentNotNull(
         domain.getRegistrant(), "Registrant is missing for domain '%s'", domain.getName());
     builder = builder.setRegistrant(convertRegistrant(domain.getRegistrant()));
