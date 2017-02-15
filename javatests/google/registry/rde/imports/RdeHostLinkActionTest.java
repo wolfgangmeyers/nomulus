@@ -43,6 +43,8 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
+import org.joda.time.DateTime;
+import org.joda.time.Seconds;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -87,9 +89,17 @@ public class RdeHostLinkActionTest extends MapreduceTestCase<RdeHostLinkAction> 
     Key<DomainResource> superOrdinateDomainKey = Key.create(superordinateDomain);
     pushToGcs(DEPOSIT_1_HOST);
     runMapreduce();
+    // verify that host is linked to domain
     List<HostResource> hosts = ofy().load().type(HostResource.class).list();
     assertThat(hosts).hasSize(1);
     assertThat(hosts.get(0).getSuperordinateDomain()).isEqualTo(superOrdinateDomainKey);
+    // verify that last superordinate change is within the last 10 seconds
+    assertThat(hosts.get(0).getLastSuperordinateChange())
+        .isAtLeast(DateTime.now().minus(Seconds.seconds(10)));
+    // verify that domain is linked to host
+    List<DomainResource> domains = ofy().load().type(DomainResource.class).list();
+    assertThat(domains).hasSize(1);
+    assertThat(domains.get(0).getSubordinateHosts()).contains("ns1.example1.test");
   }
 
   private void runMapreduce() throws Exception {

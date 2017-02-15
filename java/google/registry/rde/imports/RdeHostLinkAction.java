@@ -117,10 +117,18 @@ public class RdeHostLinkAction implements Runnable {
         ofy().transact(new VoidWork() {
           @Override
           public void vrun() {
+            // link host to superordinate domain and set time of last superordinate change to
+            // the time of the import
             HostResource host =
                 ofy().load().now(Key.create(HostResource.class, xjcHost.getRoid()));
             ofy().save()
-                .entity(host.asBuilder().setSuperordinateDomain(superordinateDomainKey).build());
+                .entity(host.asBuilder().setSuperordinateDomain(superordinateDomainKey)
+                    .setLastSuperordinateChange(ofy().getTransactionTime())
+                    .build());
+            // link domain to subordinate host
+            DomainResource domain = ofy().load().now(superordinateDomainKey);
+            ofy().save().entity(
+                domain.asBuilder().addSubordinateHost(host.getFullyQualifiedHostName()).build());
           }
         });
         logger.infofmt(
