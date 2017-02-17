@@ -125,6 +125,18 @@
     <url-pattern>/_dr/task/checkSnapshot</url-pattern>
   </servlet-mapping>
 
+  <!-- Loads an external dpml block into the queue -->
+  <servlet-mapping>
+    <servlet-name>backend-servlet</servlet-name>
+    <url-pattern>/_dr/task/queueBlockedLabel</url-pattern>
+  </servlet-mapping>
+
+  <!-- Loads an external dpml block into datastore -->
+  <servlet-mapping>
+    <servlet-name>backend-servlet</servlet-name>
+    <url-pattern>/_ah/queue/queue-blocked-label</url-pattern>
+  </servlet-mapping>
+
   <!-- Loads a datastore backup snapshot into BigQuery. -->
   <servlet-mapping>
     <servlet-name>backend-servlet</servlet-name>
