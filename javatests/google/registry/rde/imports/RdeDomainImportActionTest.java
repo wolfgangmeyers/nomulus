@@ -53,6 +53,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.joda.money.Money;
 import org.joda.time.DateTime;
 import org.joda.time.Seconds;
@@ -331,10 +332,12 @@ public class RdeDomainImportActionTest extends MapreduceTestCase<RdeDomainImport
     return result;
   }
 
+  @Nullable
   private static BillingEvent.Recurring loadAutorenewBillingEventForDomain(DomainResource domain) {
     return ofy().load().key(domain.getAutorenewBillingEvent()).now();
   }
 
+  @Nullable
   private static PollMessage.Autorenew loadAutorenewPollMessageForDomain(DomainResource domain) {
     return ofy().load().key(domain.getAutorenewPollMessage()).now();
   }

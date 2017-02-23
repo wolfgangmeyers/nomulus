@@ -103,7 +103,15 @@ public class RdeImportUtils {
         EppResourceIndex.create(Key.create(resource)));
   }
 
-  private <T extends EppResource & ForeignKeyedEppResource> void
+  /**
+   * Imports a resource from an escrow file.
+   *
+   * <p>The host will only be imported if it has not been previously imported.
+   *
+   * <p>If the host is imported, {@link ForeignKeyIndex} and {@link EppResourceIndex} are also
+   * created.
+   */
+  public <T extends EppResource & ForeignKeyedEppResource> void
       importEppResource(final T resource) {
     ofy.save().entities(new ImmutableSet.Builder<>()
         .add(resource)
@@ -112,42 +120,6 @@ public class RdeImportUtils {
     logger.infofmt(
         "Imported %s resource - ROID=%s, id=%s",
         resource.getClass().getCanonicalName(), resource.getRepoId(), resource.getForeignKey());
-  }
-
-  /**
-   * Imports a host from an escrow file.
-   *
-   * <p>The host will only be imported if it has not been previously imported.
-   *
-   * <p>If the host is imported, {@link ForeignKeyIndex} and {@link EppResourceIndex} are also
-   * created.
-   */
-  public void importHost(final HostResource resource) {
-    importEppResource(resource);
-  }
-
-  /**
-   * Imports a contact from an escrow file.
-   *
-   * <p>The contact will only be imported if it has not been previously imported.
-   *
-   * <p>If the contact is imported, {@link ForeignKeyIndex} and {@link EppResourceIndex} are also
-   * created.
-   */
-  public void importContact(final ContactResource resource) {
-    importEppResource(resource);
-  }
-
-  /**
-   * Imports a domain from an escrow file.
-   *
-   * <p>The domain will only be imported if it has not been previously imported.
-   *
-   * <p>If the domain is imported, {@link ForeignKeyIndex} and {@link EppResourceIndex} are also
-   * created.
-   */
-  public void importDomain(final DomainResource resource) {
-    importEppResource(resource);
   }
 
   /**
