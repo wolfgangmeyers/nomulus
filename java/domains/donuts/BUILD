@@ -144,7 +144,7 @@ registry_ear_file(
     name = "registry_sandbox_ear",
     out = "registry_sandbox.ear",
     configs = {
-        "env/common/META-INF/appengine-application.xml": "META-INF/appengine-application.xml",
+        "env/sandbox/META-INF/appengine-application.xml": "META-INF/appengine-application.xml",
         "env/common/META-INF/application.xml": "META-INF/application.xml",
     },
     wars = {

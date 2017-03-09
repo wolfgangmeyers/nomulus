@@ -4,8 +4,72 @@ appEngine:
   projectId: domain-registry-sandbox
 
 registryPolicy:
-  contactAndHostRoidSuffix: ROID
-  productName: Google Registry Sandbox
+  # Repository identifier (ROID) suffix for contacts and hosts.
+  contactAndHostRoidSuffix: DONUTS
+
+  # Custom logic factory fully-qualified class name.
+  # See flows/custom/CustomLogicFactory.java
+  customLogicFactoryClass: google.registry.flows.custom.CustomLogicFactory
+
+  # WHOIS command factory fully-qualified class name.
+  # See whois/WhoisCommandFactory.java
+  whoisCommandFactoryClass: google.registry.whois.WhoisCommandFactory
+
+  # Length of time after which contact transfers automatically conclude.
+  contactAutomaticTransferDays: 5
+
+  # Server ID used in the 'svID' element of an EPP 'greeting'.
+  greetingServerId: OTE Mercury Donuts Registry
+
+  # List of email addresses that notifications of registrar and/or registrar
+  # contact updates should be sent to, or empty list for no notifications.
+  registrarChangesNotificationEmailAddresses: []
+
+  # Default WHOIS server used when not specified on a registrar.
+  defaultRegistrarWhoisServer: whois.ote.hg.team
+
+  # Default referral URL used when not changed by a registrar.
+  defaultRegistrarReferralUrl: https://www.domain-registry.example
+
+  # Mode TMCH should run in (PRODUCTION for production environments, PILOT for
+  # all others including sandbox).
+  tmchCaMode: PILOT
+
+  # URL for the ICANN TMCH Certificate Revocation List.
+  tmchCrlUrl: http://crl.icann.org/tmch_pilot.crl
+
+  # URL for the MarksDB registry interface.
+  tmchMarksDbUrl: https://test.ry.marksdb.org
+
+  # Registry’s operations registrar, used for front-end availability/premium
+  # domain checks.
+  checkApiServletClientId: Donuts
+
+  # Disclaimer at the top of the exported reserved terms list.
+  reservedTermsExportDisclaimer: |
+    This list contains reserve terms for the TLD. Other terms may be reserved
+    but not included in this list, including terms Donuts Inc. chooses not
+    to publish, and terms that ICANN commonly mandates to be reserved. This
+    list is subject to change and the most up-to-date source is always to
+    check availability directly with the Registry server.
+
+  # Disclaimer at the top of WHOIS results.
+  whoisDisclaimer: |
+    Terms of Use: Users accessing the Donuts WHOIS service must agree to use the data
+    only for lawful purposes, and under under no circumstances use the data to: Allow,
+    enable, or otherwise support the transmission by e-mail, telephone, or facsimile
+    of mass unsolicited, commercial advertising or solicitations to entities other
+    than the registrar's own existing customers. Enable high volume, automated,
+    electronic processes that send queries or data to the systems of Donuts or
+    any ICANN-accredited registrar, except as reasonably necessary to register
+    domain names or modify existing registrations. When using the Donuts Whois
+    service, please consider the following: The Whois service is not a replacement
+    for standard EPP commands to the SRS service. Whois is not considered authoritative
+    for registered domain objects. The Whois service may be scheduled for downtime
+    during production or OT&E maintenance periods. Queries to the Whois services are
+    throttled. If too many queries are received from a single IP address within a
+    specified time, the service will begin to reject further queries for a period of
+    time to prevent disruption of Whois service access.
 
 registrarConsole:
   logoFilename: google_registry.png
