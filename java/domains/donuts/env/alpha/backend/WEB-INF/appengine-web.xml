@@ -3,12 +3,12 @@
 
   <application>mercury-donuts-alpha</application>
   <version>alpha</version>
-  <module>backend</module>
+  <service>backend</service>
   <threadsafe>true</threadsafe>
   <sessions-enabled>true</sessions-enabled>
   <instance-class>B4</instance-class>
   <basic-scaling>
-    <max-instances>10</max-instances>
+    <max-instances>4</max-instances>
     <idle-timeout>10m</idle-timeout>
   </basic-scaling>
 
@@ -17,8 +17,6 @@
               value="WEB-INF/logging.properties"/>
     <property name="google.registry.environment"
               value="alpha"/>
-    <property name="google.registry.config"
-              value="domains.donuts.config.DonutsRegistryConfig"/>
   </system-properties>
 
   <static-files>
