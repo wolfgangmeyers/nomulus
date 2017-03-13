@@ -2,6 +2,10 @@
 appEngine:
   projectId: mercury-donuts-alpha
 
+registryPolicy:
+  contactAndHostRoidSuffix: ROID
+  productName: Mercury Donuts Alpha
+
 registrarConsole:
   logoFilename: google_registry.png
 
@@ -31,10 +35,10 @@ rde:
 
 registryPolicy:
   # Repository identifier (ROID) suffix for contacts and hosts.
-  contactAndHostRoidSuffix: DONUTS
+  contactAndHostRoidSuffix: ROID
 
   # Product name of the registry. Used throughout the registrar console.
-  productName: Mercury Donuts Alpha
+  productName: Nomulus
 
   # Custom logic factory fully-qualified class name.
   # See flows/custom/CustomLogicFactory.java
@@ -55,7 +59,7 @@ registryPolicy:
   registrarChangesNotificationEmailAddresses: []
 
   # Default WHOIS server used when not specified on a registrar.
-  defaultRegistrarWhoisServer: whois.alpha.hg.team
+  defaultRegistrarWhoisServer: whois.domain-registry.example
 
   # Default referral URL used when not changed by a registrar.
   defaultRegistrarReferralUrl: https://www.domain-registry.example
