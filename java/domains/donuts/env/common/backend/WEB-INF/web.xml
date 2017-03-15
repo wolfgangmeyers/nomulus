@@ -128,7 +128,7 @@
   <!-- Loads an external dpml block into the queue -->
   <servlet-mapping>
     <servlet-name>backend-servlet</servlet-name>
-    <url-pattern>/_dr/task/queueBlockedLabel</url-pattern>
+    <url-pattern>/_api/task/queueBlockedLabel</url-pattern>
   </servlet-mapping>
 
   <!-- Loads an external dpml block into datastore -->

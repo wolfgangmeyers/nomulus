@@ -18,6 +18,7 @@ import dagger.Module;
 import dagger.Subcomponent;
 import domains.donuts.external.BlockedLabelQueueAction;
 import domains.donuts.external.BlockedLabelWorkerAction;
+import domains.donuts.registry.service.OAuthModule;
 import google.registry.backup.BackupModule;
 import google.registry.backup.CommitLogCheckpointAction;
 import google.registry.backup.DeleteOldCommitLogsAction;
@@ -86,6 +87,7 @@ import google.registry.tmch.TmchSmdrlAction;
         DnsUpdateConfigModule.class,
         DnsUpdateWriterModule.class,
         ExportRequestModule.class,
+        OAuthModule.class,
         MapreduceModule.class,
         RdeModule.class,
         RdeImportsModule.class,

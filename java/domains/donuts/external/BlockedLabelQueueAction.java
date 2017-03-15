@@ -20,12 +20,15 @@ import com.google.appengine.api.taskqueue.TaskOptions;
 import com.google.appengine.repackaged.org.joda.time.DateTime;
 import com.google.appengine.repackaged.org.joda.time.DateTimeZone;
 import domains.donuts.external.BlockedLabelConstants.Action;
+import domains.donuts.registry.service.ServiceAccountAuthenticator;
 import google.registry.request.HttpException.BadRequestException;
+import google.registry.request.HttpException.ForbiddenException;
 import google.registry.request.HttpException.InternalServerErrorException;
 import google.registry.request.Parameter;
 import google.registry.util.FormattingLogger;
 
 import javax.inject.Inject;
+import javax.servlet.http.HttpServletRequest;
 import java.util.Arrays;
 
 import static com.google.appengine.api.taskqueue.TaskOptions.Builder.withParam;
@@ -37,7 +40,7 @@ import static domains.donuts.external.BlockedLabelConstants.QUEUE_BLOCKED_LABEL;
 import static domains.donuts.external.BlockedLabelConstants.REQ_PARAM_ERROR_TEMPLATE;
 import static google.registry.request.Action.Method.POST;
 
-@google.registry.request.Action(path = "/_dr/task/queueBlockedLabel", method = POST)
+@google.registry.request.Action(path = "/_api/task/queueBlockedLabel", method = POST)
 public class BlockedLabelQueueAction implements Runnable {
 
   private static final FormattingLogger logger = FormattingLogger.getLoggerForCallerClass();
@@ -46,10 +49,17 @@ public class BlockedLabelQueueAction implements Runnable {
 
   @Inject @Parameter(LABEL_PARAM) String[] labels;
   @Inject @Parameter(ACTION_PARAM) String action;
+  @Inject ServiceAccountAuthenticator authenticator;
+  @Inject HttpServletRequest request;
+
   @Inject public BlockedLabelQueueAction() {}
 
   @Override
   public void run() {
+    String authorization = request.getHeader("Authorization");
+    if (!authenticator.authenticate(authorization)) {
+      throw new ForbiddenException("Not authorized");
+    }
     try {
       // Validate the parameters provided
       checkArgument(labels != null && labels.length > 0, REQ_PARAM_ERROR_TEMPLATE, LABEL_PARAM);

@@ -15,14 +15,19 @@
 package domains.donuts.external;
 
 import static google.registry.util.ResourceUtils.readResourceUtf8;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
+import domains.donuts.registry.service.ServiceAccountAuthenticator;
 import google.registry.request.HttpException;
 import google.registry.testing.AppEngineRule;
+import javax.servlet.http.HttpServletRequest;
 import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.ExpectedException;
 import org.junit.runner.RunWith;
+import org.mockito.Mock;
 import org.mockito.runners.MockitoJUnitRunner;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -35,23 +40,41 @@ public class BlockedLabelQueueActionTest {
 
   @Rule public final ExpectedException thrown = ExpectedException.none();
 
+  @Mock
+  private HttpServletRequest request;
+
+  @Mock
+  private ServiceAccountAuthenticator authenticator;
+
   private final BlockedLabelQueueAction tested = new BlockedLabelQueueAction();
 
   @Before
   public void setUp() throws Exception {
     tested.labels = new String[]{"label"};
+    tested.request = request;
+    when(tested.request.getHeader("Authorization")).thenReturn("Bearer: xyz");
+    tested.authenticator = authenticator;
+    when(tested.authenticator.authenticate("Bearer: xyz")).thenReturn(true);
   }
 
   @Test
   public void testRun() throws Exception {
     tested.action = "create";
     tested.run();
+    verify(tested.authenticator).authenticate("Bearer: xyz");
   }
 
   @Test
   public void testRun_InvalidArgument() throws Exception {
     tested.action = null;
     thrown.expect(HttpException.BadRequestException.class);
+    tested.run();
+  }
+
+  @Test
+  public void testRun_Unauthorized() throws Exception {
+    when(tested.request.getHeader("Authorization")).thenReturn("Bearer: abc");
+    thrown.expect(HttpException.ForbiddenException.class);
     tested.run();
   }
 }

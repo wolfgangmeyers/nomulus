@@ -279,6 +279,8 @@ def domain_registry_repositories(
     org_slf4j_api()
   if not omit_org_yaml_snakeyaml:
     org_yaml_snakeyaml()
+  com_google_oauth2()
+  commons_io()
 
 def com_beust_jcommander():
   java_import_external(
@@ -1631,6 +1633,30 @@ def org_yaml_snakeyaml():
       jar_urls = [
           "http://maven.ibiblio.org/maven2/org/yaml/snakeyaml/1.17/snakeyaml-1.17.jar",
           "http://repo1.maven.org/maven2/org/yaml/snakeyaml/1.17/snakeyaml-1.17.jar",
+      ],
+  )
+
+# "com.google.apis:google-api-services-oauth2:v2-rev75-1.19.0
+def com_google_oauth2():
+  java_import_external(
+      name = "com_google_oauth2",
+      licenses = ["notice"], # Apache License, Version 2.0
+      jar_sha256 = "251a572f8605a2707839f2916f4591d3c61869ebd5fc7aa0ea2693c48273c033",
+      jar_urls = [
+           "http://maven.ibiblio.org/maven2/com/google/apis/google-api-services-oauth2/v2-rev124-1.22.0/google-api-services-oauth2-v2-rev124-1.22.0.jar",
+           "http://repo1.maven.org/maven2/com/google/apis/google-api-services-oauth2/v2-rev124-1.22.0/google-api-services-oauth2-v2-rev124-1.22.0.jar",
+      ],
+  )
+
+# commons-io:commons-io:2.4
+def commons_io():
+  java_import_external(
+      name = "commons_io",
+      licenses = ["notice"], # Apache License, Version 2.0
+      jar_sha256 = "cc6a41dc3eaacc9e440a6bd0d2890b20d36b4ee408fe2d67122f328bb6e01581",
+      jar_urls = [
+        "http://maven.ibiblio.org/maven2/commons-io/commons-io/2.4/commons-io-2.4.jar",
+        "http://repo1.maven.org/maven2/commons-io/commons-io/2.4/commons-io-2.4.jar",
       ],
   )
 

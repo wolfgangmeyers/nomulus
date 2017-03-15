@@ -22,6 +22,7 @@ java_binary(
     testonly = 1,
     create_executable = 0,
     runtime_deps = [
+        "//java/domains/donuts",
         "//java/google/registry/module/backend",
         "//java/google/registry/module/frontend",
         "//java/google/registry/module/tools",
@@ -57,6 +58,7 @@ genrule(
         "cd $$TMP",
         "$$JAR -xf $$IN",
         "rm -rf google/registry",
+        "rm -rf domains/donuts",
         "$$JAR -cmf META-INF/MANIFEST.MF eclipse_deps.jar .",
         "mv eclipse_deps.jar $$OUT",
         "rm -rf $$TMP",

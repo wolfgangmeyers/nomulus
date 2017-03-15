@@ -24,13 +24,11 @@ import static google.registry.request.RequestParameters.extractRequiredParameter
 import com.google.common.base.Optional;
 import dagger.Module;
 import dagger.Provides;
-
 import google.registry.batch.ExpandRecurringBillingEventsAction;
 import google.registry.request.Parameter;
 import google.registry.request.RequestParameters;
-import org.joda.time.DateTime;
-
 import javax.servlet.http.HttpServletRequest;
+import org.joda.time.DateTime;
 
 /**
  * Dagger module for injecting common settings for all Backend tasks.
