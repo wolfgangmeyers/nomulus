@@ -29,17 +29,18 @@ import javax.inject.Named;
  */
 public class ServiceAccountAuthenticator {
 
-  static final ImmutableSet<String> AUTHORIZED_USERS = ImmutableSet.of(
-      "titan-service@mercury-donuts-alpha.iam.gserviceaccount.com"
-  );
-
   private static final Logger logger = Logger.getLogger(ServiceAccountAuthenticator.class.getName());
   private static final String prefix = "Bearer";
   private final String oauthId;
   private final Oauth2 oauth2;
+  private final ImmutableSet<String> authorizedServiceAccounts;
 
   @Inject
-  public ServiceAccountAuthenticator(@Named("oauthId") String oauthId, Oauth2 oauth2) {
+  public ServiceAccountAuthenticator
+  (@Named("authorizedServiceAccounts") ImmutableSet<String> authorizedServiceAccounts,
+      @Named("oauthId") String oauthId,
+      Oauth2 oauth2) {
+    this.authorizedServiceAccounts = authorizedServiceAccounts;
     this.oauthId = oauthId;
     this.oauth2 = oauth2;
   }
@@ -68,7 +69,7 @@ public class ServiceAccountAuthenticator {
       logger.severe("Invalid audience token: " + tokeninfo.getAudience());
       return false;
     }
-    if (!AUTHORIZED_USERS.contains(tokeninfo.getEmail())) {
+    if (!authorizedServiceAccounts.contains(tokeninfo.getEmail())) {
       logger.severe("Invalid service account: " + tokeninfo.getEmail());
       return false;
     }

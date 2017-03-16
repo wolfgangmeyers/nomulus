@@ -19,6 +19,7 @@ import com.google.api.client.googleapis.auth.oauth2.GoogleCredential;
 import com.google.api.client.http.HttpTransport;
 import com.google.api.client.json.JsonFactory;
 import com.google.api.services.oauth2.Oauth2;
+import com.google.common.collect.ImmutableSet;
 import dagger.Module;
 import dagger.Provides;
 import java.io.IOException;
@@ -28,6 +29,15 @@ import javax.inject.Named;
 /** Provides oauth service configuration */
 @Module
 public class OAuthModule {
+
+  static final ImmutableSet<String> AUTHORIZED_SERVICE_ACCOUNTS = ImmutableSet.of(
+      "titan-service@mercury-donuts-alpha.iam.gserviceaccount.com"
+  );
+
+  @Provides @Named("authorizedServiceAccounts")
+  public static ImmutableSet<String> provideAuthorizedServiceAccounts() {
+    return AUTHORIZED_SERVICE_ACCOUNTS;
+  }
 
   @Provides @Named("oauthId")
   public static String provideOauthId() {

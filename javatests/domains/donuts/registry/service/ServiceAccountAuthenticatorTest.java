@@ -20,8 +20,8 @@ import static org.mockito.Mockito.when;
 
 import com.google.api.services.oauth2.Oauth2;
 import com.google.api.services.oauth2.model.Tokeninfo;
+import com.google.common.collect.ImmutableSet;
 import java.io.IOException;
-import javax.annotation.Nullable;
 import org.junit.Before;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -40,14 +40,14 @@ public class ServiceAccountAuthenticatorTest {
 
   @Before
   public void before() {
-    service = new ServiceAccountAuthenticator(oauthId, oauth2);
+    service = new ServiceAccountAuthenticator(ImmutableSet.of("sa@test.co"), oauthId, oauth2);
   }
 
   @Test
   public void testAuthenticate() throws Exception {
     Tokeninfo tokeninfo = new Tokeninfo();
     tokeninfo.setAudience(oauthId);
-    tokeninfo.setEmail("titan-service@mercury-donuts-alpha.iam.gserviceaccount.com");
+    tokeninfo.setEmail("sa@test.co");
     when(oauth2.tokeninfo()).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.setAccessToken("accessToken")).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.execute()).thenReturn(tokeninfo);
@@ -58,7 +58,7 @@ public class ServiceAccountAuthenticatorTest {
   public void testAuthenticateNoAuthorizationHeader() throws Exception {
     Tokeninfo tokeninfo = new Tokeninfo();
     tokeninfo.setAudience(oauthId);
-    tokeninfo.setEmail("titan-service@mercury-donuts-alpha.iam.gserviceaccount.com");
+    tokeninfo.setEmail("sa@test.co");
     when(oauth2.tokeninfo()).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.setAccessToken("accessToken")).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.execute()).thenReturn(tokeninfo);
@@ -69,7 +69,7 @@ public class ServiceAccountAuthenticatorTest {
   public void testAuthenticateEmptyAuthorizationHeader() throws Exception {
     Tokeninfo tokeninfo = new Tokeninfo();
     tokeninfo.setAudience(oauthId);
-    tokeninfo.setEmail("titan-service@mercury-donuts-alpha.iam.gserviceaccount.com");
+    tokeninfo.setEmail("sa@test.co");
     when(oauth2.tokeninfo()).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.setAccessToken("accessToken")).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.execute()).thenReturn(tokeninfo);
@@ -80,7 +80,7 @@ public class ServiceAccountAuthenticatorTest {
   public void testAuthenticateInvalidAuthorizationHeader() throws Exception {
     Tokeninfo tokeninfo = new Tokeninfo();
     tokeninfo.setAudience(oauthId);
-    tokeninfo.setEmail("titan-service@mercury-donuts-alpha.iam.gserviceaccount.com");
+    tokeninfo.setEmail("sa@test.co");
     when(oauth2.tokeninfo()).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.setAccessToken("accessToken")).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.execute()).thenReturn(tokeninfo);
@@ -91,7 +91,7 @@ public class ServiceAccountAuthenticatorTest {
   public void testAuthenticateWrongAuthorizationType() throws Exception {
     Tokeninfo tokeninfo = new Tokeninfo();
     tokeninfo.setAudience(oauthId);
-    tokeninfo.setEmail("titan-service@mercury-donuts-alpha.iam.gserviceaccount.com");
+    tokeninfo.setEmail("sa@test.co");
     when(oauth2.tokeninfo()).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.setAccessToken("accessToken")).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.execute()).thenReturn(tokeninfo);
@@ -102,7 +102,7 @@ public class ServiceAccountAuthenticatorTest {
   public void testAuthenticateOAuthError() throws Exception {
     Tokeninfo tokeninfo = new Tokeninfo();
     tokeninfo.setAudience(oauthId);
-    tokeninfo.setEmail("titan-service@mercury-donuts-alpha.iam.gserviceaccount.com");
+    tokeninfo.setEmail("sa@test.co");
     when(oauth2.tokeninfo()).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.setAccessToken("accessToken")).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.execute()).thenThrow(new IOException("test exception message"));
@@ -113,7 +113,7 @@ public class ServiceAccountAuthenticatorTest {
   public void testAuthenticateBadAudience() throws Exception {
     Tokeninfo tokeninfo = new Tokeninfo();
     tokeninfo.setAudience("nope");
-    tokeninfo.setEmail("titan-service@mercury-donuts-alpha.iam.gserviceaccount.com");
+    tokeninfo.setEmail("sa@test.co");
     when(oauth2.tokeninfo()).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.setAccessToken("accessToken")).thenReturn(oauth2TokenInfo);
     when(oauth2TokenInfo.execute()).thenReturn(tokeninfo);
