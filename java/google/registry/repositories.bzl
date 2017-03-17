@@ -106,7 +106,9 @@ def domain_registry_repositories(
     omit_org_mortbay_jetty_servlet_api=False,
     omit_org_mortbay_jetty_util=False,
     omit_org_slf4j_api=False,
-    omit_org_yaml_snakeyaml=False):
+    omit_org_yaml_snakeyaml=False,
+    omit_com_google_oauth2=False,
+    omit_commons_io=False):
   """Imports dependencies for Nomulus."""
   domain_registry_bazel_check()
   if not omit_com_beust_jcommander:
@@ -279,8 +281,10 @@ def domain_registry_repositories(
     org_slf4j_api()
   if not omit_org_yaml_snakeyaml:
     org_yaml_snakeyaml()
-  com_google_oauth2()
-  commons_io()
+  if not omit_com_google_oauth2:
+    com_google_oauth2()
+  if not omit_commons_io:
+    commons_io()
 
 def com_beust_jcommander():
   java_import_external(
