@@ -110,7 +110,9 @@ public class RdeHostLinkAction implements Runnable {
           public HostLinkResult run() {
             Optional<DomainResource> superordinateDomain =
                 lookupSuperordinateDomain(hostName, ofy().getTransactionTime());
-            // if suporordinateDomain is null, this is an out of zone host and can't be linked
+            // if suporordinateDomain is absent, this is an out of zone host and can't be linked.
+            // absent is only returned for out of zone hosts, and an exception is thrown for in
+            // zone hosts with no superordinate domain.
             if (!superordinateDomain.isPresent()) {
               return HostLinkResult.HOST_OUT_OF_ZONE;
             }
