@@ -31,6 +31,7 @@ import com.googlecode.objectify.Key;
 import com.googlecode.objectify.Work;
 import google.registry.config.RegistryConfig.Config;
 import google.registry.mapreduce.MapreduceRunner;
+import google.registry.model.EppResource;
 import google.registry.model.domain.DomainResource;
 import google.registry.model.host.HostResource;
 import google.registry.request.Action;
@@ -108,7 +109,7 @@ public class RdeHostLinkAction implements Runnable {
           @Override
           public HostLinkResult run() {
             Optional<DomainResource> superordinateDomain =
-                lookupSuperordinateDomain(hostName, DateTime.now());
+                lookupSuperordinateDomain(hostName, ofy().getTransactionTime());
             // if suporordinateDomain is null, this is an out of zone host and can't be linked
             if (!superordinateDomain.isPresent()) {
               return HostLinkResult.HOST_OUT_OF_ZONE;
@@ -121,12 +122,11 @@ public class RdeHostLinkAction implements Runnable {
             if (host == null) {
               return HostLinkResult.HOST_NOT_FOUND;
             }
-            ofy().save()
-                .entity(host.asBuilder().setSuperordinateDomain(superordinateDomainKey)
-                    .setLastSuperordinateChange(ofy().getTransactionTime())
-                    .build());
             // link domain to subordinate host
-            ofy().save().entity(
+            ofy().save().<EppResource>entities(
+                host.asBuilder().setSuperordinateDomain(superordinateDomainKey)
+                    .setLastSuperordinateChange(ofy().getTransactionTime())
+                    .build(),
                 superordinateDomain.get().asBuilder()
                     .addSubordinateHost(host.getFullyQualifiedHostName()).build());
             return HostLinkResult.HOST_LINKED;
@@ -152,8 +152,7 @@ public class RdeHostLinkAction implements Runnable {
             logger.infofmt("Host %s is out of zone", xjcHost.getName());
             break;
         }
-
-      } catch (Exception e) {
+      } catch (RuntimeException e) {
         // Record the number of hosts with unexpected errors
         getContext().incrementCounter("post-import host errors");
         logger.severefmt(e, "Error linking host %s; xml=%s", xjcHost.getName(), xjcHost);
